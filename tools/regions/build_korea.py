@@ -4,9 +4,8 @@
      python은 numpy가 있으면 된다 (예: Blender 동봉 python).
 
 - OSM 행정경계는 바다(해상 경계)까지 그려져 있어, 해안선으로 바다를 채운(flood fill) 육지 격자와 겹친 부분만 남긴다.
-- 지도 L2 단위 (가이드 v1.2): 도 아래 시·군, 특별·광역시 아래 자치구·군. 아래 단위가 없는 세종은 시 전체 한 칸.
-  전남광주통합특별시의 옛 광주 자치구는 '광주 동구'처럼 이름 앞에 '광주'를 붙인다.
-- L3 읍·면·동은 build_dong.py가 이 파일을 읽어 따로 만들고, P·U 줄 끝에 L3 파일 이름·읍면동 수를 덧붙인다.
+- 지도 '시' 단위: 도 아래 시·군은 하나씩, 특별·광역·특별자치시는 시 전체가 한 칸.
+  전남광주통합특별시는 시·군은 그대로, 옛 광주광역시 자치구 다섯은 '광주' 한 칸으로 합친다.
 - 출력은 줄 단위 텍스트(앱이 라이브러리 없이 읽음). 좌표는 1e-4도 정수, 고리마다 첫 점 절댓값 + 나머지 차분.
 """
 import json, math, os, sys, zlib, struct
@@ -32,8 +31,8 @@ SHORT = {
     "전남광주통합특별시": "전남광주", "경상북도": "경북", "경상남도": "경남", "대구광역시": "대구",
     "울산광역시": "울산", "부산광역시": "부산", "제주특별자치도": "제주",
 }
-# (예전에는 특별·광역시를 시 전체 한 칸으로 합쳤다. 가이드 v1.2부터 자치구·군으로 나눈다)
-MERGE_GU = {"전남광주통합특별시": "광주"}   # 옛 광주 자치구 이름 앞에 붙일 말
+METRO = {"서울특별시", "인천광역시", "세종특별자치시", "대전광역시", "대구광역시", "울산광역시", "부산광역시"}
+MERGE_GU = {"전남광주통합특별시": "광주"}   # 자치구(…구)를 합친 '시' 이름
 LABEL_AT = {}                               # 자동 라벨 위치가 어색할 때 (id → (lon, lat))
 
 
@@ -220,14 +219,12 @@ def main(work, out=OUT):
     provinces, units = [], []
     for p in raw:
         full = p["name"]; short = SHORT[full]
-        # 지도 L2 (가이드 v1.2 SCR-05): 도는 시·군, 특별·광역시는 자치구·군. 아래 단위가 없는 시(세종)는 시 전체 한 칸.
-        # 전남광주통합특별시의 옛 광주 자치구는 이름 앞에 '광주'를 붙인다 (도 안에서 동구·서구를 알아보게)
-        kids = [c for c in p["children"] if c.get("geojson")]
-        if not kids:
+        if full in METRO:
             parts = [(short, [p["geojson"]])]
         else:
-            prefix = MERGE_GU.get(full)
-            parts = [((f"{prefix} {c['name']}" if prefix and c["name"].endswith("구") else c["name"]), [c["geojson"]]) for c in kids]
+            gu = [c for c in p["children"] if c["name"].endswith("구")] if full in MERGE_GU else []
+            parts = [(c["name"], [c["geojson"]]) for c in p["children"] if c not in gu]
+            if gu: parts.append((MERGE_GU[full], [c["geojson"] for c in gu]))
         masks = []
         for name, geos in parts:
             polys = [poly for g in geos for poly in rings_of(g)]

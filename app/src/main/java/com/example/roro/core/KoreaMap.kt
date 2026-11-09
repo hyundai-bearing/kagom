@@ -3,12 +3,11 @@ package com.example.roro.core
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 
 /*
- * 남한 지도 (SCR-05, 가이드 v1.2 3단계). 데이터: tools/regions가 OSM에서 만든다.
- *   L1 시·도 (province)      assets/regions/korea_map.txt  P 줄
- *   L2 시·군·구 (unit)       assets/regions/korea_map.txt  U 줄 (도 아래 시·군, 특별·광역시 아래 자치구·군)
- *   L3 읍·면·동 (area, 구획)  assets/regions/l3/<시·도 파일>.txt  A 줄 (시·도마다 따로, 들어갈 때만 읽는다)
+ * 남한 지도 (SCR-05). 데이터: assets/regions/korea_map.txt (tools/regions/build_korea.py가 OSM에서 만듦)
+ * 지도 칸은 두 겹이다: 시·도(province)와 그 안의 '시'(unit; 도 아래 시·군, 특별·광역시는 시 전체).
  */
 
 /** 경위도 사각형 */
@@ -23,15 +22,11 @@ data class GeoBounds(val west: Float, val south: Float, val east: Float, val nor
 class MapRegion(
     val id: String,
     val name: String,
-    /** 위 단계 칸 id (unit → 시·도, area → 시·군·구, province → null) */
-    val parentId: String?,
+    /** 시·군의 상위 시·도 ID 또는 구획의 상위 시·군 ID. 시·도는 null. */
+    val provinceId: String?,
     val labelLon: Float,
     val labelLat: Float,
     val rings: List<FloatArray>,
-    /** unit: 안에 든 읍·면·동 수 (구획 수). 데이터에 없으면 0 */
-    val areaCount: Int = 0,
-    /** province: L3 파일 이름 (assets/regions/l3/<file>.txt) */
-    val file: String? = null,
 ) {
     val bounds: GeoBounds = run {
         var w = Float.MAX_VALUE; var s = Float.MAX_VALUE; var e = -Float.MAX_VALUE; var n = -Float.MAX_VALUE
@@ -57,56 +52,49 @@ class MapRegion(
     }
 }
 
-class KoreaMap(val provinces: List<MapRegion>, val units: List<MapRegion>) {
+class KoreaMap(
+    val provinces: List<MapRegion>,
+    val units: List<MapRegion>,
+    val districts: List<MapRegion> = emptyList(),
+) {
     val bounds: GeoBounds = provinces.map { it.bounds }.reduce(GeoBounds::union)
     private val unitById = units.associateBy { it.id }
     private val provinceById = provinces.associateBy { it.id }
-    private val unitsByProvince = units.groupBy { it.parentId }
+    private val districtsByUnit = districts.groupBy { it.provinceId }
 
     fun unit(id: String?): MapRegion? = unitById[id]
     fun province(id: String?): MapRegion? = provinceById[id]
-    fun unitsOf(provinceId: String?): List<MapRegion> = unitsByProvince[provinceId].orEmpty()
+    fun districtsOf(unitId: String): List<MapRegion> = districtsByUnit[unitId].orEmpty()
     fun unitAt(lon: Float, lat: Float): MapRegion? = units.firstOrNull { it.contains(lon, lat) }
-    fun provinceAt(lon: Float, lat: Float): MapRegion? = provinces.firstOrNull { it.contains(lon, lat) }
-
-    /** 여러 칸을 다 담는 사각형 */
-    fun boundsOf(regions: List<MapRegion>): GeoBounds = regions.map { it.bounds }.reduceOrNull(GeoBounds::union) ?: bounds
 
     companion object {
-        /** korea_map.txt 읽기 (P·U 줄). 형식은 build_korea.py·build_dong.py 머리말 참고 */
+        /** korea_map.txt 읽기. 형식은 build_korea.py 머리말 참고 */
         fun parse(lines: Sequence<String>): KoreaMap {
-            val provinces = mutableListOf<MapRegion>(); val units = mutableListOf<MapRegion>()
-            readBlocks(lines) { h, rings ->
-                if (h[0] == "P") provinces += MapRegion(h[1], h[2], null, h[3].toInt() / SCALE, h[4].toInt() / SCALE, rings,
-                    file = h.getOrNull(5)?.takeIf { it.isNotBlank() })
-                else if (h[0] == "U") units += MapRegion(h[1], h[2], h[3], h[4].toInt() / SCALE, h[5].toInt() / SCALE, rings,
-                    areaCount = h.getOrNull(6)?.toIntOrNull() ?: 0)
-            }
-            require(provinces.isNotEmpty() && units.isNotEmpty()) { "빈 지도 데이터" }
-            return KoreaMap(provinces, units)
-        }
-
-        /** L3 파일 읽기 (A 줄: 구획 id|이름|시·군·구 id|라벨 경도|라벨 위도) */
-        fun parseAreas(lines: Sequence<String>): List<MapRegion> {
-            val areas = mutableListOf<MapRegion>()
-            readBlocks(lines) { h, rings ->
-                if (h[0] == "A") areas += MapRegion(h[1], h[2], h[3], h[4].toInt() / SCALE, h[5].toInt() / SCALE, rings)
-            }
-            return areas
-        }
-
-        private fun readBlocks(lines: Sequence<String>, emit: (List<String>, List<FloatArray>) -> Unit) {
+            val provinces = mutableListOf<MapRegion>()
+            val units = mutableListOf<MapRegion>()
+            val districts = mutableListOf<MapRegion>()
             var head: List<String>? = null
             val rings = mutableListOf<FloatArray>()
-            fun flush() { head?.let { emit(it, rings.toList()) }; rings.clear() }
+            fun flush() {
+                val h = head ?: return
+                if (h[0] == "P") {
+                    provinces += MapRegion(h[1], h[2], null, h[3].toInt() / SCALE, h[4].toInt() / SCALE, rings.toList())
+                } else {
+                    val region = MapRegion(h[1], h[2], h[3], h[4].toInt() / SCALE, h[5].toInt() / SCALE, rings.toList())
+                    if (h[0] == "D") districts += region else units += region
+                }
+                rings.clear()
+            }
             for (line in lines) {
                 if (line.isEmpty() || line[0] == '#') continue
                 when (line[0]) {
-                    'P', 'U', 'A' -> { flush(); head = line.split('|') }
+                    'P', 'U', 'D' -> { flush(); head = line.split('|') }
                     'R' -> rings += decodeRing(line)
                 }
             }
             flush()
+            require(provinces.isNotEmpty() && units.isNotEmpty()) { "빈 지도 데이터" }
+            return KoreaMap(provinces, units, districts)
         }
 
         private const val SCALE = 10_000f
@@ -142,14 +130,38 @@ data class MapCamera(val cx: Float, val cy: Float, val scale: Float) {
     fun toScreenY(y: Float, h: Float) = (y - cy) * scale + h / 2
     fun toPlaneX(sx: Float, w: Float) = (sx - w / 2) / scale + cx
     fun toPlaneY(sy: Float, h: Float) = (sy - h / 2) / scale + cy
+}
 
-    companion object {
-        /** [b]가 화면([w]×[h], 여백 [pad] px)에 꼭 들어가게 */
-        fun fit(b: GeoBounds, w: Float, h: Float, pad: Float): MapCamera {
-            val x0 = MapProjection.x(b.west); val x1 = MapProjection.x(b.east)
-            val y0 = MapProjection.y(b.north); val y1 = MapProjection.y(b.south)
-            val s = min((w - 2 * pad) / (x1 - x0), (h - 2 * pad) / (y1 - y0))
-            return MapCamera((x0 + x1) / 2, (y0 + y1) / 2, s)
-        }
+/**
+ * 탭 확대 규칙 (SCR-05): 처음엔 남한 전체, 탭할 때마다 탭한 곳을 가운데로 [STEP]배씩 두 번까지 확대.
+ * 2단계(×9)면 시·군이 구별된다. 그다음 탭은 그 자리의 시를 고른다.
+ */
+object MapZoom {
+    const val STEP = 3f
+    const val MAX_LEVEL = 2
+
+    /** 0단계: [b]가 화면([w]×[h], 여백 [pad] px)에 꼭 들어가게 */
+    fun fit(b: GeoBounds, w: Float, h: Float, pad: Float): MapCamera {
+        val x0 = MapProjection.x(b.west); val x1 = MapProjection.x(b.east)
+        val y0 = MapProjection.y(b.north); val y1 = MapProjection.y(b.south)
+        val s = min((w - 2 * pad) / (x1 - x0), (h - 2 * pad) / (y1 - y0))
+        return MapCamera((x0 + x1) / 2, (y0 + y1) / 2, s)
     }
+
+    /**
+     * [level]단계 시점. [focus] = 단계마다 탭한 평면 좌표(가장 마지막 것이 가운데).
+     * 화면이 지도 밖으로 나가지 않게 가운데를 당긴다.
+     */
+    fun camera(b: GeoBounds, w: Float, h: Float, pad: Float, focus: List<Pair<Float, Float>>): MapCamera {
+        val base = fit(b, w, h, pad)
+        if (focus.isEmpty()) return base
+        val s = base.scale * STEP.pow(focus.size)
+        val (fx, fy) = focus.last()
+        val x0 = MapProjection.x(b.west); val x1 = MapProjection.x(b.east)
+        val y0 = MapProjection.y(b.north); val y1 = MapProjection.y(b.south)
+        return MapCamera(clampCenter(fx, x0, x1, w / 2 / s), clampCenter(fy, y0, y1, h / 2 / s), s)
+    }
+
+    private fun clampCenter(c: Float, lo: Float, hi: Float, half: Float): Float =
+        if (hi - lo <= 2 * half) (lo + hi) / 2 else c.coerceIn(lo + half, hi - half)
 }

@@ -67,7 +67,7 @@ object KagomColor {
         val landLocked = Color(0xFFE4E6EA)
         val landUnlocked = Color(0xFF7DBF78)
         /** 지도 구획 일부 해금 (1~2/3, Figma green/200, 가이드 v1.2 land-partial) */
-        val landPartial = Color(0xFFC5E5C2)
+        val landPartial = Color(0xFFC3E2C0)
         val fog = Color(0x59131417)
         val road = Color(0xFF44464E)
         val boundary = Color(0xFFF6F7F8)
