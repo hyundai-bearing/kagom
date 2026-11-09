@@ -1,0 +1,23 @@
+﻿# Gradle / build
+.gradle/
+.kotlin/
+build/
+*/build/
+
+# Local config (SDK path, per-machine)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing keys
+*.jks
+*.keystore
+
+# Python
+__pycache__/

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Pleos 공개 권한 -->
+    <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />   <!-- SEN-01/02 연료·배터리 -->
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />   <!-- SEN-03~07 오일·브레이크액·미션오일·워셔액·엔진 경고 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />    <!-- 주행거리·기어 -->
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" /> <!-- 랜드마크 방문 판정 (위치는 저장하지 않음) -->
+
+    <application
+        android:label="카곰"
+        android:theme="@style/Theme.Roro">
+        <!-- Full(16:9) ↔ Split(1/3) 전환은 화면 크기 변경으로 들어온다: 액티비티를 다시 만들지 않고 Compose가 다시 그린다 -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 주행 중에도 화면 유지. 주행 중 입력·정비·저장·모달은 앱이 직접 막는다 (gear≠P) -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
+    </application>
+</manifest>
