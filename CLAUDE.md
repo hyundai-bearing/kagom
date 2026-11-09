@@ -10,7 +10,7 @@
 - `core/`: 게임 규칙과 마스터 데이터. 순수 Kotlin이다(`android.*`, Compose, Pleos import 금지). 그래야 `app/src/test/.../core`에서 단위 테스트할 수 있다.
 - `data/`: Pleos 차량 신호, 위치, 저장소(`KagomStore`), 지도 에셋. SDK 호출은 모두 여기에만 둔다.
 - `ui/`: `theme/`(토큰, 글자, Full/Split 스케일), `components/`(`PleosKit` = Pleos ivi_* 위젯, `KagomComponents` = Figma 부록 C, `Glyphs`, `KagomCharacter`, `KagomTurntable`), `screens/`(SCR-00~06, POP-01~05), `KagomController`(앱 상태와 동작), `KagomApp`(화면 이동, 팝업 큐, 시연 패널).
-- 디자인 자료: `docs/design/`의 가장 최근 날짜 폴더(버전별 차이는 그 폴더의 `README.md`, 코드 주석의 Figma 노드 번호는 이 내보내기 기준). 그 밖에 `docs/spec.pdf`, `docs/requirements.md`. 현재 구현 설명은 `docs/IMPLEMENTATION.md`이고, 동작이나 구조가 바뀌면 같이 고친다.
+- 디자인 자료: Figma "Kagom App"을 브리지로 직접 읽는다(`docs/FIGMA_BRIDGE.md`, 읽기 도구만 쓰고 Figma 파일은 고치지 않는다). 작업 가이드 PDF와 버전별 차이는 `docs/design/`(가장 최근 날짜 폴더, `README.md`). 코드 주석의 Figma 노드 번호는 가이드 부록 A·C 기준. 그 밖에 `docs/spec.pdf`, `docs/requirements.md`. 현재 구현 설명은 `docs/IMPLEMENTATION.md`이고, 동작이나 구조가 바뀌면 같이 고친다.
 
 ## 코드 규칙
 
@@ -32,7 +32,7 @@
 - 로그: `Kagom…` 태그로 `Log.w`/`Log.i`. 위치나 개인정보는 로그에 남기지 않는다.
 - 디자인에 없는 값: 정해서 쓰고 `docs/IMPLEMENTATION.md`의 "디자인에 없던 값 (가정)"에 적는다.
 - 생성된 파일은 손으로 고치지 않는다: `app/src/main/assets/kagom/**`는 `tools/closet3d/build_closet.py`, `app/src/main/assets/regions/**`는 `tools/regions/*.py`에서 나온다. 스크립트를 고치고 다시 만들어 둘 다 커밋한다. Python 도구는 `python -I -X utf8`로 돌리고 다운로드·작업 폴더는 레포 밖에 둔다.
-- 확인은 Pleos Connect 에뮬레이터(Full)와 세로 폰 에뮬레이터(Split)에서 `docs/design/`의 PNG와 비교한다.
+- 확인은 Pleos Connect 에뮬레이터(Full)와 세로 폰 에뮬레이터(Split)에서 Figma 화면(브리지 `get_screenshot`)과 비교한다.
 
 ## PR 규칙
 

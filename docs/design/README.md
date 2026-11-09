@@ -1,7 +1,8 @@
 # 디자인 기준 자료
 
-Figma "Kagom App" 내보내기와 개발 에이전트 작업 가이드를 **받은 날짜별로** 나눠 둔다.
-zip 안 파일의 날짜는 내려받은 시각이라 버전 구분에 쓸 수 없다. 버전은 아래 표와 가이드 PDF 첫 장을 본다.
+개발 에이전트 작업 가이드를 **받은 날짜별로** 나눠 두고, 버전마다 달라진 점을 적는다.
+화면·컴포넌트는 Figma "Kagom App"에서 직접 읽는다 → [`docs/FIGMA_BRIDGE.md`](../FIGMA_BRIDGE.md).
+예전에는 Figma 내보내기 PNG를 zip으로 함께 올렸는데 2026-11-09에 지웠다 (git 기록과 시험 레포 `hyundai-bearing/bearing-test`에 남아 있다).
 
 **구현 기준은 가장 최근 폴더(`2026-11-09`)다.** 이전 폴더는 비교·되돌아보기용.
 
@@ -11,9 +12,9 @@ zip 안 파일의 날짜는 내려받은 시각이라 버전 구분에 쓸 수 �
 | | `Kagom_App_screens.zip` | 화면 PNG 118장 (Figma "Kagom App" 페이지). 위와 같이 bearing-test에만 있음 |
 | | `Kagom_App_components.zip` | 컴포넌트 시트 PNG 13장 (Figma "Components" 페이지). 위와 같이 bearing-test에만 있음 |
 | `2026-11-09/` | `Kagom_Agent_Handoff_Guide_v1.2.pdf` | 작업 가이드 **v1.2** (기준일 11-06, PDF 생성 11-06 17:54) |
-| | `Kagom_App_screens.zip` | 화면 PNG 119장 (Figma "Kagom App" 페이지) |
-| | `Kagom_App_components.zip` | 컴포넌트 시트 PNG 13장 (Figma "Components" 페이지) |
-| | `Kagom_App_archive_old_SCR-05_map.zip` | Figma "Archive" 페이지: 예전 SCR-05 강릉 단일 안개 지도 8장 + 안내 1장. **구현하지 않는다** |
+| | ~~`Kagom_App_screens.zip`~~ | 화면 PNG 119장 (Figma "Kagom App" 페이지). 2026-11-09 삭제 → Figma에서 직접 |
+| | ~~`Kagom_App_components.zip`~~ | 컴포넌트 시트 PNG 13장 (Figma "Components" 페이지). 2026-11-09 삭제 → Figma에서 직접 |
+| | ~~`Kagom_App_archive_old_SCR-05_map.zip`~~ | Figma "Archive" 페이지: 예전 SCR-05 강릉 단일 안개 지도. **구현하지 않는다**. 2026-11-09 삭제 |
 
 ## 2026-11-06 → 2026-11-09 달라진 점
 
@@ -34,6 +35,7 @@ zip 안 파일의 날짜는 내려받은 시각이라 버전 구분에 쓸 수 �
 
 ## 새 버전을 받으면
 
-1. `docs/design/<받은 날짜>/` 폴더를 만들고 같은 이름 규칙으로 넣는다 (`Kagom_App_screens.zip`, `Kagom_App_components.zip`, 가이드는 `_v<버전>.pdf`).
-2. 이 표와 "달라진 점"에 한 줄씩 추가한다.
+1. 작업 가이드 PDF만 `docs/design/<받은 날짜>/`에 넣는다 (`Kagom_Agent_Handoff_Guide_v<버전>.pdf`). PNG zip은 올리지 않는다.
+2. 이 표와 "달라진 점"에 한 줄씩 추가한다: Figma 버전 이름(파일 `Version history`), 바뀐 화면·컴포넌트의 노드 번호.
+   바뀐 화면은 Figma 브리지(`get_node`, `get_screenshot`)로 직접 비교한다.
 3. `docs/IMPLEMENTATION.md` 첫 줄의 기준 자료 경로를 새 폴더로 바꾼다.
