@@ -7,8 +7,10 @@
   base_<P0n>_<표정>.webp          스킨 × 표정 기본 캐릭터 (아이템 없음)        614×965
   item_<ITEM>.webp                아이템 레이어. 곰은 그림자만 받는 투명 처리  614×965 (기본 렌더와 같은 카메라)
   thumb_<ITEM>.webp               아이템·칭호 썸네일 (곰 없음)                320×320
-  turn/b_<P0n>_<단>_<nn>.webp     돌려보기 몸 (고도 단 × 24방향)               480×754
+  turn/b_<P0n>_<단>_<nn>.webp     돌려보기 몸 (고도 단 × 48방향, 7.5° 간격)     480×754
   turn/i_<ITEM>_<단>_<nn>.webp    돌려보기 아이템 레이어
+  motion/<동작>/b_<P0n>_<nn>.webp  터치 반응 동작 프레임 (24 fps, 대기 표정)     480×754 (돌려보기 0단 HOME_YAW 시점)
+  motion/<동작>/i_<ITEM>_<nn>.webp 터치 반응 아이템 레이어 (옷이 뼈를 따라 움직인다)
 
 앱은 base 위에 하의 → 상의 → 머리 순서로 item 레이어를 겹친다 (ui/components/KagomCharacter.kt).
 base·item은 돌려보기 카메라의 (0단, HOME_YAW) 시점이라 홈에서 밀기 시작하면 돌려보기 프레임으로 그대로 이어진다.
@@ -17,8 +19,11 @@ base·item은 돌려보기 카메라의 (0단, HOME_YAW) 시점이라 홈에서 
   blender -b --factory-startup -P tools/closet3d/build_closet.py -- \
       --glb <절대경로>/tools/closet3d/source/pebble_bear.glb --skins <절대경로>/tools/closet3d/source/skins \
       --font <절대경로>/app/src/main/res/font/asta_sans.ttf \
-      --out <절대경로>/app/src/main/assets/kagom [--what all|base|items|thumbs|turn|preview|clipcheck] \
-      [--rows 0,1,2] [--codes P01,P02] [--preview ITM-H-01,ITM-T-02,ITM-B-01]
+      --out <절대경로>/app/src/main/assets/kagom [--what all|base|items|thumbs|turn|motion|preview|motion_preview|clipcheck] \
+      [--rows 0,1,2] [--codes P01,P02] [--acts wave,cheer,stomp] [--preview ITM-H-01,ITM-T-02,ITM-B-01]
+
+  --what motion          터치 반응 동작(MOTIONS). 오래 걸리니 --acts·--codes로 나눠 동시에 돌리고, 멈추면 --skip-existing
+  --what motion_preview  동작을 곰+옷 진짜 3D로 몇 장씩 찍어 <out>/motion_preview/에 저장 (확인용, 앱에 넣지 않는다)
 
   --what clipcheck  옷이 몸을 뚫는지 점검: 아이템 정점이 몸 안에 들어간 양을 출력하고(CLIP ...),
                     진짜 3D(곰+옷 함께) / 앱식 합성 / 차이를 8방향으로 나란히 clip_<키>.png에 저장 (--rows로 고도 단 선택)
@@ -50,16 +55,28 @@ ap.add_argument("--turn-items", type=int, default=1)   # 0이면 돌려보기 �
 ap.add_argument("--rows", default="")               # 돌려보기 고도 단 일부만 (예: 0 또는 1,2)
 ap.add_argument("--skip-existing", action="store_true")   # 이미 있는 파일은 건너뛴다 (멈춘 렌더 이어 하기)
 ap.add_argument("--exprs", default="")              # 표정 일부만 (예: blink)
+ap.add_argument("--acts", default="")               # 터치 반응 동작 일부만 (예: wave,stomp)
 A = ap.parse_args(argv)
 os.makedirs(A.out, exist_ok=True)
 
 W, H = 614, 965          # Figma kagomCharacter 렌더 크기
 THUMB = 320
 TW, TH = 480, 754        # 돌려보기 프레임
-TURN_N = 24              # 15° 간격
+TURN_N = 48              # 7.5° 간격. 24(15°)에서 늘렸다: 예전 i번 프레임 = 지금 2i번 (카메라 거리·위치는 같다)
 # 돌려보기 고도 단 (도): 0단 = 예전 시점(약 9°), 1·2단 = 위에서 내려다보기 (머리 위 아이템 확인용)
 TURN_ELEV = [math.degrees(math.atan(0.16)), 25.0, 40.0]
-HOME_YAW = 1             # 홈·보상의 정지 화면 = 0단 1번 프레임 (곰 왼쪽으로 15°). 앱 KagomRenders.HOME_YAW와 같아야 한다
+HOME_YAW = 2             # 홈·보상의 정지 화면 = 0단 2번 프레임 (곰 왼쪽으로 15°). 앱 KagomRenders.HOME_YAW와 같아야 한다
+
+# 터치 반응 (홈, 기어 P + 대기 표정): 이름 → (glb 동작, 없으면 이 스크립트가 만든 동작; 프레임 수 @24 fps).
+# 첫·끝 프레임은 기본 자세라 앱에서 기본 렌더와 이어진다. 이름은 앱 TouchAct와 같아야 한다
+# 동작 프레임 크기: 팔을 벌리거나 뛰어오르면 돌려보기 화면(480×754) 밖으로 나가서, 같은 카메라·같은 픽셀 크기로
+# 좌우 80 px, 위 76 px를 넓혀 찍는다 (곰 위치는 돌려보기 프레임과 같다. 앱 KagomRenders.MOTION_* 와 같아야 한다)
+MW, MH = 640, 830
+MOTIONS = {
+    "wave": ("wave", 38),     # 왼팔 들어 손 흔들기 + 고개 갸웃
+    "cheer": ("happy", 22),   # 두 팔 만세 + 깡충 + 귀 쫑긋
+    "stomp": (None, 28),      # 발 동동: 왼발·오른발 번갈아 들고 몸·고개·팔이 같이 흔들린다
+}
 
 # 스킨: 텍스처, 금속성, 거칠기, 귀 안쪽, 귀 테두리 (spec 3장 + 이전 BearSkin.kt)
 SKINS = {
@@ -111,6 +128,12 @@ def setup():
         print("GPU 없음 → CPU", e)
     sc.cycles.samples = A.samples
     sc.cycles.use_denoising = True
+    # 렌더가 CPU에 묶여 있었다 (GPU 20%): 노이즈 제거(같은 OIDN)를 GPU로, 렌더 사이에 장면 데이터를 다시 만들지 않게
+    try:
+        sc.cycles.denoising_use_gpu = True
+    except AttributeError:
+        pass
+    sc.render.use_persistent_data = True
     sc.render.film_transparent = True
     sc.view_settings.view_transform = "Standard"
     sc.view_settings.look = "None"
@@ -927,7 +950,7 @@ def clipcheck(sc, bear, items, rig):
         o = a[..., :3] * a[..., 3:4] + bg[:3] * (1 - a[..., 3:4])
         return np.concatenate([o, np.ones_like(a[..., :1])], axis=-1)
 
-    angles = [0, 3, 6, 9, 12, 15, 18, 21]   # TURN_N=24 기준 45° 간격
+    angles = [k * TURN_N // 8 for k in range(8)]   # 45° 간격
     crow = int(A.rows.split(",")[0]) if A.rows else 0   # 볼 고도 단
     base, layers = {}, {k: {} for k in items}
     for i in angles:
@@ -961,6 +984,180 @@ def clipcheck(sc, bear, items, rig):
     os.remove(tmp)
 
 
+# ───────────────────────── 터치 반응 동작 ─────────────────────────
+
+def bind_to_rig(objs, allowed, fallback):
+    """
+    옷을 곰 뼈대에 붙인다 (기본 자세에서): 모디파이어까지 반영한 메시로 굳힌 뒤, 몸 표면에서 가장 가까운 곳의
+    뼈 가중치를 옮겨 받고 Armature 모디파이어를 단다. 그러면 머리·몸·다리를 움직일 때 옷이 같이 움직인다.
+    [allowed] 뼈만 남기고 다시 합이 1이 되게 맞춘다 (팔 가중치를 받으면 팔을 들 때 조끼 자락이 부채처럼 늘어났다).
+    가중치가 하나도 없는 정점은 [fallback] 뼈에 붙인다.
+    굳힌 메시는 렌더 모양이 같다 (원래 오브젝트는 지운다). 새 오브젝트 목록을 돌려준다.
+    """
+    rig, body = bpy.data.objects["bear_rig"], bpy.data.objects["bear_body"]
+    out = []
+    for o in objs:
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
+        n = link(bpy.data.objects.new(o.name, me))
+        n.matrix_world = o.matrix_world.copy()
+        bpy.data.objects.remove(o)
+        n.name = n.name.split(".")[0]
+        for g in body.vertex_groups:
+            n.vertex_groups.new(name=g.name)
+        dt = n.modifiers.new("bones", "DATA_TRANSFER")
+        dt.object = body
+        dt.use_vert_data = True
+        dt.data_types_verts = {"VGROUP_WEIGHTS"}
+        dt.vert_mapping = "POLYINTERP_NEAREST"
+        dt.layers_vgroup_select_src = "ALL"
+        dt.layers_vgroup_select_dst = "NAME"
+        with bpy.context.temp_override(object=n, active_object=n, selected_objects=[n]):
+            bpy.ops.object.modifier_apply(modifier=dt.name)
+        names = [g.name for g in n.vertex_groups]
+        weights = [[(names[g.group], g.weight) for g in v.groups if names[g.group] in allowed and g.weight > 1e-4]
+                   for v in n.data.vertices]
+        for g in list(n.vertex_groups):
+            n.vertex_groups.remove(g)
+        groups = {a: n.vertex_groups.new(name=a) for a in allowed}
+        for i, ws in enumerate(weights):
+            total = sum(w for _, w in ws)
+            if total <= 1e-4:
+                groups[fallback].add([i], 1.0, "REPLACE")
+            else:
+                for a, w in ws:
+                    groups[a].add([i], w / total, "REPLACE")
+        n.modifiers.new("rig", "ARMATURE").object = rig
+        out.append(n)
+    return out
+
+
+def world_rot(pb, axis, deg):
+    """뼈를 월드 축 [axis] 둘레로 [deg]도 돌리는 pose 회전 (뼈 머리 기준, 리그 = 월드 좌표)"""
+    from mathutils import Quaternion
+    r = pb.bone.matrix_local.to_3x3()
+    return (r.inverted() @ Quaternion(Vector(axis), math.radians(deg)).to_matrix() @ r).to_quaternion()
+
+
+def pose_rest():
+    rig = bpy.data.objects["bear_rig"]
+    if rig.animation_data:
+        rig.animation_data.action = None
+    for pb in rig.pose.bones:
+        pb.rotation_quaternion = (1, 0, 0, 0)
+        pb.location = (0, 0, 0)
+        pb.scale = (1, 1, 1)
+    set_expression({})
+    bpy.context.view_layer.update()
+
+
+def smooth(t):
+    t = min(max(t, 0.0), 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def pose_motion(act, nn, n):
+    """[act]의 nn번째 프레임 자세 (0번·끝 = 기본 자세). 표정은 대기 + 동작 중 웃는 눈"""
+    pose_rest()
+    rig = bpy.data.objects["bear_rig"]
+    src, _ = MOTIONS[act]
+    t = nn / (n - 1)
+    env = smooth(t / 0.2) * smooth((1 - t) / 0.2)     # 처음·끝은 기본 자세로
+    if src:
+        action = bpy.data.actions[src]
+        rig.animation_data.action = action
+        if hasattr(rig.animation_data, "action_slot") and rig.animation_data.action_slot is None and len(action.slots):
+            rig.animation_data.action_slot = action.slots[0]
+        bpy.context.scene.frame_set(1 + nn)
+        keys = {"eyes:happy": env, "mouth:open": 0.5 * env if act == "cheer" else 0.0}
+    else:
+        # 발 동동: 네 걸음(왼·오·왼·오). 든 발은 앞으로 살짝 들리고, 몸은 디딘 발 쪽으로 기울고, 팔은 반대로 흔든다
+        pb = rig.pose.bones
+        k, u = divmod(t * 4, 1.0)
+        k = min(int(k), 3)
+        lift = math.sin(math.pi * u)
+        side = 1 if k % 2 == 0 else -1          # 1 = 왼발(+X) 들기
+        leg = pb["leg_L" if side == 1 else "leg_R"]
+        leg.location = (0, -0.07 * lift, 0)       # 뼈가 아래를 향하므로 -Y = 위로
+        leg.rotation_quaternion = world_rot(leg, (1, 0, 0), -28 * lift)
+        pb["root"].location = (0, 0.018 * lift, 0)
+        pb["spine"].rotation_quaternion = world_rot(pb["spine"], (0, 1, 0), -8 * side * lift)
+        pb["head"].rotation_quaternion = world_rot(pb["head"], (0, 1, 0), 7 * side * lift) @ world_rot(pb["head"], (1, 0, 0), 6 * lift)
+        swing = {"arm_L": -26 if side == -1 else 14, "arm_R": -26 if side == 1 else 14}
+        for name, a in swing.items():
+            pb[name].rotation_quaternion = world_rot(pb[name], (1, 0, 0), a * lift)
+        for name in ("ear_L", "ear_R"):
+            pb[name].rotation_quaternion = world_rot(pb[name], (0, 1, 0), -10 * side * lift)
+        keys = {"eyes:happy": env}
+    set_expression(keys)
+    bpy.context.view_layer.update()
+
+
+def motion_view(sc, rig):
+    """돌려보기 (0단, HOME_YAW) 카메라 그대로, 화면만 MW×MH로 넓힌다 (위로 MH-TH, 좌우로 (MW-TW)/2).
+    AUTO 맞춤은 긴 쪽(세로 TH)에 센서 폭을 쓰므로, 세로 맞춤 + 센서를 MH/TH배 → 한 픽셀이 보는 각이 같다"""
+    rig.view(0, HOME_YAW, MW, MH)
+    cam = rig.cam.data
+    cam.sensor_fit = "VERTICAL"
+    cam.sensor_height = cam.sensor_width * MH / TH
+    cam.shift_y = (MH - TH) / 2 / MH
+
+
+def unmotion_view(rig):
+    cam = rig.cam.data
+    cam.sensor_fit, cam.shift_y = "AUTO", 0.0
+
+
+def render_motion(sc, rig, items, codes, acts):
+    """터치 반응 프레임: motion/<동작>/b_<스킨>_<nn>, motion/<동작>/i_<아이템>_<nn> (MW×MH, motion_view)"""
+    motion_view(sc, rig)
+    sc.cycles.samples = A.turn_samples
+    sc.render.image_settings.quality = 80
+    for act in acts:
+        _, n = MOTIONS[act]
+        out = os.path.join(A.out, "motion", act)
+        os.makedirs(out, exist_ok=True)
+        for nn in range(n):
+            pose_motion(act, nn, n)
+            for code in codes:
+                set_skin(code)
+                show_only([], "normal")
+                render(sc, os.path.join(out, f"b_{code}_{nn:02d}.webp"))
+            for key, objs in items.items():
+                show_only(objs, "catcher")
+                render(sc, os.path.join(out, f"i_{key}_{nn:02d}.webp"))
+    pose_rest()
+    unmotion_view(rig)
+
+
+def motion_preview(sc, rig, items, acts):
+    """확인용: 곰+옷을 진짜 3D로 함께 (앱 합성이 아님) 동작마다 7장. 0번 앞에 돌려보기 프레임(rest_turn)도 찍어 위치 비교"""
+    out = os.path.join(A.out, "motion_preview")
+    os.makedirs(out, exist_ok=True)
+    rig.view(0, HOME_YAW, TW, TH)
+    sc.cycles.samples = 16
+    set_skin("P03")
+    show_only([], "normal")
+    sc.render.image_settings.file_format = "PNG"
+    sc.render.filepath = os.path.join(out, "rest_turn.png")
+    bpy.ops.render.render(write_still=True)
+    motion_view(sc, rig)
+    sc.render.filepath = os.path.join(out, "rest_motion.png")   # 가운데를 잘라 내면 rest_turn과 같아야 한다
+    bpy.ops.render.render(write_still=True)
+    sel = [o for k in A.preview.split(",") for o in items.get(k, [])]
+    for act in acts:
+        _, n = MOTIONS[act]
+        for nn in sorted({round(j * (n - 1) / 6) for j in range(7)}):
+            pose_motion(act, nn, n)
+            show_only(sel, "normal")
+            sc.render.filepath = os.path.join(out, f"{act}_{nn:02d}.png")
+            bpy.ops.render.render(write_still=True)
+            print("WROTE", sc.render.filepath)
+    pose_rest()
+    unmotion_view(rig)
+
+
 def main():
     global BM, BVH
     sc = setup()
@@ -986,6 +1183,18 @@ def main():
     codes = [c for c in A.codes.split(",") if c in SKINS] if A.codes else list(SKINS)
 
     what = A.what
+    if what in ("motion", "motion_preview"):
+        # 옷을 뼈대에 붙이는 건 동작 렌더 때만 (다른 렌더는 기본 자세라 결과가 같지만 굳이 바꾸지 않는다)
+        # 머리 아이템 = 머리에 고정, 상의 = 몸통만, 하의 = 몸통 + 다리 (팔은 옷 밖에 있으니 옷이 팔을 따라가지 않는다)
+        follow = {"H": ({"head"}, "head"), "T": ({"root", "spine"}, "spine"), "B": ({"root", "spine", "leg_L", "leg_R"}, "spine")}
+        items = {k: bind_to_rig(objs, *follow[k.split("-")[1]]) for k, objs in items.items()}
+        acts = [a for a in A.acts.split(",") if a in MOTIONS] if A.acts else list(MOTIONS)
+        if what == "motion_preview":
+            motion_preview(sc, rig, items, acts)
+        else:
+            render_motion(sc, rig, items, codes, acts)
+        return
+
     if what == "preview":
         rig.view(0, HOME_YAW, W, H)
         set_skin("P03")
