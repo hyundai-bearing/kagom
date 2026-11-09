@@ -7,7 +7,8 @@
 | 이름 | 쓰는 곳 | 라이선스 | 지킬 것 |
 |---|---|---|---|
 | Asta Sans (© 2024 The Asta Sans Project Authors, [42dot/Asta-Sans](https://github.com/42dot/Asta-Sans)) | `app/src/main/res/font/asta_sans.ttf` | SIL Open Font License 1.1 | 라이선스 전문을 같이 배포한다 (`app/src/main/assets/licenses/AstaSans-OFL.txt`, APK에 들어감). 폰트만 따로 팔지 않는다 |
-| OpenStreetMap 데이터 (© OpenStreetMap contributors) | 지도 경계 `app/src/main/assets/regions/**`, 랜드마크 좌표 (`tools/regions/`가 Overpass·Nominatim에서 받음) | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) | 지도 화면 오른쪽 아래 "© OpenStreetMap contributors" 표시를 지우지 않는다 (`MapScreen.kt`). 가공한 지도 데이터를 외부에 배포할 때는 ODbL의 출처 표시·동일 조건 공개 의무를 확인한다 |
+| OpenStreetMap 데이터 (© OpenStreetMap contributors) | 전국·시·도·시·군 경계 `app/src/main/assets/regions/korea_map.txt`, 랜드마크 좌표 (`tools/regions/`가 Overpass·Nominatim에서 받음) | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) | 지도 화면 오른쪽 아래 "© OpenStreetMap contributors" 표시를 지우지 않는다 (`MapScreen.kt`). 가공한 지도 데이터를 외부에 배포할 때는 ODbL의 출처 표시·동일 조건 공개 의무를 확인한다 |
+| 행정동 경계 (원본: [통계청 통계지리정보서비스(SGIS)](https://sgis.kostat.go.kr), 가공: [vuski/admdongkor](https://github.com/vuski/admdongkor) 2026-10-01판) | 강릉 구획 경계 `app/src/main/assets/regions/gangneung_districts.txt` (`tools/regions/build_gangneung.py`로 추출·단순화) | 원본 공공누리 제1유형(출처 표시), 가공 데이터 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | 구획 지도 오른쪽 아래 "경계 © 통계청 SGIS · vuski/admdongkor" 표시를 지우지 않는다 (`MapScreen.kt`). 다른 지역으로 넓힐 때도 같은 출처를 적는다 |
 | AndroidX Core, Activity, Jetpack Compose (UI, Foundation, Material3) | 앱 전체 | Apache License 2.0 | — |
 | Pleos Playground SDK (`ai.pleos.playground:Vehicle` 2.3.2, `FusedLocation` 1.1.3) | `data/` | Pleos 개발자 이용 조건 | 레포에 넣지 않고 빌드 때 Pleos 저장소에서 받는다. `PRIVATE_*` API는 값 제공과 앱마켓 승인이 보장되지 않는다 |
 
