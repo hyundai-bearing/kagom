@@ -1,19 +1,18 @@
 package com.example.roro.ui.components
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,26 +22,37 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.Expression
 import com.example.roro.core.Items
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.roundToInt
+import kotlin.random.Random
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.random.Random
 
 /**
  * 캐릭터·아이템 렌더 매핑 테이블 (가이드 8.3).
@@ -51,14 +61,25 @@ import kotlin.random.Random
  *  - item_<ID>.webp          착용 레이어 (기본 위에 그대로 겹치면 맞는다)
  *  - thumb_<ID>.webp         아이템·칭호 썸네일 (320×320)
  *  - turn/b_<P0n>_<단>_<nn>.webp, turn/i_<ID>_<단>_<nn>.webp  돌려보기 프레임 ([TURN_ROWS]고도 × [TURN_FRAMES]방향, 480×754)
+ *  - motion/<동작>/b_<P0n>_<nn>.webp, motion/<동작>/i_<ID>_<nn>.webp  터치 반응 동작 프레임 (24 fps, [MOTION_W]×[MOTION_H])
  * base·item은 돌려보기 0단 [HOME_YAW]번 프레임과 같은 카메라라, 홈에서 밀기 시작하면 그대로 돌려보기로 이어진다.
+ * 동작 프레임도 같은 카메라인데 팔·점프가 잘리지 않게 화면만 넓혔다: 가운데 ([MOTION_X], [MOTION_Y])부터 480×754가 돌려보기 프레임과 겹친다.
  */
 object KagomRenders {
-    const val TURN_FRAMES = 24
+    /** 7.5° 간격 (예전 24장 = 지금 짝수 번호) */
+    const val TURN_FRAMES = 48
     /** 고도 단: 0 = 약 9°(거의 정면 높이), 1 = 25°, 2 = 40° (위에서 내려다보기) */
     const val TURN_ROWS = 3
     /** 홈·보상 화면의 방향 = 돌려보기 0단 이 번호 프레임 (build_closet.py HOME_YAW와 같아야 한다) */
-    const val HOME_YAW = 1
+    const val HOME_YAW = 2
+    const val TURN_W = 480
+    const val TURN_H = 754
+    /** 동작 프레임 크기와, 그 안에서 돌려보기 프레임(480×754)이 놓인 자리 (build_closet.py MW, MH) */
+    const val MOTION_W = 640
+    const val MOTION_H = 830
+    const val MOTION_X = 80
+    const val MOTION_Y = 76
+    const val MOTION_FPS = 24
 
     /** Expression → 렌더 파일 키 */
     fun key(e: Expression) = when (e) {
@@ -78,6 +99,8 @@ object KagomRenders {
     fun thumbPath(itemId: String) = "kagom/thumb_$itemId.webp"
     fun turnBase(skinCode: String, row: Int, i: Int) = "kagom/turn/b_${skinCode}_${row}_%02d.webp".format(i)
     fun turnLayer(itemId: String, row: Int, i: Int) = "kagom/turn/i_${itemId}_${row}_%02d.webp".format(i)
+    fun motionBase(act: TouchAct, skinCode: String, i: Int) = "kagom/motion/${act.key}/b_${skinCode}_%02d.webp".format(i)
+    fun motionLayer(act: TouchAct, itemId: String, i: Int) = "kagom/motion/${act.key}/i_${itemId}_%02d.webp".format(i)
 
     /** 디코딩한 이미지 캐시 (최대 약 40 MB) */
     private val cache = object : LruCache<String, ImageBitmap>(40 * 1024 * 1024) {
@@ -125,54 +148,105 @@ fun wornLayers(head: String?, top: String?, bottom: String?): List<String> = lis
     .filter { Items.byId(it) != null }
 
 /**
- * 터치 반응 RAND_ACT_1~3. 몸과 옷을 겹친 그림을 통째로 움직여 옷이 어긋나지 않는다.
- * 기준점은 발끝([FEET])이라 찌그러지고 늘어나도 바닥에 붙어 있다.
- * 애니메이션 원칙을 작게 적용: 예비 동작 → 동작 → 여운, 찌그러질 때 부피 유지(가로가 늘면 세로가 준다).
+ * 터치 반응 RAND_ACT_1~3: 곰 뼈대로 움직인 3D 동작을 프레임으로 렌더해 둔 것 (tools/closet3d/build_closet.py MOTIONS).
+ * 옷도 뼈를 따라 움직이게 렌더해서 착용 레이어를 겹치면 맞는다. 첫·끝 프레임은 기본 자세라 기본 렌더와 이어진다.
  */
-enum class TouchAct {
-    /** 통통: 납작해졌다 길어지며 두 번 튕긴다 */
-    SQUISH,
-    /** 오뚝이: 발끝을 축으로 좌우로 흔들리다 선다 */
-    WOBBLE,
-    /** 깡충: 웅크렸다 살짝 뛰어올라 착지 반동 (예전 옆돌기보다 약한 동작) */
-    HOP,
+enum class TouchAct(val key: String, val frames: Int) {
+    /** 손 흔들기: 왼팔을 들어 흔들고 고개를 갸웃 (1.6초) */
+    WAVE("wave", 38),
+    /** 만세: 두 팔을 들고 깡충, 귀 쫑긋 (0.9초) */
+    CHEER("cheer", 22),
+    /** 발 동동: 왼발·오른발을 번갈아 들고 몸·고개·팔이 같이 흔들린다 (1.2초) */
+    STOMP("stomp", 28),
 }
 
-/** 렌더에서 발끝 위치 (돌려보기 카메라 0단 기준, 곰 발바닥 ≈ 높이의 95%) */
+/** 렌더에서 발끝 위치 (돌려보기 카메라 0단 기준, 곰 발바닥 ≈ 높이의 95%). 숨쉬기 기준점 */
 private val FEET = TransformOrigin(0.5f, 0.95f)
 
-/** 터치 반응 값: 가로·세로 배율, 기울기(도), 떠오름(dp, 위가 -) */
-private class TouchMotion {
-    val sx = Animatable(1f)
-    val sy = Animatable(1f)
-    val tilt = Animatable(0f)
-    val lift = Animatable(0f)
-
-    suspend fun reset() { sx.snapTo(1f); sy.snapTo(1f); tilt.snapTo(0f); lift.snapTo(0f) }
-
-    suspend fun play(act: TouchAct) = coroutineScope {
-        reset()
-        when (act) {
-            TouchAct.SQUISH -> {
-                launch { sx.animateTo(1f, keyframes { durationMillis = 560; 1.07f at 90; 0.96f at 220; 1.03f at 340; 0.99f at 450 }) }
-                sy.animateTo(1f, keyframes { durationMillis = 560; 0.92f at 90; 1.05f at 220; 0.97f at 340; 1.01f at 450 })
-            }
-            TouchAct.WOBBLE -> {
-                launch { sy.animateTo(1f, keyframes { durationMillis = 300; 0.97f at 110 }) }
-                tilt.animateTo(0f, keyframes { durationMillis = 820; -7f at 110; 6f at 270; -4f at 430; 2.5f at 580; -1f at 700 })
-            }
-            TouchAct.HOP -> {
-                launch { sx.animateTo(1f, keyframes { durationMillis = 680; 1.06f at 110; 0.96f at 260; 1f at 400; 1.06f at 500; 0.99f at 590 }) }
-                launch { sy.animateTo(1f, keyframes { durationMillis = 680; 0.9f at 110; 1.06f at 260; 1.02f at 400; 0.92f at 500; 1.02f at 590 }) }
-                launch { tilt.animateTo(0f, keyframes { durationMillis = 560; 4f at 250; -2f at 420 }) }
-                lift.animateTo(0f, keyframes {
-                    durationMillis = 460
-                    0f at 110 using LinearOutSlowInEasing      // 솟을 때는 점점 느리게
-                    -34f at 300 using FastOutLinearInEasing    // 떨어질 때는 점점 빠르게
-                })
-            }
-        }
+/** 동작 프레임 한 장 합성: 몸 위에 착용 레이어를 차례로 (없으면 null) */
+private fun composeMotion(context: Context, act: TouchAct, skinCode: String, worn: List<String>, i: Int): ImageBitmap? {
+    fun decode(path: String, mutable: Boolean = false) = runCatching {
+        context.assets.open(path).use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inMutable = mutable }) }
+    }.getOrNull()
+    // 몸은 처음부터 고칠 수 있는 비트맵으로 읽어 그 위에 바로 옷을 그린다 (복사 한 번을 아낀다)
+    val out = decode(KagomRenders.motionBase(act, skinCode, i), mutable = worn.isNotEmpty()) ?: return null
+    if (worn.isNotEmpty()) {
+        val canvas = android.graphics.Canvas(out)
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        worn.forEach { id -> decode(KagomRenders.motionLayer(act, id, i))?.let { canvas.drawBitmap(it, 0f, 0f, paint); it.recycle() } }
     }
+    return out.asImageBitmap()
+}
+
+/** 탭하기 전에 미리 합성해 두는 앞부분 장수 (약 13 MB). 탭하면 바로 시작하고, 그동안 나머지를 합성한다 */
+private const val MOTION_PRELOAD = 6
+
+/** 다음에 보여 줄 동작의 앞 [MOTION_PRELOAD]장 (홈에 가만히 있을 때 미리 만든다) */
+private class MotionHead(val act: TouchAct, val skinCode: String, val worn: List<String>, val frames: List<ImageBitmap>)
+
+private suspend fun preloadMotion(context: Context, act: TouchAct, skinCode: String, worn: List<String>): MotionHead =
+    withContext(Dispatchers.Default) {
+        MotionHead(act, skinCode, worn, (0 until minOf(MOTION_PRELOAD, act.frames)).mapNotNull { composeMotion(context, act, skinCode, worn, it) })
+    }
+
+/**
+ * 동작을 24 fps로 재생한다. 앞부분은 [head]에서 바로 쓰고, 나머지는 4장까지 동시에 합성해 차례로 받는다 (한 번에 약 10장 ≈ 20 MB).
+ * 시간에 맞춰 보여 주고, 합성이 늦어 제 시간을 한 장 넘게 지난 프레임은 건너뛴다 (동작 길이는 그대로). 끝나면 [show]에 null.
+ */
+private suspend fun playMotion(
+    context: Context, act: TouchAct, skinCode: String, worn: List<String>, head: MotionHead?, show: (ImageBitmap?) -> Unit,
+) = coroutineScope {
+    val pre = head?.takeIf { it.act == act && it.skinCode == skinCode && it.worn == worn }?.frames.orEmpty()
+    val ready = Channel<ImageBitmap?>(capacity = 4)
+    val sent = AtomicInteger(0)     // 채널에 넣은 장수 (다음 프레임이 이미 와 있는지 보려고)
+    launch(Dispatchers.Default) {
+        pre.forEach { ready.send(it); sent.incrementAndGet() }
+        val window = ArrayDeque<Deferred<ImageBitmap?>>()
+        var next = pre.size
+        while (next < act.frames || window.isNotEmpty()) {
+            while (next < act.frames && window.size < 4) {
+                val i = next++
+                window.addLast(async { composeMotion(context, act, skinCode, worn, i) })
+            }
+            ready.send(window.removeFirst().await())
+            sent.incrementAndGet()
+        }
+        ready.close()
+    }
+    // 시계는 실제 시간: 화면 갱신(vsync)을 기다리며 재면 기다린 시간이 쌓여 모든 프레임이 늦은 것으로 보였다
+    val frameNanos = 1_000_000_000L / KagomRenders.MOTION_FPS
+    var start = -1L
+    var index = 0
+    try {
+        for (bmp in ready) {
+            if (bmp == null) break                         // 렌더가 없으면 그만 (기본 렌더 그대로)
+            val now = System.nanoTime()
+            if (start < 0) start = now
+            val due = start + index * frameNanos
+            index++
+            // 늦었고 다음 프레임이 이미 와 있으면 건너뛴다. 다음 것이 아직이면 늦어도 보여 줘서 멈춰 보이지 않게 (마지막 = 기본 자세는 꼭 보인다)
+            if (now > due + frameNanos && index < act.frames && sent.get() > index) continue
+            show(bmp)
+            val wait = due + frameNanos - System.nanoTime()
+            if (wait > 0) delay(wait / 1_000_000)
+        }
+    } finally {
+        show(null)
+        ready.cancel()
+    }
+}
+
+/** 동작 프레임을 기본 렌더와 같은 자리에 그린다 (가운데 480×754가 Fit으로 놓인 기본·돌려보기 그림과 겹치고, 넓힌 부분은 박스 밖으로 나간다) */
+private fun DrawScope.drawMotionFrame(image: ImageBitmap) {
+    val s = minOf(size.width / KagomRenders.TURN_W, size.height / KagomRenders.TURN_H)
+    val left = (size.width - KagomRenders.TURN_W * s) / 2 - KagomRenders.MOTION_X * s
+    val top = (size.height - KagomRenders.TURN_H * s) / 2 - KagomRenders.MOTION_Y * s
+    drawImage(
+        image,
+        dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
+        dstSize = IntSize((KagomRenders.MOTION_W * s).roundToInt(), (KagomRenders.MOTION_H * s).roundToInt()),
+        filterQuality = FilterQuality.Medium,
+    )
 }
 
 /**
@@ -193,9 +267,8 @@ fun KagomCharacter(
     alive: Boolean = false,
 ) {
     val context = LocalContext.current
-    val motion = remember { TouchMotion() }
     var motionJob by remember { mutableStateOf<Job?>(null) }
-    var lastAct by remember { mutableStateOf<TouchAct?>(null) }
+    var motionFrame by remember { mutableStateOf<ImageBitmap?>(null) }
     val scope = rememberCoroutineScope()
 
     // 숨쉬기: 3.2초에 한 번 세로로 1.2% 부풀었다 돌아온다 (가로는 반만큼 줄어 부피 유지)
@@ -225,20 +298,32 @@ fun KagomCharacter(
     val turn = remember { TurnState(KagomRenders.HOME_YAW) }
     var warm by remember { mutableStateOf(false) }
     val frames = rememberTurnFrames(skinCode, worn, turn, active = warm)
-    LaunchedEffect(turn.dragging) { if (turn.dragging) warm = true }
+    LaunchedEffect(turn.dragging) {
+        if (turn.dragging) { warm = true; motionJob?.cancel() }   // 돌리기 시작하면 터치 반응은 멈춘다
+    }
     LaunchedEffect(turnable) { if (!turnable) turn.reset(300) }
     LaunchedEffect(warm, turn.atRest) {
         if (warm && turn.atRest) { delay(20_000); frames.clear(); warm = false }
     }
-    val turned = if (turn.atRest) null else frames.nearest(turn.row, turn.frame)
+    val turning = !turn.atRest && frames.hasAny
+
+    // 다음 반응은 미리 정해 두고, 탭할 수 있는 동안(홈, 기어 P + 대기 표정) 앞부분을 합성해 둔다 → 탭하면 바로 움직인다
+    var nextAct by remember { mutableStateOf(TouchAct.entries.random()) }
+    var head by remember { mutableStateOf<MotionHead?>(null) }
+    LaunchedEffect(onTouch != null, nextAct, skinCode, worn) {
+        head = null
+        if (onTouch != null) head = preloadMotion(context.applicationContext, nextAct, skinCode, worn)
+    }
 
     /** 바로 전과 다른 반응을 고른다. 반응 중에 또 누르면 새 반응으로 바로 바꾼다 */
     fun react() {
-        val act = TouchAct.entries.filter { it != lastAct }.random()
-        lastAct = act
+        val act = nextAct
+        val ready = head
+        nextAct = TouchAct.entries.filter { it != act }.random()
         motionJob?.cancel()
-        motionJob = scope.launch { motion.play(act) }
+        motionJob = scope.launch { playMotion(context.applicationContext, act, skinCode, worn, ready) { motionFrame = it } }
     }
+    val playing = motionFrame != null
 
     val names = worn.mapNotNull { Items.byId(it)?.name }
     Box(
@@ -260,15 +345,13 @@ fun KagomCharacter(
                 .graphicsLayer {
                     transformOrigin = FEET
                     val b = breath.value
-                    scaleX = motion.sx.value * (1f - 0.006f * b)
-                    scaleY = motion.sy.value * (1f + 0.012f * b)
-                    rotationZ = motion.tilt.value
-                    translationY = motion.lift.value.dp.toPx()
+                    scaleX = 1f - 0.006f * b
+                    scaleY = 1f + 0.012f * b
                 },
             contentAlignment = Alignment.Center,
         ) {
-            // 돌리는 중에는 돌려보기 프레임. 기본 렌더는 숨겨만 둔다 (제자리로 오면 바로 다시 보이게)
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (turned != null) 0f else 1f }) {
+            // 돌리는 중에는 돌려보기 프레임, 터치 반응 중에는 동작 프레임. 기본 렌더는 숨겨만 둔다 (끝나면 바로 다시 보이게)
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (turning || playing) 0f else 1f }) {
                 // 표정이 바뀌면 살짝 교차 페이드
                 Crossfade(KagomRenders.baseOrIdle(context, skinCode, expression), Modifier.fillMaxSize(), tween(220), label = "expr") { path ->
                     AssetImage(path, Modifier.fillMaxSize())
@@ -282,8 +365,9 @@ fun KagomCharacter(
                     }
                 }
             }
-            if (turned != null) Image(turned, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            if (turning) TurnImage(frames, turn, Modifier.fillMaxSize())
+            motionFrame?.let { img -> Spacer(Modifier.fillMaxSize().drawBehind { drawMotionFrame(img) }) }
         }
     }
-    LaunchedEffect(expression) { motionJob?.cancel(); motion.reset() }
+    LaunchedEffect(expression) { motionJob?.cancel() }
 }

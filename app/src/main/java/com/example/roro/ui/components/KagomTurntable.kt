@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,18 +32,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.roro.ui.theme.KagomColor
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomType
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,8 +61,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 private const val N = KagomRenders.TURN_FRAMES
 private const val ROWS = KagomRenders.TURN_ROWS
@@ -77,6 +85,8 @@ class TurnState(val restFrame: Int = 0) {
 
     val frame: Int get() = Math.floorMod((yaw.value / STEP).roundToInt(), N)
     val row: Int get() = pitch.value.roundToInt().coerceIn(0, ROWS - 1)
+    /** 프레임 단위 연속 방향 (0..N), 소수 부분 = 다음 프레임 쪽으로 간 정도 */
+    internal val yawFrames: Float get() = (yaw.value / STEP).mod(N.toFloat())
 
     /** 처음 각도에 멈춰 있음 */
     val atRest: Boolean get() = !dragging && frame == restFrame && row == 0 && !yaw.isRunning && !pitch.isRunning
@@ -164,6 +174,11 @@ class TurnFrames internal constructor(private val context: Context, private val 
         return null
     }
 
+    /** 정확히 (row, i) 프레임 (아직 없으면 null) */
+    fun exact(row: Int, i: Int): ImageBitmap? = cache[key(row, i)]
+
+    val hasAny: Boolean get() = cache.isNotEmpty()
+
     fun clear() = cache.clear()
 
     private fun key(row: Int, i: Int) = row * N + Math.floorMod(i, N)
@@ -209,13 +224,60 @@ fun rememberTurnFrames(skinCode: String, worn: List<String>, state: TurnState, a
     return frames
 }
 
-/** 지금 각도 프레임 (아직 없으면 가까운 프레임, 그것도 없으면 직전에 보이던 그림) */
+/** 프레임 사이 위치 [f](0..1) → 다음 프레임 비중. 가운데 [BLEND] 구간에서만 섞는다 (반반 섞으면 7.5° 차이로 얼굴이 두 개로 보였다) */
+private const val BLEND = 0.3f
+private fun mix(f: Float): Float {
+    val t = ((f - (1 - BLEND) / 2) / BLEND).coerceIn(0f, 1f)
+    return t * t * (3 - 2 * t)
+}
+
+/**
+ * 지금 각도 그림. 프레임 사이 각도에서는 양옆 방향 두 장과 위아래 단 두 장(최대 네 장)을 섞어 넘어가는 순간을 부드럽게 한다.
+ * 대부분의 각도에서는 가까운 한 장이 또렷하게 보이고, 다음 프레임으로 넘어가는 가운데 구간([BLEND])에서만 짧게 섞는다.
+ * 섞기는 미리 곱한 알파끼리 더하기(Plus)라 겹친 곳이 비쳐 보이지 않는다.
+ * 섞을 프레임이 아직 없으면 가까운 프레임, 그것도 없으면 직전에 보이던 그림.
+ */
 @Composable
 fun TurnImage(frames: TurnFrames, state: TurnState, modifier: Modifier = Modifier) {
     val last = remember { arrayOfNulls<ImageBitmap>(1) }
-    val shown = frames.nearest(state.row, state.frame) ?: last[0]
-    last[0] = shown
-    if (shown != null) Image(shown, contentDescription = null, contentScale = ContentScale.Fit, modifier = modifier)
+    val y = state.yawFrames
+    val i0 = y.toInt()
+    val fy = mix(y - i0)
+    val p = state.pitch.value.coerceIn(0f, ROWS - 1f)
+    val r0 = p.toInt().coerceAtMost(ROWS - 1)
+    val fr = mix(p - r0)
+    val parts = buildList {
+        for ((r, wr) in listOf(r0 to 1 - fr, (r0 + 1).coerceAtMost(ROWS - 1) to fr)) {
+            for ((i, wi) in listOf(i0 to 1 - fy, i0 + 1 to fy)) {
+                val w = wr * wi
+                if (w > 0.004f) frames.exact(r, i)?.let { add(it to w) }
+            }
+        }
+    }
+    val total = parts.sumOf { it.second.toDouble() }.toFloat()
+    if (parts.isEmpty() || total < 0.6f) {
+        // 섞을 프레임이 모자라면 (막 돌리기 시작했을 때) 가까운 한 장
+        val shown = frames.nearest(state.row, state.frame) ?: last[0]
+        last[0] = shown
+        if (shown != null) Image(shown, contentDescription = null, contentScale = ContentScale.Fit, modifier = modifier)
+        return
+    }
+    last[0] = parts.maxBy { it.second }.first
+    Spacer(
+        modifier
+            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+            .drawBehind {
+                val img = parts[0].first
+                val s = minOf(size.width / img.width, size.height / img.height)
+                val w = (img.width * s).roundToInt()
+                val h = (img.height * s).roundToInt()
+                val at = IntOffset(((size.width - w) / 2).roundToInt(), ((size.height - h) / 2).roundToInt())
+                parts.forEach { (bmp, wt) ->
+                    drawImage(bmp, dstOffset = at, dstSize = IntSize(w, h), alpha = wt / total,
+                        blendMode = BlendMode.Plus, filterQuality = FilterQuality.Medium)
+                }
+            },
+    )
 }
 
 /**
