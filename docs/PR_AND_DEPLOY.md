@@ -1,6 +1,6 @@
 # PR·배포 가이드
 
-카곰(bearing-test) 코드를 고쳐서 PR로 올리고, `main`에 합치고, APK로 배포하기까지의 순서와 유의사항.
+카곰 코드를 고쳐서 PR로 올리고, `main`에 합치고, APK로 배포하기까지의 순서와 유의사항.
 처음 하는 사람은 1장부터, 익숙하면 [한눈에 보는 체크리스트](#한눈에-보는-체크리스트)만 봐도 된다.
 
 ---
@@ -45,14 +45,16 @@ Pleos SDK는 `settings.gradle.kts`의 Pleos 저장소(`nexus-playground.pleos.ai
 - `local.properties` (개인 SDK 경로)
 - 키스토어 `*.jks`, `*.keystore`, 서명 비밀번호, API 키
 - `build/`, `.gradle/`, `.idea/`, `.kotlin/`
-- 렌더 작업용 임시 파일 (`bear.glb`, `skins/`는 git 기록에서 꺼내 쓰는 것이라 다시 넣지 않는다)
+- 렌더·지도 도구의 다운로드·작업 폴더 (레포 밖에 둔다)
+- 시연 영상 `*.mp4` (GitHub Release에 첨부한다)
 
 **에셋(`app/src/main/assets/kagom`)을 바꿀 때:**
 
 - 손으로 고친 이미지를 넣지 말고 `tools/closet3d/build_closet.py`로 다시 만든다. 스크립트 변경과 산출물을 **같은 커밋**에 넣는다.
+- 곰 모델과 스킨 텍스처 원본은 `tools/closet3d/source/`에 있다. 원본을 바꾸면 에셋도 다시 만들어 같은 PR에 넣는다.
 - PR 본문에 다시 만드는 명령과 에셋 크기 변화를 적는다. APK 크기와 첫 실행 로딩에 바로 영향이 간다.
 
-> Windows에서 `LF will be replaced by CRLF` 경고는 무시해도 된다 (`core.autocrlf=true`). 다만 diff에 파일 전체가 바뀐 것처럼 보이면 편집기가 줄바꿈을 바꾼 것이니 되돌린다.
+> 줄바꿈은 `.gitattributes`가 맞춘다 (레포에는 LF). Windows에서 `LF will be replaced by CRLF` 경고는 무시해도 된다. 다만 diff에 파일 전체가 바뀐 것처럼 보이면 편집기가 줄바꿈을 바꾼 것이니 되돌린다.
 
 ---
 
@@ -106,8 +108,8 @@ gh pr create --base main --title "<한국어 제목>"    # 본문은 템플릿�
 ## 5. 리뷰와 머지
 
 - 리뷰어 **1명 이상 승인** 후, **작성자가** 머지한다.
-- 머지 방식은 **Create a merge commit** (쌓인 PR과 섞여도 안전).
-- 머지 후 브랜치는 지운다 (GitHub 버튼 또는 `git push origin --delete <브랜치>`).
+- 머지 방식은 **Create a merge commit** (쌓인 PR과 섞여도 안전). 레포 설정에서 squash·rebase 머지는 꺼 두었다.
+- 머지하면 브랜치는 자동으로 지워진다 (레포 설정). 로컬 브랜치는 `git branch -d <브랜치>`로 지운다.
 - `main`과 충돌하면 내 브랜치에 `main`을 merge해서 푼다. **이미 리뷰 중인 브랜치에 force push 하지 않는다** (리뷰 코멘트 위치가 사라지고, 위에 쌓인 브랜치가 깨진다).
 - 리뷰 코멘트는 고친 커밋을 올린 뒤 "반영했어요 (커밋 해시)"로 답하고, 해결 표시는 리뷰어가 한다.
 
@@ -124,7 +126,21 @@ gh pr create --base main --title "<한국어 제목>"    # 본문은 템플릿�
 
 - release 빌드는 R8 축소 + 리소스 축소가 켜져 있다. **debug에서 되던 것이 release에서 깨질 수 있으니** 배포 전에 release APK를 꼭 설치해서 한 바퀴 돌려 본다 (특히 Pleos SDK: 내부에서 Gson·리플렉션을 써서, 규칙이 빠지면 모든 신호가 "확인 불가"로 읽힌다).
   깨지면 `app/proguard-rules.pro`에 keep 규칙을 추가한다.
-- 지금 release는 **디버그 키로 서명**된다 (`app/build.gradle.kts`). 시연용으로만 쓴다.
+- 정식 키 정보가 없으면 release도 **디버그 키로 서명**된다 (`app/build.gradle.kts`). 이 APK는 시연·내부 공유용으로만 쓴다.
+
+### 정식 키로 서명하기
+
+키스토어 파일과 비밀번호는 레포에 넣지 않는다. 각자 PC의 `~/.gradle/gradle.properties`(Windows: `C:\Users\<이름>\.gradle\gradle.properties`)에 적는다:
+
+```properties
+kagom.signing.storeFile=C:/keys/kagom-release.jks
+kagom.signing.storePassword=...
+kagom.signing.keyAlias=kagom
+kagom.signing.keyPassword=...
+```
+
+CI처럼 파일을 둘 수 없는 곳에서는 환경 변수 `KAGOM_SIGNING_STORE_FILE`, `KAGOM_SIGNING_STORE_PASSWORD`, `KAGOM_SIGNING_KEY_ALIAS`, `KAGOM_SIGNING_KEY_PASSWORD`를 쓴다. 네 값이 다 있어야 정식 키로 서명하고, 하나라도 없으면 디버그 키로 돌아간다.
+서명 확인: `apksigner verify --print-certs app\build\outputs\apk\release\app-release.apk` (Android SDK `build-tools`에 있다).
 
 ### 버전 올리기
 
@@ -132,7 +148,7 @@ gh pr create --base main --title "<한국어 제목>"    # 본문은 템플릿�
 
 ### GitHub Release에 올리기
 
-`main`에 머지된 커밋에서만 만든다.
+`main`에 머지된 커밋에서만 만든다. 태그는 `v<versionName>`, 변경 내용은 `CHANGELOG.md`에 먼저 적는다.
 
 ```bash
 git switch main && git pull
@@ -140,10 +156,12 @@ gh release create v2.1.0 app/build/outputs/apk/release/app-release.apk \
   --title "카곰 v2.1.0" --notes "변경 사항 요약 (머지된 PR 번호)"
 ```
 
+- 디버그 키로 서명한 APK면 노트 첫 줄에 "시연용 (디버그 키 서명)"이라고 적는다.
+- 시연 영상(`*.mp4`)도 레포가 아니라 Release에 첨부한다.
+
 ### 앱마켓·외부 제출 (정식 배포)
 
-- **정식 서명 키**로 서명해야 한다. 키는 레포에 넣지 않고 팀이 따로 보관한다 (잃어버리면 같은 앱으로 업데이트할 수 없다).
-  서명 정보는 `~/.gradle/gradle.properties`나 환경 변수로 넘기고, `build.gradle.kts`에 비밀번호를 적지 않는다.
+- **정식 서명 키**로 서명해야 한다 ([정식 키로 서명하기](#정식-키로-서명하기)). 키는 팀이 따로 보관한다 (잃어버리면 같은 앱으로 업데이트할 수 없다).
 - `applicationId`가 아직 `com.example.roro`다. 마켓에 올리기 전에 정식 패키지명으로 바꿔야 한다 (한 번 올리면 못 바꾼다).
 - Pleos의 `PRIVATE_*` API는 값과 앱마켓 승인이 보장되지 않는다. 쓰게 되면 `data/`의 신호 소스 안에만 두고, 없어도 앱이 돌아가게 만든다 (NFR-06).
 
@@ -154,7 +172,8 @@ gh release create v2.1.0 app/build/outputs/apk/release/app-release.apk \
 - **AI로 코드를 쓸 때**: 코드 규칙(구조, 토큰, Full/Split, 기어 P 제한, 저장 호환, 생성 에셋 등)은 `CLAUDE.md`에 있다. Claude Code는 자동으로 읽고, Codex·Cursor 등은 `AGENTS.md`를 거쳐 같은 파일을 읽는다. 다른 도구를 쓰면 `CLAUDE.md`를 프롬프트나 규칙 파일에 넣는다. 규칙이 바뀌면 `CLAUDE.md`만 고친다.
 - **디버그 전용 기능**: 시연 패널과 `demo_*` adb 옵션은 debuggable 빌드에서만 열린다. release에서 시연하려면 debug APK를 쓴다.
 - **권한**: Pleos 차량·위치 권한(`AndroidManifest.xml`)이 바뀌면 PR 본문에 적는다. 위치는 랜드마크 방문 판정에만 쓰고 저장하지 않는다.
-- **요구사항 문서**: `docs/requirements.md`의 완료 표시가 실제 코드와 다를 수 있다 (11/6 Figma 리빌드 때 말풍선·질문 메뉴·TTS가 빠졌다). 기능을 다시 넣거나 뺄 때 문서도 같이 고친다.
+- **요구사항 문서**: `docs/requirements.md`의 "현재 데모" 열은 11/5(Figma 리빌드 전) 기준이다. 리빌드 때 빠진 기능은 문서 맨 위에 모아 두었다. 기능을 다시 넣거나 뺄 때 문서도 같이 고친다.
+- **지도 데이터 출처**: 지도 경계와 랜드마크 좌표는 OpenStreetMap(ODbL)에서 만든다. 지도 화면의 "© OpenStreetMap contributors" 표시는 지우지 않는다 (`THIRD_PARTY_NOTICES.md`).
 - **큰 바이너리**: 렌더 산출물이 계속 쌓이면 레포가 무거워진다. 한 PR에서 에셋을 여러 번 다시 만들었다면 마지막 결과만 남도록 커밋을 정리한 뒤 올린다 (리뷰 시작 전에만).
 
 ---

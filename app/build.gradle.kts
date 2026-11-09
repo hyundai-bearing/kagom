@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+/** 서명 값: Gradle 속성이 있으면 그것, 없으면 환경 변수 (CI에서 넘기기 쉽게) */
+fun signingValue(property: String, env: String): String? =
+    providers.gradleProperty(property).orElse(providers.environmentVariable(env)).orNull
+
 android {
     namespace = "com.example.roro"
     compileSdk = 37
@@ -14,14 +18,30 @@ android {
         versionCode = 2
         versionName = "2.0"
     }
+    signingConfigs {
+        // 정식 키는 레포에 넣지 않는다: ~/.gradle/gradle.properties의 kagom.signing.* 또는 환경 변수 KAGOM_SIGNING_*로 넘긴다
+        // (docs/PR_AND_DEPLOY.md 6장). 네 값이 다 있을 때만 만든다.
+        val storeFile = signingValue("kagom.signing.storeFile", "KAGOM_SIGNING_STORE_FILE")
+        val storePassword = signingValue("kagom.signing.storePassword", "KAGOM_SIGNING_STORE_PASSWORD")
+        val keyAlias = signingValue("kagom.signing.keyAlias", "KAGOM_SIGNING_KEY_ALIAS")
+        val keyPassword = signingValue("kagom.signing.keyPassword", "KAGOM_SIGNING_KEY_PASSWORD")
+        if (storeFile != null && storePassword != null && keyAlias != null && keyPassword != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             // 코드 축소(R8) + 안 쓰는 리소스 제거
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // 시연·측정용으로 디버그 키 서명 (배포 때는 정식 키로 교체)
-            signingConfig = signingConfigs.getByName("debug")
+            // 정식 키가 없으면 디버그 키로 서명한다 (시연·내부 공유용, 앱마켓에는 못 올림)
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     // Android 차량 API (CarUxRestrictionsManager: 기어 신호가 없을 때 주행 여부). 기기 시스템 라이브러리라 APK에 들어가지 않음

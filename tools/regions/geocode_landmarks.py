@@ -5,7 +5,7 @@
 import json, os, sys, time, urllib.request, urllib.parse
 from geo import rings_of, point_in_unit
 
-UA = {"User-Agent": "kagom-dev-tools/0.1 (bearing-test prototype)", "Accept-Language": "ko"}
+UA = {"User-Agent": "kagom-dev-tools/0.1 (kagom prototype)", "Accept-Language": "ko"}
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 def search(q, bbox):

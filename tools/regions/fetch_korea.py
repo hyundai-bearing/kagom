@@ -6,7 +6,7 @@
 """
 import json, sys, time, urllib.request, urllib.parse
 
-UA = {"User-Agent": "kagom-dev-tools/0.1 (bearing-test prototype)", "Accept-Language": "ko"}
+UA = {"User-Agent": "kagom-dev-tools/0.1 (kagom prototype)", "Accept-Language": "ko"}
 
 
 def get(url, data=None):

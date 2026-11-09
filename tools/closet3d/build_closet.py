@@ -13,11 +13,10 @@
 앱은 base 위에 하의 → 상의 → 머리 순서로 item 레이어를 겹친다 (ui/components/KagomCharacter.kt).
 base·item은 돌려보기 카메라의 (0단, HOME_YAW) 시점이라 홈에서 밀기 시작하면 돌려보기 프레임으로 그대로 이어진다.
 
-사용법 (모델·텍스처는 git 기록에서 꺼낸다. 경로는 절대 경로로 — Blender는 상대 경로를 C:\\ 기준으로 푼다):
-  git show 934bcd4:app/src/main/assets/models/pebble_bear.glb > bear.glb
-  git show 934bcd4:app/src/main/assets/skins/<skin>.png > skins/<skin>.png   (8종)
+사용법 (모델·텍스처 원본은 tools/closet3d/source/. 경로는 절대 경로로 — Blender는 상대 경로를 C:\\ 기준으로 푼다):
   blender -b --factory-startup -P tools/closet3d/build_closet.py -- \
-      --glb bear.glb --skins skins --font <절대경로>/app/src/main/res/font/asta_sans.ttf \
+      --glb <절대경로>/tools/closet3d/source/pebble_bear.glb --skins <절대경로>/tools/closet3d/source/skins \
+      --font <절대경로>/app/src/main/res/font/asta_sans.ttf \
       --out <절대경로>/app/src/main/assets/kagom [--what all|base|items|thumbs|turn|preview|clipcheck] \
       [--rows 0,1,2] [--codes P01,P02] [--preview ITM-H-01,ITM-T-02,ITM-B-01]
 

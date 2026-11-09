@@ -14,5 +14,5 @@ dependencyResolutionManagement {
         maven("https://nexus-playground.pleos.ai/repository/maven-releases/")
     }
 }
-rootProject.name = "RoroAvatarDemo"
+rootProject.name = "Kagom"
 include(":app")
