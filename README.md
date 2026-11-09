@@ -70,6 +70,7 @@ docs/       기획(spec.pdf)·요구사항·구현 노트·PR/배포 가이드·
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | 구현 노트: 구조, 디자인에 없던 값(가정), 지도·렌더 파이프라인, 시연, 검증 |
 | [docs/requirements.md](docs/requirements.md) | 요구사항 (FR/NFR), 결정 사항 |
 | [docs/design/README.md](docs/design/README.md) | 디자인 자료 버전별 차이, 새 버전 받는 법 |
+| [docs/FIGMA_BRIDGE.md](docs/FIGMA_BRIDGE.md) | AI 도구가 Figma 파일을 직접 읽게 연결하는 법 (Figma MCP Bridge) |
 | [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 내역 |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 외부 라이브러리·폰트·지도 데이터의 라이선스 |
 | [.github/pull_request_template.md](.github/pull_request_template.md) | PR 본문 양식 |

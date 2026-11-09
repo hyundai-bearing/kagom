@@ -9,6 +9,7 @@
 - release 서명: `kagom.signing.*` Gradle 속성이나 `KAGOM_SIGNING_*` 환경 변수가 있으면 정식 키, 없으면 디버그 키
 - 렌더 원본(곰 모델·스킨 텍스처)을 `tools/closet3d/source/`에 넣음 (예전에는 git 기록에서 꺼내 씀)
 - `docs/requirements.md`에 11/6 리빌드 때 빠진 기능 표시
+- 디자인 PNG zip을 레포에서 지우고, AI 도구가 Figma를 직접 읽는 연결 안내 추가 (`docs/FIGMA_BRIDGE.md`)
 
 ## 2.0 (2026-11-09, bearing-test에서 옮김)
 
