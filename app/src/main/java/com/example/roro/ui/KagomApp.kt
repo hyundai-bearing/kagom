@@ -46,7 +46,7 @@ import com.example.roro.ui.screens.OnboardingState
 import com.example.roro.ui.screens.QuestsScreen
 import com.example.roro.ui.screens.RewardModal
 import com.example.roro.ui.screens.TierUpModal
-import com.example.roro.ui.screens.mapSpots
+import com.example.roro.ui.screens.landmarkViews
 import com.example.roro.ui.theme.KagomColor
 import com.example.roro.ui.theme.KagomTheme
 import com.example.roro.ui.theme.LayoutMode
@@ -71,7 +71,6 @@ fun KagomApp(c: KagomController) = KagomTheme {
 
     var tab by rememberSaveable { mutableStateOf(NavTab.HOME) }
     var sheetOpen by remember { mutableStateOf(false) }
-    var mapFocus by remember { mutableStateOf<String?>(null) }
     var debugOpen by remember { mutableStateOf(false) }
     val onboarding = remember { OnboardingState() }
     val profile = data.profile
@@ -92,13 +91,10 @@ fun KagomApp(c: KagomController) = KagomTheme {
             NavTab.HOME -> HomeScreen(profile, data, status, gearP) { if (gearP) sheetOpen = true }
             NavTab.QUESTS -> QuestsScreen(Progress.all(c.progressContext(data), data.completedQuests), data.exp)
             NavTab.MAP -> MapScreen(
-                mapSpots(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet(), examples),
-                gearP, mapFocus,
-            ) { mapFocus = null }
-            NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, examples) { target, landmark ->
-                mapFocus = landmark   // '지도에서 보기': 그 랜드마크의 구획을 열고 상세를 띄운다
-                tab = target
-            }
+                landmarkViews(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet()),
+                gearP, c::equip,
+            )
+            NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, examples) { target, _ -> tab = target }
         }
     }
 

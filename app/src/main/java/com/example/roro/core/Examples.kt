@@ -34,16 +34,4 @@ object Examples {
     fun of(category: Category) = items.filter { it.category == category }
     fun isExample(id: String?) = id?.startsWith(PREFIX) == true
     fun item(id: String?) = items.firstOrNull { it.id == id }
-
-    /**
-     * 지도 예시 (Figma 149:4593): 주문진읍 1/3 (주문진항은 실제 랜드마크, 나머지 둘은 예시 · 미방문),
-     * 사천면 3/3 (예시 셋 · 방문). 좌표는 각 구획 안 (KoreaMapTest가 확인).
-     */
-    val mapSpots: List<MapSpot> = listOf(
-        MapSpot("EX-LM-01", "주문진 해수욕장", Landmarks.GANGNEUNG, "주문진읍", 37.9068, 128.8209, "EX-H-03", visited = false, example = true),
-        MapSpot("EX-LM-02", "소돌 아들바위공원", Landmarks.GANGNEUNG, "주문진읍", 37.9032, 128.8297, "EX-H-06", visited = false, example = true),
-        MapSpot("EX-LM-03", "사천면 예시 랜드마크 1", Landmarks.GANGNEUNG, "사천면", 37.8350, 128.8600, "EX-H-04", visited = true, example = true),
-        MapSpot("EX-LM-04", "사천면 예시 랜드마크 2", Landmarks.GANGNEUNG, "사천면", 37.8000, 128.8000, "EX-H-09", visited = true, example = true),
-        MapSpot("EX-LM-05", "사천면 예시 랜드마크 3", Landmarks.GANGNEUNG, "사천면", 37.7750, 128.7500, "EX-H-12", visited = true, example = true),
-    )
 }
