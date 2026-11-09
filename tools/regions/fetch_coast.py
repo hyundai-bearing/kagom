@@ -5,7 +5,7 @@ build_korea.py가 이 해안선으로 바다를 걷어 낸다.
 """
 import json, os, sys, time, urllib.request, urllib.parse
 
-UA = {"User-Agent": "kagom-dev-tools/0.1 (bearing-test prototype)"}
+UA = {"User-Agent": "kagom-dev-tools/0.1 (kagom prototype)"}
 SERVERS = ["https://maps.mail.ru/osm/tools/overpass/api/interpreter", "https://overpass-api.de/api/interpreter",
            "https://overpass.private.coffee/api/interpreter"]
 BBOX = (124.4, 32.9, 132.0, 38.8)   # 서, 남, 동, 북

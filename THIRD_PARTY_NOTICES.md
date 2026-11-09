@@ -1,0 +1,25 @@
+# 외부 자료와 라이선스
+
+카곰이 쓰는 외부 라이브러리·폰트·데이터와 그 조건. 새로 넣거나 버전을 바꾸면 이 표도 고친다.
+
+## 앱에 들어가는 것
+
+| 이름 | 쓰는 곳 | 라이선스 | 지킬 것 |
+|---|---|---|---|
+| Asta Sans (© 2024 The Asta Sans Project Authors, [42dot/Asta-Sans](https://github.com/42dot/Asta-Sans)) | `app/src/main/res/font/asta_sans.ttf` | SIL Open Font License 1.1 | 라이선스 전문을 같이 배포한다 (`app/src/main/assets/licenses/AstaSans-OFL.txt`, APK에 들어감). 폰트만 따로 팔지 않는다 |
+| OpenStreetMap 데이터 (© OpenStreetMap contributors) | 지도 경계 `app/src/main/assets/regions/**`, 랜드마크 좌표 (`tools/regions/`가 Overpass·Nominatim에서 받음) | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/) | 지도 화면 오른쪽 아래 "© OpenStreetMap contributors" 표시를 지우지 않는다 (`MapScreen.kt`). 가공한 지도 데이터를 외부에 배포할 때는 ODbL의 출처 표시·동일 조건 공개 의무를 확인한다 |
+| AndroidX Core, Activity, Jetpack Compose (UI, Foundation, Material3) | 앱 전체 | Apache License 2.0 | — |
+| Pleos Playground SDK (`ai.pleos.playground:Vehicle` 2.3.2, `FusedLocation` 1.1.3) | `data/` | Pleos 개발자 이용 조건 | 레포에 넣지 않고 빌드 때 Pleos 저장소에서 받는다. `PRIVATE_*` API는 값 제공과 앱마켓 승인이 보장되지 않는다 |
+
+## 빌드·테스트에만 쓰는 것
+
+| 이름 | 쓰는 곳 | 라이선스 |
+|---|---|---|
+| Android 차량 라이브러리 (`android.car`) | `useLibrary("android.car")` (CarUxRestrictionsManager). 기기 시스템 라이브러리라 APK에 들어가지 않는다 | Android SDK 이용 약관 |
+| JUnit 4.13.2 | 단위 테스트 | Eclipse Public License 1.0 |
+| Blender 5.x | `tools/closet3d`, `tools/bear3d` 렌더 (레포에 들어 있지 않음) | GPL (도구로만 쓰고 결과물에는 영향 없음) |
+
+## 확인이 필요한 것
+
+- **곰 3D 모델과 스킨 텍스처** (`tools/closet3d/source/`)와 거기서 렌더한 캐릭터 이미지(`app/src/main/assets/kagom/**`): 출처와 이용 조건을 아직 이 문서에 적지 않았다. 외부에 공개하기 전에 확인해서 적는다.
+- **기획·디자인 자료** (`docs/spec.pdf`, `docs/design/**`): 팀이 받은 자료다. 레포를 공개로 바꾸기 전에 공개해도 되는지 확인한다.

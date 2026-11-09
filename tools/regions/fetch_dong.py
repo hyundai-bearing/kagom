@@ -6,7 +6,7 @@
 """
 import json, os, sys, time, urllib.request, urllib.parse
 
-UA = {"User-Agent": "kagom-dev-tools/0.1 (bearing-test prototype)", "Accept-Language": "ko"}
+UA = {"User-Agent": "kagom-dev-tools/0.1 (kagom prototype)", "Accept-Language": "ko"}
 OVERPASS = ["https://maps.mail.ru/osm/tools/overpass/api/interpreter", "https://overpass-api.de/api/interpreter",
             "https://overpass.private.coffee/api/interpreter"]
 THRESHOLD = 0.0001   # Nominatim 단순화(도, ≈10 m). build_dong.py에서 다시 단순화한다

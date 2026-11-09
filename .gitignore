@@ -21,3 +21,9 @@ captures/
 
 # Python
 __pycache__/
+
+# 시연 영상 (GitHub Release에 첨부하고 레포에는 넣지 않는다)
+*.mp4
+
+# Claude Code 개인 설정
+.claude/settings.local.json

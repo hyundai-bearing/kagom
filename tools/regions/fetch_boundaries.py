@@ -6,7 +6,7 @@
 """
 import json, sys, time, urllib.request, urllib.parse
 
-UA = {"User-Agent": "kagom-dev-tools/0.1 (bearing-test prototype)", "Accept-Language": "ko"}
+UA = {"User-Agent": "kagom-dev-tools/0.1 (kagom prototype)", "Accept-Language": "ko"}
 CITIES = ["서울특별시", "인천광역시"]
 
 def get(url, data=None):

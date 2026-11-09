@@ -7,12 +7,12 @@ zip 안 파일의 날짜는 내려받은 시각이라 버전 구분에 쓸 수 �
 
 | 폴더 | 파일 | 내용 |
 |---|---|---|
-| `2026-11-06/` | `Kagom_Agent_Handoff_Guide.pdf` | 작업 가이드 이전판 (PDF 생성 11-06 11:35) |
-| | `Kagom_App_screens.zip` | 화면 PNG 118장 (Figma "Kagom App" 페이지) |
-| | `Kagom_App_components.zip` | 컴포넌트 시트 PNG 13장 (Figma "Components" 페이지) |
+| `2026-11-06/` | `Kagom_Agent_Handoff_Guide.pdf` | 작업 가이드 이전판 (PDF 생성 11-06 11:35). **이 레포에는 없다** (시험 레포 `hyundai-bearing/bearing-test`의 같은 경로) |
+| | `Kagom_App_screens.zip` | 화면 PNG 118장 (Figma "Kagom App" 페이지). 위와 같이 bearing-test에만 있음 |
+| | `Kagom_App_components.zip` | 컴포넌트 시트 PNG 13장 (Figma "Components" 페이지). 위와 같이 bearing-test에만 있음 |
 | `2026-11-09/` | `Kagom_Agent_Handoff_Guide_v1.2.pdf` | 작업 가이드 **v1.2** (기준일 11-06, PDF 생성 11-06 17:54) |
-| | `Kagom_App_screens.zip` | 화면 PNG 119장 |
-| | `Kagom_App_components.zip` | 컴포넌트 시트 PNG 13장 |
+| | `Kagom_App_screens.zip` | 화면 PNG 119장 (Figma "Kagom App" 페이지) |
+| | `Kagom_App_components.zip` | 컴포넌트 시트 PNG 13장 (Figma "Components" 페이지) |
 | | `Kagom_App_archive_old_SCR-05_map.zip` | Figma "Archive" 페이지: 예전 SCR-05 강릉 단일 안개 지도 8장 + 안내 1장. **구현하지 않는다** |
 
 ## 2026-11-06 → 2026-11-09 달라진 점

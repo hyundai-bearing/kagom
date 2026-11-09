@@ -1,7 +1,7 @@
-# 카곰 구현 노트 (v2.0, 2026-11-06)
+# 카곰 구현 노트 (앱 v2.0 · 가이드 v1.2, 2026-11-09)
 
 기준 자료: `docs/spec.pdf`(기획), 가이드와 Figma 내보내기 PNG는 받은 날짜별로 `docs/design/<날짜>/`에 있다 (버전 차이는 `docs/design/README.md`).
-리빌드(11-06)는 `docs/design/2026-11-06/`(가이드 이전판, `Kagom_App_screens.zip`, `Kagom_App_components.zip`) 기준이다. 최신은 `docs/design/2026-11-09/`(가이드 v1.2: SCR-05 3단계 지도, SCR-06 페이지네이션, 캐릭터 상태 텍스트 제거).
+지금 구현은 `docs/design/2026-11-09/`(가이드 v1.2: SCR-05 3단계 지도, SCR-06 페이지네이션, 캐릭터 상태 텍스트 제거) 기준이다. 11-06 리빌드 때 쓴 가이드 이전판과 내보내기(`2026-11-06/`)는 이 레포에 옮기지 않았다 (시험 레포 `hyundai-bearing/bearing-test`에 있다).
 Figma MCP는 Starter 팀 호출 한도로 막혀, 토큰은 MCP(`get_variable_defs`)로, 화면·컴포넌트는 내보낸 PNG로 대조했다.
 
 ## 구조
@@ -43,7 +43,7 @@ Figma MCP는 Starter 팀 호출 한도로 막혀, 토큰은 MCP(`get_variable_de
 
 ## 캐릭터·치장 3D 렌더 (`tools/closet3d/build_closet.py`)
 
-곰 모델(`pebble_bear.glb`, git 934bcd4)에 맞춰 Blender에서 치장 아이템을 절차적으로 모델링하고, 같은 카메라로 렌더한다.
+곰 모델(`tools/closet3d/source/pebble_bear.glb`)과 스킨 텍스처(`tools/closet3d/source/skins/`)에 맞춰 Blender에서 치장 아이템을 절차적으로 모델링하고, 같은 카메라로 렌더한다.
 
 | 파일 (`assets/kagom/`) | 내용 |
 |---|---|
