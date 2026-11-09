@@ -30,7 +30,7 @@ Pleos SDK는 `settings.gradle.kts`의 Pleos 저장소(`nexus-playground.pleos.ai
 
 - 항상 최신 `main`에서 딴다: `git switch main && git pull && git switch -c feature/<요약>`
 - 이름: `feature/<요약>` (기능), `fix/<요약>` (버그), `docs/<요약>` (문서). 요약은 영문 kebab-case.
-- **`main`에 직접 push하지 않는다.** 모든 변경은 PR로.
+- **`main`에 직접 push하지 않는다.** 모든 변경은 PR로. organization이 Free 플랜이고 레포가 비공개라 GitHub 브랜치 보호(승인 필수, force push 금지)를 켤 수 없다. push가 막히지 않으니 각자 지킨다.
 - 브랜치 하나 = 목적 하나. "버그 고치다가 겸사겸사 리팩터링"은 PR을 나눈다.
 
 ---
