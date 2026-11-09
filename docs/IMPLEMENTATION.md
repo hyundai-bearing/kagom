@@ -1,8 +1,8 @@
 # 카곰 구현 노트 (앱 v2.0 · 가이드 v1.2, 2026-11-09)
 
-기준 자료: `docs/spec.pdf`(기획), 가이드와 Figma 내보내기 PNG는 받은 날짜별로 `docs/design/<날짜>/`에 있다 (버전 차이는 `docs/design/README.md`).
+기준 자료: `docs/spec.pdf`(기획), 작업 가이드는 받은 날짜별로 `docs/design/<날짜>/`에 있다 (버전 차이는 `docs/design/README.md`). 화면·컴포넌트는 Figma에서 직접 읽는다 (`docs/FIGMA_BRIDGE.md`).
 지금 구현은 `docs/design/2026-11-09/`(가이드 v1.2: SCR-05 3단계 지도, SCR-06 페이지네이션, 캐릭터 상태 텍스트 제거) 기준이다. 11-06 리빌드 때 쓴 가이드 이전판과 내보내기(`2026-11-06/`)는 이 레포에 옮기지 않았다 (시험 레포 `hyundai-bearing/bearing-test`에 있다).
-Figma MCP는 Starter 팀 호출 한도로 막혀, 토큰은 MCP(`get_variable_defs`)로, 화면·컴포넌트는 내보낸 PNG로 대조했다.
+11/6~11/9에는 공식 Figma MCP가 Starter 팀 호출 한도로 막혀, 토큰은 MCP(`get_variable_defs`)로, 화면·컴포넌트는 내보낸 PNG로 대조했다. 앞으로는 한도가 없는 Figma MCP Bridge로 직접 읽는다.
 
 ## 구조
 
