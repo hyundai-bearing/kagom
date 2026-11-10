@@ -3,9 +3,14 @@ package com.example.roro.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -62,6 +67,7 @@ import com.example.roro.ui.components.unlockLabel
 import com.example.roro.ui.components.wornLayers
 import com.example.roro.ui.josa
 import com.example.roro.ui.theme.KagomColor
+import com.example.roro.ui.theme.KagomMotion
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomSkinPalette
 import com.example.roro.ui.theme.KagomSpace
@@ -129,8 +135,8 @@ fun ClosetScreen(
     var toast by remember { mutableStateOf<String?>(null) }
     var lastToast by remember { mutableStateOf("") }
     LaunchedEffect(toast) { toast?.let { lastToast = it; delay(3_000); toast = null } }
-    val category = Category.entries[tab]
-    val items = Items.of(category) + if (examples) Examples.of(category) else emptyList()
+    fun itemsOf(category: Category) = Items.of(category) + if (examples) Examples.of(category) else emptyList()
+    val items = itemsOf(Category.entries[tab])
 
     fun pageSizeFor(panelOpen: Boolean) = when {
         split -> 3
@@ -194,13 +200,16 @@ fun ClosetScreen(
         }
     }
     val grid: @Composable (Modifier) -> Unit = { m ->
-        Column(m, verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-            items.drop(shownPage * pageSize).take(pageSize).chunked(cols).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-                    row.forEach { item ->
-                        key(item.id) {
-                            val s = stateOf(item)
-                            ItemGridCell(item, s, captionOf(item, s), lockedSel?.id == item.id, { onCell(item) })
+        // 탭·페이지를 넘기면 앞 칸들이 옅어지며 다음 칸들로 바뀐다 (주행 중에는 바로)
+        Crossfade(tab to shownPage, m, tween(KagomMotion.ms(KagomMotion.SCREEN, gearP)), label = "grid") { (shownTab, shown) ->
+            Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
+                itemsOf(Category.entries[shownTab]).drop(shown * pageSize).take(pageSize).chunked(cols).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
+                        row.forEach { item ->
+                            key(item.id) {
+                                val s = stateOf(item)
+                                ItemGridCell(item, s, captionOf(item, s), lockedSel?.id == item.id, { onCell(item) })
+                            }
                         }
                     }
                 }
@@ -213,6 +222,12 @@ fun ClosetScreen(
     val tabs: @Composable (Modifier) -> Unit = { m ->
         GhostSegmentedTabs(Category.entries.map { it.label }, tab, { tab = it; lockedSel = null; page = 0 }, m, itemWidth = if (split) null else 160.dp)
     }
+    // 주행 중에는 저장 버튼이 꺼져 있는 까닭을 알려 준다 (가이드 5.2: 치장 저장은 기어 P에서만)
+    val hint = if (gearP) "잠긴 아이템을 누르면 얻는 방법을 알려드려요" else "주행 중에는 돌려보기와 저장을 할 수 없어요"
+    // 패널·시트가 닫히며 사라지는 동안에도 마지막 아이템을 그린다
+    val lastLocked = remember { arrayOfNulls<Item>(1) }
+    lockedSel?.let { lastLocked[0] = it }
+    val panelItem = lockedSel ?: lastLocked[0]
     val actions: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
             val size = if (split) IviButtonSize.Medium else IviButtonSize.Large
@@ -228,7 +243,7 @@ fun ClosetScreen(
                 preview(Modifier.fillMaxWidth().height(400.dp).background(palette.canvasTint, RoundedCornerShape(KagomRadius.r24)).padding(12.dp), true)
                 Spacer(Modifier.height(KagomSpace.s16))
                 Text("치장", style = KagomType.Heading22, color = KagomColor.Text.primary)
-                Text("잠긴 아이템을 누르면 얻는 방법을 알려드려요", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
+                Text(hint, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
                 Spacer(Modifier.height(KagomSpace.s12))
                 tabs(Modifier.fillMaxWidth())
                 Spacer(Modifier.height(KagomSpace.s12))
@@ -244,17 +259,24 @@ fun ClosetScreen(
                 Column(Modifier.weight(1f).fillMaxHeight().padding(start = 36.dp, end = 36.dp, top = 28.dp, bottom = 28.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("치장", style = KagomType.Heading24, color = KagomColor.Text.primary, modifier = Modifier.weight(1f))
-                        Text("잠긴 아이템을 누르면 얻는 방법을 알려드려요", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
+                        Text(hint, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
                     }
                     Spacer(Modifier.height(KagomSpace.s16))
                     tabs(Modifier)
                     Spacer(Modifier.height(KagomSpace.s16))
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         grid(Modifier)
-                        lockedSel?.let { item ->
-                            val info = unlockInfo(item, ctx, data.completedQuests)
-                            ItemUnlockPanel(item, item.source.unlockLabel(), info.progressValue, info.ratio, info.hint, info.cta, true,
-                                { onNavigate(info.target, info.landmarkId) }, Modifier.align(Alignment.TopEnd).width(320.dp))
+                        // itemUnlockPanel: 오른쪽에서 밀려 들어온다 (바깥 Column의 AnimatedVisibility가 아니라 일반 것을 쓴다)
+                        androidx.compose.animation.AnimatedVisibility(
+                            lockedSel != null, Modifier.align(Alignment.TopEnd),
+                            enter = fadeIn(tween(KagomMotion.SHEET)) + slideInHorizontally(tween(KagomMotion.SHEET, easing = FastOutSlowInEasing)) { it / 3 },
+                            exit = fadeOut(tween(KagomMotion.SHEET_OUT)) + slideOutHorizontally(tween(KagomMotion.SHEET_OUT)) { it / 3 },
+                        ) {
+                            panelItem?.let { item ->
+                                val info = unlockInfo(item, ctx, data.completedQuests)
+                                ItemUnlockPanel(item, item.source.unlockLabel(), info.progressValue, info.ratio, info.hint, info.cta, true,
+                                    { onNavigate(info.target, info.landmarkId) }, Modifier.width(320.dp))
+                            }
                         }
                     }
                     // closetFooter: 페이지 넘김 | 빈칸 | 원래대로·저장하기 (버튼은 늘 오른쪽 끝, 가이드 v1.2 2.1)
@@ -267,21 +289,31 @@ fun ClosetScreen(
             }
         }
 
-        // Split: 바텀시트 (딤 위)
-        if (split) lockedSel?.let { item ->
-            val info = unlockInfo(item, ctx, data.completedQuests)
-            Box(Modifier.fillMaxSize().background(KagomColor.Overlay.dim).clickable(remember { MutableInteractionSource() }, null) { select(null) })
-            Column(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .background(KagomColor.Surface.card, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .clickable(remember { MutableInteractionSource() }, null) {}
-                    .padding(start = 44.dp, end = 44.dp, top = 12.dp, bottom = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+        // Split: 바텀시트 (딤 위). 딤이 깔리며 아래에서 올라온다
+        if (split) {
+            AnimatedVisibility(lockedSel != null, enter = fadeIn(tween(KagomMotion.SHEET)), exit = fadeOut(tween(KagomMotion.SHEET_OUT))) {
+                Box(Modifier.fillMaxSize().background(KagomColor.Overlay.dim).clickable(remember { MutableInteractionSource() }, null) { select(null) })
+            }
+            AnimatedVisibility(
+                lockedSel != null, Modifier.align(Alignment.BottomCenter),
+                enter = slideInVertically(tween(KagomMotion.SHEET, easing = FastOutSlowInEasing)) { it },
+                exit = slideOutVertically(tween(KagomMotion.SHEET_OUT, easing = FastOutSlowInEasing)) { it },
             ) {
-                Box(Modifier.size(40.dp, 5.dp).background(KagomColor.Border.divider, RoundedCornerShape(KagomRadius.full)))
-                Spacer(Modifier.height(32.dp))
-                ItemUnlockPanel(item, item.source.unlockLabel(), info.progressValue, info.ratio, info.hint, info.cta, true,
-                    { select(null); onNavigate(info.target, info.landmarkId) }, Modifier.fillMaxWidth(), framed = false)
+                panelItem?.let { item ->
+                    val info = unlockInfo(item, ctx, data.completedQuests)
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .background(KagomColor.Surface.card, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                            .clickable(remember { MutableInteractionSource() }, null) {}
+                            .padding(start = 44.dp, end = 44.dp, top = 12.dp, bottom = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(Modifier.size(40.dp, 5.dp).background(KagomColor.Border.divider, RoundedCornerShape(KagomRadius.full)))
+                        Spacer(Modifier.height(32.dp))
+                        ItemUnlockPanel(item, item.source.unlockLabel(), info.progressValue, info.ratio, info.hint, info.cta, true,
+                            { select(null); onNavigate(info.target, info.landmarkId) }, Modifier.fillMaxWidth(), framed = false)
+                    }
+                }
             }
         }
 

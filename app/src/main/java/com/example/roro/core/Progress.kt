@@ -90,6 +90,13 @@ object Progress {
     fun ordered(queue: List<PendingPopup>): List<PendingPopup> =
         queue.filter { it !is PendingPopup.TierUp } + queue.filterIsInstance<PendingPopup.TierUp>().sortedBy { it.tier }
 
+    /**
+     * 달성했지만 보상 상자(POP-02 언박싱)를 아직 열지 않은 도전과제. 도전과제 카드는 이 동안 보상을 ?로 둔다
+     * (주행 중 달성 → 정차해서 상자를 열 때까지)
+     */
+    fun boxedQuests(queue: List<PendingPopup>): Set<String> =
+        queue.filterIsInstance<PendingPopup.Reward>().filterNot { it.opened }.map { it.questId }.toSet()
+
     /** 같은 key는 한 번만 */
     fun enqueue(queue: List<PendingPopup>, item: PendingPopup): List<PendingPopup> =
         if (queue.any { it.key == item.key }) queue else queue + item

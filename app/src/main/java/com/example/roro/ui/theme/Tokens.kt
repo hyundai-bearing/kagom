@@ -29,6 +29,8 @@ object KagomColor {
 
     object Overlay {
         val dim = Color(0x66131417)
+        /** 보상 상자가 열릴 때 번지는 흰 빛 (surface/card 90%) */
+        val flash = Color(0xE6FFFFFF)
     }
 
     object Text {

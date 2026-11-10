@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpSize
 
 /** Figma 프레임 이름의 Full|Split (가이드 5.1) */
 enum class LayoutMode(val designWidth: Float) {
@@ -37,7 +41,19 @@ fun KagomTheme(content: @Composable () -> Unit) {
         val heightPx = constraints.maxHeight.toFloat()
         val mode = if (widthPx >= heightPx) LayoutMode.FULL else LayoutMode.SPLIT
         val density = Density(density = widthPx / mode.designWidth, fontScale = 1f)
-        CompositionLocalProvider(LocalDensity provides density, LocalLayoutMode provides mode) {
+        // 가이드 8.1: 터치 타깃 ≥ 64px(ivi 기준). Figma 크기가 그보다 작은 것(이전, 빵부스러기, 핀, 칩)은
+        // 그림은 그대로 두고 누를 수 있는 범위만 64로 넓힌다 (Compose 기본은 48)
+        val platform = LocalViewConfiguration.current
+        val viewConfiguration = remember(platform) {
+            object : ViewConfiguration by platform {
+                override val minimumTouchTargetSize get() = DpSize(KagomSize.touchMin, KagomSize.touchMin)
+            }
+        }
+        CompositionLocalProvider(
+            LocalDensity provides density,
+            LocalLayoutMode provides mode,
+            LocalViewConfiguration provides viewConfiguration,
+        ) {
             content()
         }
     }

@@ -1,7 +1,11 @@
 package com.example.roro.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -11,6 +15,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -50,6 +56,7 @@ import com.example.roro.core.Source
 import com.example.roro.core.StatusRow
 import com.example.roro.core.Items
 import com.example.roro.ui.theme.KagomColor
+import com.example.roro.ui.theme.KagomMotion
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomSize
 import com.example.roro.ui.theme.KagomSpace
@@ -84,10 +91,13 @@ fun Chip(text: String, bg: Color, fg: Color, modifier: Modifier = Modifier, heig
     ) { Text(text, style = style, color = fg, maxLines = 1) }
 }
 
-/** progressBar (Size=Wide 480 | Compact 240 · Ratio). 높이 8 */
+/**
+ * progressBar (Size=Wide 480 | Compact 240 · Ratio). 높이 8.
+ * 값이 바뀌면 새 값까지 차오른다 (EXP 획득, 도전과제 진행). 처음 그릴 때는 움직이지 않는다
+ */
 @Composable
 fun ProgressBar(ratio: Float, modifier: Modifier = Modifier, height: Dp = 8.dp, fill: Color = KagomColor.Progress.fill) {
-    val r = ratio.coerceIn(0f, 1f)
+    val r by animateFloatAsState(ratio.coerceIn(0f, 1f), tween(KagomMotion.PROGRESS, easing = FastOutSlowInEasing), label = "progress")
     Box(modifier.height(height).clip(RoundedCornerShape(KagomRadius.full)).background(KagomColor.Progress.track)) {
         if (r > 0f) Box(Modifier.fillMaxHeight().fillMaxWidth(r).background(fill, RoundedCornerShape(KagomRadius.full)))
     }
@@ -145,16 +155,18 @@ enum class NavTab(val label: String) { HOME("홈"), QUESTS("도전"), MAP("지�
 @Composable
 fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(KagomRadius.r16)
+    val bg by animateColorAsState(if (selected) KagomColor.Surface.inverse else KagomColor.Surface.card, tween(KagomMotion.FAST), label = "navBg")
+    val fg by animateColorAsState(if (selected) KagomColor.Text.inverse else KagomColor.Text.secondary, tween(KagomMotion.FAST), label = "navFg")
     Box(
         modifier
             .size(KagomSize.navItem, KagomSize.navItemHeight)
             .clip(shape)
-            .background(if (selected) KagomColor.Surface.inverse else KagomColor.Surface.card, shape)
+            .background(bg, shape)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics { contentDescription = "$label 탭" },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = KagomType.Caption14Strong, color = if (selected) KagomColor.Text.inverse else KagomColor.Text.secondary)
+        Text(label, style = KagomType.Caption14Strong, color = fg)
     }
 }
 
@@ -199,10 +211,19 @@ fun TierEmblem(tier: Int, modifier: Modifier = Modifier, large: Boolean = false)
     }
 }
 
-/** headerProfile (kagomName · equippedTitle · tierBadge · expProgress 160×6) */
+/**
+ * headerProfile (kagomName · equippedTitle · tierBadge · expProgress 160×6).
+ * 한 줄에 안 들어가면 뒤쪽부터 다음 줄로 내린다: Split(폭 600)에서 이름이 길면(10자) EXP가 눌려 글자가 잘렸다.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HeaderProfile(name: String, title: String?, tier: Int, exp: Int, nextExp: Int?, modifier: Modifier = Modifier) {
-    Row(modifier.height(KagomSize.chipHeight), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    FlowRow(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(KagomSpace.s8),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(name, style = KagomType.Title32, color = KagomColor.Text.primary, maxLines = 1)
         if (title != null) Chip(title, KagomColor.Surface.card, KagomColor.Text.primary, height = KagomSize.chipHeight, modifier = Modifier.padding())
         TierEmblem(tier)
@@ -290,8 +311,9 @@ fun DriveLockBanner(title: String, body: String?, modifier: Modifier = Modifier)
 fun StepDots(step: Int, total: Int = 3, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         for (i in 1..total) {
-            val color = if (i <= step) KagomColor.Progress.fill else KagomColor.Border.divider
-            Box(Modifier.size(if (i == step) 28.dp else 8.dp, 8.dp).background(color, RoundedCornerShape(KagomRadius.full)))
+            val color by animateColorAsState(if (i <= step) KagomColor.Progress.fill else KagomColor.Border.divider, tween(KagomMotion.SCREEN), label = "dot")
+            val width by animateDpAsState(if (i == step) 28.dp else 8.dp, tween(KagomMotion.SCREEN), label = "dotWidth")
+            Box(Modifier.size(width, 8.dp).background(color, RoundedCornerShape(KagomRadius.full)))
         }
     }
 }
@@ -327,10 +349,13 @@ enum class QuestCardSize { Wide, Compact }
 /**
  * questCard (Size=Wide|Compact · Type=Single|Cumulative · State=InProgress|Achieved).
  * 달성 전: 보상 ? + 카테고리 텍스트 / 달성 후: 실제 아이템·칭호명 공개 (rewardPreview).
+ * [boxed] = 달성했지만 보상 상자(POP-02 언박싱)를 아직 안 열었다. 주행 중에 달성하면 정차할 때까지 이 상태라,
+ * 여기서 먼저 공개하면 언박싱이 김빠진다 → 상자를 열 때까지 ?로 둔다 (POP-02 각주 "열기 전에는 보상이 ? 로 표시돼요")
  */
 @Composable
-fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifier) {
+fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifier, boxed: Boolean = false) {
     val item = Items.byId(p.quest.rewardItemId)
+    val revealed = p.achieved && !boxed
     val shape = RoundedCornerShape(KagomRadius.r24)
     Row(
         modifier.fillMaxWidth().height(if (p.quest.cumulative) 110.dp else 98.dp)
@@ -354,13 +379,17 @@ fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifi
         }
         Spacer(Modifier.width(KagomSpace.s16))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-            if (p.achieved && item != null) ItemThumb(item.mark, 56.dp, locked = false, radius = KagomRadius.r16, markStyle = KagomType.Heading24, itemId = item.id)
+            if (revealed && item != null) ItemThumb(item.mark, 56.dp, locked = false, radius = KagomRadius.r16, markStyle = KagomType.Heading24, itemId = item.id)
             else Box(Modifier.size(56.dp).background(KagomColor.Surface.subtle, RoundedCornerShape(KagomRadius.r16)), contentAlignment = Alignment.Center) {
                 Text("?", style = KagomType.Heading24, color = KagomColor.Text.primary)
             }
             Column(Modifier.widthIn(max = if (size == QuestCardSize.Compact) 150.dp else 320.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    if (p.achieved && item != null) "${item.name} · ${item.category.label}" else "${item?.category?.label ?: ""} 보상",
+                    when {
+                        revealed && item != null -> "${item.name} · ${item.category.label}"
+                        boxed -> "${item?.category?.label ?: ""} 보상 · 상자 도착"
+                        else -> "${item?.category?.label ?: ""} 보상"
+                    },
                     style = KagomType.Caption14, color = KagomColor.Text.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 Text(if (p.achieved) "+${p.quest.exp} EXP 획득" else "+${p.quest.exp} EXP", style = KagomType.Caption14Strong, color = KagomColor.Text.accent)
@@ -379,12 +408,13 @@ fun ItemGridCell(item: Item, state: CellState, caption: String, selected: Boolea
     val shape = RoundedCornerShape(KagomRadius.r24)
     val highlighted = selected || state == CellState.Equipped
     val locked = state == CellState.Locked
+    val borderColor by animateColorAsState(if (highlighted) KagomColor.Progress.fill else KagomColor.Border.default, tween(KagomMotion.FAST), label = "cellBorder")
     Column(
         modifier
             .size(180.dp, 232.dp)
             .clip(shape)
             .background(KagomColor.Surface.card, shape)
-            .border(if (highlighted) 2.dp else 1.dp, if (highlighted) KagomColor.Progress.fill else KagomColor.Border.default, shape)
+            .border(if (highlighted) 2.dp else 1.dp, borderColor, shape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(top = KagomSpace.s16, start = 8.dp, end = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
