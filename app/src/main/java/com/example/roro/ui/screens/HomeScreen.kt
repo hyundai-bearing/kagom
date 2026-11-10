@@ -2,6 +2,8 @@
 
 package com.example.roro.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,9 +23,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.Expression
 import com.example.roro.core.Items
@@ -72,15 +78,28 @@ fun HomeScreen(
             alive = gearP,
         )
     }
+    val split = LocalLayoutMode.current == LayoutMode.SPLIT
+    // 이 화면이 뜬 뒤에 새로 생긴 배지만 톡 튀어나온다 (처음부터 있던 배지와 주행 중에는 움직이지 않는다)
+    val known = remember { status.badges.map { it.id }.toMutableSet() }
+    known.retainAll(status.badges.map { it.id }.toSet())
     val badges: @Composable (Modifier) -> Unit = { m ->
         FlowRow(m, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s8, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
-            if (status.badges.isEmpty()) StatusBadge(Severity.OK, "이상 없음")
-            else status.badges.forEach { b -> StatusBadge(b.severity, b.label, onClick = if (gearP) onOpenSheet else null) }
+            // Split에는 빠른 정비 카드가 없어 배지가 정비 시트로 가는 하나뿐인 길이다 → 이상이 없을 때도 열 수 있게 한다
+            if (status.badges.isEmpty()) StatusBadge(Severity.OK, "이상 없음", onClick = if (gearP && split) onOpenSheet else null)
+            else status.badges.forEach { b ->
+                key(b.id) {
+                    val pop = remember { Animatable(if (known.add(b.id) && gearP) 0f else 1f) }
+                    LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f)) }
+                    StatusBadge(b.severity, b.label, Modifier.graphicsLayer {
+                        scaleX = pop.value; scaleY = pop.value; alpha = pop.value.coerceIn(0f, 1f)
+                    }, onClick = if (gearP) onOpenSheet else null)
+                }
+            }
         }
     }
 
-    if (LocalLayoutMode.current == LayoutMode.SPLIT) {
+    if (split) {
         // 헤더 / 캔버스 / 하단 배지 그룹 세로 스택. 배지 터치 → 바텀시트
         Column(Modifier.fillMaxSize().background(palette.canvasTint)) {
             header(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp))

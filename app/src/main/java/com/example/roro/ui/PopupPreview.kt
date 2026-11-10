@@ -56,11 +56,11 @@ fun PopupPreview(kind: String, gearP: Boolean, onClose: () -> Unit) {
     Box(Modifier.fillMaxSize().background(KagomColor.Surface.page)) {
         HomeScreen(profile, data, status.copy(expression = Expression.IDLE), gearP) { sheetOpen = true }
         if (gearP) {
-            if (sheetOpen) MaintenanceSheet(status, data, true, { sheetOpen = false }, { refilled = true },
+            MaintenanceSheet(sheetOpen, status, data, true, { sheetOpen = false }, { refilled = true },
                 { oilChanged = true }, { severe = it }, { recommended = it },
                 { item -> checks = if (item in checks) checks - item else checks + item },
                 { completed = true; checks = emptyList() }, {})
-            else when {
+            if (!sheetOpen) when {
                 kind == "reward" || kind == "reveal" -> RewardModal(
                     Examples.popupReward(opened), profile, data.equipped,
                     { opened = true }, onClose, { onClose() },

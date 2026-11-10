@@ -2,6 +2,9 @@ package com.example.roro.ui.screens
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,13 +29,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +48,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -63,6 +72,7 @@ import com.example.roro.core.Items
 import com.example.roro.core.KoreaMap
 import com.example.roro.core.Landmark
 import com.example.roro.core.Landmarks
+import com.example.roro.core.MapCamera
 import com.example.roro.core.MapProjection
 import com.example.roro.core.MapRegion
 import com.example.roro.core.MapZoom
@@ -74,6 +84,7 @@ import com.example.roro.ui.components.NorthArrowGlyph
 import com.example.roro.ui.components.PinState
 import com.example.roro.ui.components.StatusBadge
 import com.example.roro.ui.theme.KagomColor
+import com.example.roro.ui.theme.KagomMotion
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomType
 import com.example.roro.ui.theme.LayoutMode
@@ -97,8 +108,19 @@ private data class RegionProgress(val region: MapRegion, val landmarks: List<Lan
         }
 }
 
+/**
+ * SCR-05 랜드마크 지도.
+ * [focusLandmarkId] = 치장의 [지도에서 보기]로 넘어왔을 때 바로 보여 줄 랜드마크: 그 시·군 지도로 들어가 구획을 고르고 상세를 띄운다.
+ * 보여 준 뒤 [onFocusShown]으로 알린다 (다시 이 탭에 올 때는 전국부터).
+ */
 @Composable
-fun MapScreen(views: List<LandmarkView>, gearP: Boolean, onEquip: (String) -> Unit) {
+fun MapScreen(
+    views: List<LandmarkView>,
+    gearP: Boolean,
+    onEquip: (String) -> Unit,
+    focusLandmarkId: String? = null,
+    onFocusShown: () -> Unit = {},
+) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
     val context = LocalContext.current
     val result by produceState<Result<KoreaMap>?>(null, context) {
@@ -136,6 +158,15 @@ fun MapScreen(views: List<LandmarkView>, gearP: Boolean, onEquip: (String) -> Un
     BackHandler(enabled = provinceId != null || pinId != null, onBack = ::goBack)
 
     val loaded = result?.getOrNull()
+    LaunchedEffect(focusLandmarkId, loaded) {
+        val lm = Landmarks.byId(focusLandmarkId) ?: return@LaunchedEffect
+        val target = loaded?.unit(lm.unitId) ?: return@LaunchedEffect
+        provinceId = target.provinceId
+        unitId = target.id
+        districtId = loaded.districtsOf(target.id).firstOrNull { it.contains(lm.lon.toFloat(), lm.lat.toFloat()) }?.id
+        pinId = lm.id
+        onFocusShown()
+    }
     if (loaded == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(if (result == null) "지도를 불러오는 중이에요" else "지도를 불러오지 못했어요.",
@@ -303,6 +334,59 @@ private fun MapRegion.outline() = Path().apply {
 
 private data class RegionLabel(val id: String, val text: TextLayoutResult, val rect: Rect)
 
+/** 지도 한 단계의 그림 (칸·경계·시점·점선 테두리를 두른 칸). 단계를 옮길 때 떠나온 단계를 겹쳐 그리려고 묶어 둔다 */
+private class MapScene(
+    val bounds: GeoBounds,
+    val regions: List<RegionProgress>,
+    val paths: Map<String, Path>,
+    val outline: Path?,
+    val camera: MapCamera,
+    val selectedId: String?,
+)
+
+/** 두 시점 사이 ([t] 0..1). 화면에서 모든 점이 곧게 움직이도록 배율과 화면 위 이동량을 같이 보간한다 */
+private fun MapCamera.towards(to: MapCamera, t: Float): MapCamera {
+    val s = scale + (to.scale - scale) * t
+    val ox = -cx * scale + (-to.cx * to.scale + cx * scale) * t
+    val oy = -cy * scale + (-to.cy * to.scale + cy * scale) * t
+    return MapCamera(-ox / s, -oy / s, s)
+}
+
+/**
+ * 지도 한 단계의 그림. 자기 시점([MapScene.camera])으로 한 번만 그려 두고, 단계 이동 중에는 그 그림을 통째로 옮기고 키운다
+ * ([shown] = 지금 화면의 시점). 프레임마다 해안선 수천 점을 새 배율로 다시 그리면 끊긴다 (에뮬레이터에서 프레임당 70~200 ms).
+ */
+@Composable
+private fun SceneLayer(scene: MapScene, shown: () -> MapCamera, alpha: () -> Float) {
+    Canvas(Modifier.fillMaxSize().graphicsLayer {
+        compositingStrategy = CompositingStrategy.Offscreen
+        val now = shown()
+        val k = now.scale / scene.camera.scale
+        scaleX = k; scaleY = k
+        translationX = (scene.camera.cx - now.cx) * now.scale
+        translationY = (scene.camera.cy - now.cy) * now.scale
+        this.alpha = alpha()
+    }) {
+        val camera = scene.camera
+        val border = 1.25.dp.toPx() / camera.scale
+        withTransform({
+            translate(size.width / 2 - camera.cx * camera.scale, size.height / 2 - camera.cy * camera.scale)
+            scale(camera.scale, camera.scale, Offset.Zero)
+        }) {
+            scene.outline?.let {
+                drawPath(it, KagomColor.Map.landFogged)
+                drawPath(it, KagomColor.Map.boundary, style = Stroke(border))
+            }
+            scene.regions.asReversed().forEach { drawPath(scene.paths.getValue(it.region.id), it.fill) }
+            scene.regions.forEach { drawPath(scene.paths.getValue(it.region.id), KagomColor.Map.boundary, style = Stroke(border)) }
+            scene.paths[scene.selectedId]?.let {
+                val dashes = floatArrayOf(7.dp.toPx() / camera.scale, 4.dp.toPx() / camera.scale)
+                drawPath(it, KagomColor.Text.primary, style = Stroke(2.5.dp.toPx() / camera.scale, pathEffect = PathEffect.dashPathEffect(dashes)))
+            }
+        }
+    }
+}
+
 @Composable
 private fun RegionMap(
     bounds: GeoBounds,
@@ -331,6 +415,25 @@ private fun RegionMap(
         val density = LocalDensity.current
         val pad = with(density) { minOf(32.dp.toPx(), minOf(w, h) / 5f) }
         val camera = remember(bounds, w, h, pad) { MapZoom.fit(bounds, w, h, pad) }
+        // 단계 이동: 떠나온 단계의 그림에서 새 단계의 그림으로 시점이 옮겨 가며 바뀐다 (주행 중에는 바로 바꾼다).
+        // 방문 기록만 바뀌거나 화면 크기가 바뀐 것(범위가 같음)은 단계 이동이 아니다
+        val scene = remember(regions, paths, outlinePath, camera, district?.region?.id) {
+            MapScene(bounds, regions, paths, outlinePath, camera, district?.region?.id)
+        }
+        val scenes = remember { arrayOfNulls<MapScene>(2) }     // [0] 지금 단계, [1] 떠나온 단계
+        scenes[0].let { shown ->
+            if (shown != null && shown.bounds != scene.bounds) scenes[1] = shown.takeIf { gearP }
+            scenes[0] = scene
+        }
+        val from = scenes[1]
+        val move = remember(scene.bounds) { Animatable(if (from != null) 0f else 1f) }
+        LaunchedEffect(move) {
+            // 두 단계의 그림이 처음 그려지는 프레임이 지난 뒤에 움직이기 시작한다 (그 프레임이 길어서 앞부분을 건너뛰지 않게)
+            if (move.value < 1f) repeat(2) { withFrameNanos { } }
+            move.animateTo(1f, tween(KagomMotion.MAP, easing = FastOutSlowInEasing))
+            scenes[1] = null
+        }
+        val moving by remember(move) { derivedStateOf { move.value < 1f } }
         fun point(lon: Float, lat: Float) = Offset(
             camera.toScreenX(MapProjection.x(lon), w),
             camera.toScreenY(MapProjection.y(lat), h),
@@ -371,6 +474,21 @@ private fun RegionMap(
             if (id != null) onRegion(id) else onDismissPin()
         }
         val back by rememberUpdatedState(onBack)
+        // 떠나온 단계는 뒤쪽 절반 동안 옅어지고, 새 단계는 앞쪽 절반 동안 짙어진다. 이름표는 자리 잡을 무렵에 나타난다
+        val shown = { if (from != null && move.value < 1f) from.camera.towards(scene.camera, move.value) else scene.camera }
+        // key = 단계: 보이던 단계가 '떠나온 단계'가 돼도 같은 그림을 그대로 쓴다 (다시 그리지 않는다)
+        listOfNotNull(from.takeIf { moving }, scene).forEach { layer ->
+            key(layer.bounds) {
+                SceneLayer(layer, shown) {
+                    when {
+                        from == null -> 1f
+                        // 새 단계는 처음부터 아주 옅게라도 그려 둔다 (알파 0이면 그리기를 미뤄서 움직이는 도중에 끊긴다)
+                        layer === scene -> (move.value / 0.55f).coerceIn(0.02f, 1f)
+                        else -> 1f - ((move.value - 0.4f) / 0.5f).coerceIn(0f, 1f)
+                    }
+                }
+            }
+        }
         Canvas(Modifier.fillMaxSize().pointerInput(Unit) {
             awaitEachGesture {
                 val down = awaitFirstDown()
@@ -394,34 +512,18 @@ private fun RegionMap(
                 } while (pressed.isNotEmpty())
             }
         }) {
-            val border = 1.25.dp.toPx() / camera.scale
-            withTransform({
-                translate(w / 2 - camera.cx * camera.scale, h / 2 - camera.cy * camera.scale)
-                scale(camera.scale, camera.scale, Offset.Zero)
-            }) {
-                outlinePath?.let {
-                    drawPath(it, KagomColor.Map.landFogged)
-                    drawPath(it, KagomColor.Map.boundary, style = Stroke(border))
-                }
-                regions.asReversed().forEach { drawPath(paths.getValue(it.region.id), it.fill) }
-                regions.forEach { drawPath(paths.getValue(it.region.id), KagomColor.Map.boundary, style = Stroke(border)) }
-                district?.let {
-                    val dashes = floatArrayOf(7.dp.toPx() / camera.scale, 4.dp.toPx() / camera.scale)
-                    drawPath(paths.getValue(it.region.id), KagomColor.Text.primary,
-                        style = Stroke(2.5.dp.toPx() / camera.scale, pathEffect = PathEffect.dashPathEffect(dashes)))
-                }
-            }
-            labels.forEach { label ->
+            val labelAlpha = if (from != null) ((move.value - 0.75f) / 0.25f).coerceIn(0f, 1f) else 1f
+            if (labelAlpha > 0f) labels.forEach { label ->
                 val rect = label.rect
                 val radius = CornerRadius(rect.height / 2)
-                drawRoundRect(KagomColor.Surface.card, rect.topLeft, rect.size, radius)
+                drawRoundRect(KagomColor.Surface.card, rect.topLeft, rect.size, radius, alpha = labelAlpha)
                 if (label.id == district?.region?.id) {
-                    drawRoundRect(KagomColor.Text.primary, rect.topLeft, rect.size, radius, style = Stroke(1.dp.toPx()))
+                    drawRoundRect(KagomColor.Text.primary, rect.topLeft, rect.size, radius, alpha = labelAlpha, style = Stroke(1.dp.toPx()))
                 }
-                drawText(label.text, topLeft = rect.center - Offset(label.text.size.width / 2f, label.text.size.height / 2f))
+                drawText(label.text, topLeft = rect.center - Offset(label.text.size.width / 2f, label.text.size.height / 2f), alpha = labelAlpha)
             }
         }
-        district?.landmarks.orEmpty().forEach { v ->
+        if (!moving) district?.landmarks.orEmpty().forEach { v ->
             val p = pinLocations.getValue(v.landmark.id)
             val name = v.landmark.name
             LandmarkPin(v.pin, Modifier.offset {
@@ -430,8 +532,9 @@ private fun RegionMap(
             val x = with(density) { p.x.toDp() }
             val y = with(density) { p.y.toDp() }
             Text(
-                name, Modifier.offset(x = (x + 28.dp).coerceIn(4.dp, maxOf(4.dp, maxWidth - 110.dp)),
-                    y = (y - 12.dp).coerceAtLeast(0.dp))
+                // 이름표는 핀 오른쪽. 오른쪽 끝에 가까워 자리가 없으면(동해안 핀, Split) 핀을 덮지 않게 핀 아래에 둔다
+                name, (if (x + 28.dp <= maxWidth - 110.dp) Modifier.offset(x = x + 28.dp, y = (y - 12.dp).coerceAtLeast(0.dp))
+                else Modifier.offset(x = (x - 40.dp).coerceIn(4.dp, maxOf(4.dp, maxWidth - 110.dp)), y = y + 28.dp))
                     .clip(RoundedCornerShape(KagomRadius.full)).background(KagomColor.Surface.card)
                     .clickable(role = Role.Button) { onPin(v.landmark.id) }.padding(horizontal = 8.dp, vertical = 2.dp),
                 style = KagomType.Caption14Strong, color = KagomColor.Text.primary, maxLines = 1,

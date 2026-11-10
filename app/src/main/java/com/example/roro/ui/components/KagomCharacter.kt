@@ -7,6 +7,8 @@ import android.util.LruCache
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.KeyframesSpec
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -36,6 +38,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -163,6 +166,50 @@ enum class TouchAct(val key: String, val frames: Int) {
 /** 렌더에서 발끝 위치 (돌려보기 카메라 0단 기준, 곰 발바닥 ≈ 높이의 95%). 숨쉬기 기준점 */
 private val FEET = TransformOrigin(0.5f, 0.95f)
 
+/**
+ * 표정별 가만히 있을 때의 움직임 (spec 6장 kagomMainCanvas: 이상 상태는 표정에 맞는 애니메이션을 되풀이, 단계가 높을수록 강하게).
+ * 표정 렌더는 한 장이라 몸과 옷을 겹친 그림을 통째로 움직인다 (숨쉬기와 같은 방식, 기준점 발끝). 수치는 가정이다.
+ */
+private class IdleMotion(
+    /** 숨 한 번 (ms)과 세로로 부푸는 비율 */
+    val breathMs: Int = 3200,
+    val breathAmp: Float = 0.012f,
+    /** 몸짓 한 번: 0에서 시작해 ±1 사이를 오가다 0으로 끝난다. null이면 숨만 쉰다 */
+    val gesture: KeyframesSpec<Float>? = null,
+    /** 몸짓 사이에 쉬는 시간 (ms, 이 사이에서 고른다) */
+    val restMs: LongRange = 0L..1L,
+    /** 몸짓 값이 1일 때: 옆으로 밀리는 거리, 기우는 각도, 납작해지는 비율(가로는 그만큼 늘어난다) */
+    val shift: Dp = 0.dp,
+    val tiltDeg: Float = 0f,
+    val squash: Float = 0f,
+)
+
+/** 배가 꼬르륵: 짧게 출렁이다 잦아든다 */
+private val RUMBLE = keyframes<Float> { durationMillis = 520; 1f at 70; -0.8f at 170; 0.6f at 270; -0.35f at 370; 0f at 520 }
+/** 오들오들: 좌우로 잘게 떨다 잦아든다 */
+private val SHIVER = keyframes<Float> {
+    durationMillis = 640
+    1f at 50; -1f at 110; 0.9f at 170; -0.9f at 230; 0.7f at 290; -0.7f at 350; 0.4f at 420; -0.3f at 500; 0f at 640
+}
+/** 꾸벅: 천천히 기울다가 잠깐 멈추고 화들짝 돌아온다 */
+private val NOD = keyframes<Float> { durationMillis = 2100; 0f at 0 using FastOutSlowInEasing; 1f at 1200; 1f at 1600; -0.15f at 1850; 0f at 2100 }
+
+private val IDLE_PLAIN = IdleMotion()
+private val IDLE_TIRED = IdleMotion(breathMs = 4600, breathAmp = 0.018f, gesture = NOD, restMs = 2600L..5200L, tiltDeg = 2.4f, squash = 0.012f)
+private val IDLE_HUNGRY_1 = IdleMotion(gesture = RUMBLE, restMs = 4200L..6400L, squash = 0.012f)
+private val IDLE_HUNGRY_2 = IdleMotion(gesture = RUMBLE, restMs = 3000L..4600L, squash = 0.017f)
+private val IDLE_HUNGRY_3 = IdleMotion(breathMs = 3800, breathAmp = 0.009f, gesture = RUMBLE, restMs = 2000L..3200L, squash = 0.022f)
+private val IDLE_SICK = IdleMotion(breathMs = 3600, breathAmp = 0.009f, gesture = SHIVER, restMs = 2200L..3600L, shift = 2.5.dp)
+
+private fun idleMotion(expression: Expression) = when (expression) {
+    Expression.IDLE, Expression.STAIN -> IDLE_PLAIN
+    Expression.TIRED -> IDLE_TIRED
+    Expression.HUNGRY_1 -> IDLE_HUNGRY_1
+    Expression.HUNGRY_2 -> IDLE_HUNGRY_2
+    Expression.HUNGRY_3 -> IDLE_HUNGRY_3
+    Expression.SICK -> IDLE_SICK
+}
+
 /** 동작 프레임 한 장 합성: 몸 위에 착용 레이어를 차례로 (없으면 null) */
 private fun composeMotion(context: Context, act: TouchAct, skinCode: String, worn: List<String>, i: Int): ImageBitmap? {
     fun decode(path: String, mutable: Boolean = false) = runCatching {
@@ -271,13 +318,25 @@ fun KagomCharacter(
     var motionFrame by remember { mutableStateOf<ImageBitmap?>(null) }
     val scope = rememberCoroutineScope()
 
-    // 숨쉬기: 3.2초에 한 번 세로로 1.2% 부풀었다 돌아온다 (가로는 반만큼 줄어 부피 유지)
+    // 숨쉬기: 대기 표정은 3.2초에 한 번 세로로 1.2% 부풀었다 돌아온다 (가로는 반만큼 줄어 부피 유지). 표정마다 빠르기·깊이가 다르다
+    val idle = idleMotion(expression)
     val breath = remember { Animatable(0f) }
-    LaunchedEffect(alive) {
+    LaunchedEffect(alive, idle) {
         if (!alive) { breath.animateTo(0f, tween(300)); return@LaunchedEffect }
         while (true) {
-            breath.animateTo(1f, tween(1600, easing = FastOutSlowInEasing))
-            breath.animateTo(0f, tween(1600, easing = FastOutSlowInEasing))
+            breath.animateTo(1f, tween(idle.breathMs / 2, easing = FastOutSlowInEasing))
+            breath.animateTo(0f, tween(idle.breathMs / 2, easing = FastOutSlowInEasing))
+        }
+    }
+    // 표정별 몸짓: 배고픔 = 배가 꼬르륵, 아픔 = 오들오들, 피곤함 = 꾸벅 (쉬었다가 되풀이)
+    val gesture = remember { Animatable(0f) }
+    LaunchedEffect(alive, idle) {
+        gesture.snapTo(0f)
+        val once = idle.gesture
+        if (!alive || once == null) return@LaunchedEffect
+        while (true) {
+            delay(Random.nextLong(idle.restMs.first, idle.restMs.last))
+            gesture.animateTo(0f, once)
         }
     }
     // 눈 깜빡임: 대기 표정일 때 2.6~5.2초마다 0.12초, 네 번에 한 번은 두 번 연속
@@ -345,8 +404,11 @@ fun KagomCharacter(
                 .graphicsLayer {
                     transformOrigin = FEET
                     val b = breath.value
-                    scaleX = 1f - 0.006f * b
-                    scaleY = 1f + 0.012f * b
+                    val g = gesture.value
+                    scaleX = 1f - idle.breathAmp / 2 * b + idle.squash * g
+                    scaleY = 1f + idle.breathAmp * b - idle.squash * g
+                    translationX = idle.shift.toPx() * g
+                    rotationZ = idle.tiltDeg * g
                 },
             contentAlignment = Alignment.Center,
         ) {

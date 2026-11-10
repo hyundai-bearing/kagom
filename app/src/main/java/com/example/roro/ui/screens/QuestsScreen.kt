@@ -27,9 +27,9 @@ import com.example.roro.ui.theme.KagomType
 import com.example.roro.ui.theme.LayoutMode
 import com.example.roro.ui.theme.LocalLayoutMode
 
-/** SCR-04 도전과제 (questList) */
+/** SCR-04 도전과제 (questList). [boxed] = 보상 상자를 아직 열지 않은 도전과제 id (보상을 ?로 둔다) */
 @Composable
-fun QuestsScreen(quests: List<QuestProgress>, totalExp: Int) {
+fun QuestsScreen(quests: List<QuestProgress>, totalExp: Int, boxed: Set<String> = emptySet()) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
     val pad = if (split) 20.dp else 36.dp
     Column(
@@ -47,7 +47,7 @@ fun QuestsScreen(quests: List<QuestProgress>, totalExp: Int) {
         }
         Spacer(Modifier.height(KagomSpace.s12))
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-            quests.forEach { QuestCard(it, if (split) QuestCardSize.Compact else QuestCardSize.Wide) }
+            quests.forEach { QuestCard(it, if (split) QuestCardSize.Compact else QuestCardSize.Wide, boxed = it.quest.id in boxed) }
         }
     }
 }

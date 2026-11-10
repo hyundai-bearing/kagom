@@ -68,6 +68,14 @@ class ProgressTest {
         assertEquals(1, Progress.enqueue(Progress.enqueue(emptyList(), r), r).size)
     }
 
+    @Test fun rewardStaysBoxedUntilOpened() {
+        val boxed = PendingPopup.Reward("QST-01", "ITM-B-01", 100, 0, 100)
+        val opened = PendingPopup.Reward("QST-02", "ITM-T-02", 150, 100, 250, opened = true)
+        val landmark = PendingPopup.Landmark("LM-GN-01", "ITM-H-01", 150, 250, 400, 1, 0)
+        assertEquals(setOf("QST-01"), Progress.boxedQuests(listOf(boxed, opened, landmark)))
+        assertTrue(Progress.boxedQuests(emptyList()).isEmpty())
+    }
+
     @Test fun tiers() {
         assertEquals(1, Tiers.tierFor(0))
         assertEquals(1, Tiers.tierFor(399))
