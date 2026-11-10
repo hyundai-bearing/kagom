@@ -380,7 +380,15 @@ fun KagomCharacter(
         val ready = head
         nextAct = TouchAct.entries.filter { it != act }.random()
         motionJob?.cancel()
-        motionJob = scope.launch { playMotion(context.applicationContext, act, skinCode, worn, ready) { motionFrame = it } }
+        motionJob = scope.launch {
+            // 돌려 둔 채로 누르면 정면으로 빨리 돌려놓고 시작한다: 동작 프레임은 정면(HOME_YAW)뿐이라 돌아간 그림 위에 겹쳐 잔상처럼 보였다.
+            // 제자리로 돌아오려고 기다리던 settleJob은 끈다 (동작 중에 다시 돌려보기 그림이 올라오지 않게). 0.2초는 가정
+            if (!turn.atRest) {
+                turn.settleJob?.cancel()
+                turn.reset(200)
+            }
+            playMotion(context.applicationContext, act, skinCode, worn, ready) { motionFrame = it }
+        }
     }
     val playing = motionFrame != null
 
@@ -427,9 +435,11 @@ fun KagomCharacter(
                     }
                 }
             }
-            if (turning) TurnImage(frames, turn, Modifier.fillMaxSize())
+            // 둘을 같이 그리지 않는다 (각도가 다른 두 그림이 겹친다)
+            if (turning && !playing) TurnImage(frames, turn, Modifier.fillMaxSize())
             motionFrame?.let { img -> Spacer(Modifier.fillMaxSize().drawBehind { drawMotionFrame(img) }) }
         }
     }
-    LaunchedEffect(expression) { motionJob?.cancel() }
+    // 표정이 바뀌거나 터치 반응이 막히면(주행 시작) 하던 동작도 바로 멈춘다
+    LaunchedEffect(expression, onTouch != null) { motionJob?.cancel() }
 }
