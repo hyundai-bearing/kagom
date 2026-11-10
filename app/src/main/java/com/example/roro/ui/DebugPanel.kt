@@ -93,6 +93,10 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
                 val examples by c.demoExamples.collectAsState()
                 Btn(if (examples) "켜짐 · 치장 예시 아이템 03~12" else "꺼짐", examples) { c.demoExamples.value = !examples }
             }
+            Group("새 차량 (SCR-00 이어가기)") {
+                val data by c.store.data.collectAsState()
+                Btn(if (data.newVehicle) "이전 카곰 기록 발견 ✓" else "이전 카곰 기록 발견", data.newVehicle) { c.demoNewVehicle(!data.newVehicle); onClose() }
+            }
             Group("데이터") {
                 Btn("신호 덮어쓰기 해제", false) { c.signals.clear() }
                 Btn("전체 초기화", false) { c.demoResetAll(); onClose() }

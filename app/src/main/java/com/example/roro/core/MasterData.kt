@@ -122,13 +122,21 @@ object Items {
 
 enum class QuestKind { DISTANCE, LANDMARK_PLACES, LANDMARK_VISITS, CHECKUP }
 
+/** 도전과제 카드 아이콘 (Figma questIcon/flag …, 194:1837) */
+enum class QuestIcon { FLAG, GAUGE, COMPASS, MAP, WRENCH }
+
 data class Quest(
     val id: String,
+    /** 카드 제목 (Figma 6:2085 "첫 드라이브") */
+    val name: String,
+    val icon: QuestIcon,
+    /** 달성 조건 (카드 둘째 줄 "10 km 주행", 보상 모달 부제) */
     val title: String,
     /** true = 누적형 (progressBar + 카운트 표시, showGauge) */
     val cumulative: Boolean,
     val kind: QuestKind,
     val target: Int,
+    /** 진행 숫자 뒤에 그대로 붙인다 (Figma "64 / 100 km", "2 / 3곳", "4 / 10회") */
     val unit: String,
     val rewardItemId: String,
     val exp: Int,
@@ -142,15 +150,15 @@ data class Quest(
 
 object Quests {
     val all = listOf(
-        Quest("QST-01", "10 km 주행", false, QuestKind.DISTANCE, 10, "km", "ITM-B-01", 100,
+        Quest("QST-01", "첫 드라이브", QuestIcon.FLAG, "10 km 주행", false, QuestKind.DISTANCE, 10, " km", "ITM-B-01", 100,
             "10 km 달성!", "주행", "첫 드라이브를 무사히 마쳤어요"),
-        Quest("QST-02", "누적 100 km 주행", true, QuestKind.DISTANCE, 100, "km", "ITM-T-02", 150,
+        Quest("QST-02", "100 km의 여정", QuestIcon.GAUGE, "누적 100 km 주행", true, QuestKind.DISTANCE, 100, " km", "ITM-T-02", 150,
             "누적 100 km 달성!", "주행", "벌써 100 km를 함께 달렸어요"),
-        Quest("QST-03", "랜드마크 3곳 방문", true, QuestKind.LANDMARK_PLACES, 3, "", "ITM-B-02", 150,
+        Quest("QST-03", "강릉 탐험가", QuestIcon.COMPASS, "랜드마크 3곳 방문", true, QuestKind.LANDMARK_PLACES, 3, "곳", "ITM-B-02", 150,
             "랜드마크 3곳 달성!", "도전과제", "강릉 랜드마크를 모두 둘러봤어요"),
-        Quest("QST-04", "랜드마크 10회 방문", true, QuestKind.LANDMARK_VISITS, 10, "", "TTL-01", 300,
+        Quest("QST-04", "동해안 정복자", QuestIcon.MAP, "랜드마크 10회 방문", true, QuestKind.LANDMARK_VISITS, 10, "회", "TTL-01", 300,
             "랜드마크 10회 달성!", "도전과제", "동해안 구석구석을 누볐어요"),
-        Quest("QST-05", "정기 점검 1회 완료", false, QuestKind.CHECKUP, 1, "", "TTL-02", 200,
+        Quest("QST-05", "성실한 카곰 집사", QuestIcon.WRENCH, "정기 점검 1회 완료", false, QuestKind.CHECKUP, 1, "회", "TTL-02", 200,
             "정기 점검 완료!", "정비", "차를 꼼꼼하게 챙겼어요"),
     )
 

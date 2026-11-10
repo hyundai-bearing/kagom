@@ -33,6 +33,7 @@ import kotlinx.coroutines.cancel
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_visit LM-GN-01  # 랜드마크 방문
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_reset true     # 전체 초기화
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_examples true  # Figma 예시 데이터 켜기/끄기
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_new_vehicle true # 새 차에서 이전 카곰 기록 발견 (SCR-00 Carry-over)
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_popup reward  # reward/reveal/landmark:LM-GN-01/level/maintenance/maintenance-ev/maintenance-done/off (저장 안 함)
  */
 class MainActivity : ComponentActivity() {
@@ -83,6 +84,7 @@ class MainActivity : ComponentActivity() {
         if (intent.hasExtra("demo_odo")) c.signals.edit { it.copy(odometerKm = intent.getIntExtra("demo_odo", 0).toFloat()) }
         intent.getStringExtra("demo_visit")?.let { c.demoVisit(it.takeIf { id -> id.isNotBlank() }) }
         if (intent.hasExtra("demo_examples")) c.demoExamples.value = intent.getBooleanExtra("demo_examples", false)
+        if (intent.hasExtra("demo_new_vehicle")) c.demoNewVehicle(intent.getBooleanExtra("demo_new_vehicle", false))
     }
 
     override fun onDestroy() {

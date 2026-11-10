@@ -42,7 +42,9 @@ import com.example.roro.ui.components.BottomTabBar
 import com.example.roro.ui.components.IviToast
 import com.example.roro.ui.components.NavRail
 import com.example.roro.ui.components.NavTab
+import com.example.roro.ui.screens.CarryOverScreen
 import com.example.roro.ui.screens.ClosetScreen
+import com.example.roro.ui.screens.DriveLockScreen
 import com.example.roro.ui.screens.DrivingToastView
 import com.example.roro.ui.screens.HomeScreen
 import com.example.roro.ui.screens.LandmarkUnlockModal
@@ -90,7 +92,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
     var mapFocus by remember { mutableStateOf<String?>(null) }
     val onboarding = remember { OnboardingState() }
     val profile = data.profile
-    val current = if (profile == null) NavTab.HOME else tab
+    val current = if (profile == null || data.newVehicle) NavTab.HOME else tab
 
     // gear≠P: 정비 시트 조작 차단 → 닫는다
     LaunchedEffect(gearP) { if (!gearP) sheetOpen = false }
@@ -100,12 +102,14 @@ fun KagomApp(c: KagomController) = KagomTheme {
     BackHandler(enabled = profile != null && current != NavTab.HOME) { tab = NavTab.HOME }
 
     val debugGesture = if (c.debug) Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { debugOpen = true }) } else Modifier
-    val select: (NavTab) -> Unit = { if (profile != null) tab = it }
+    // 새 차에서 이전 기록을 찾았으면(SCR-00 Carry-over) 고를 때까지 온보딩처럼 다른 탭으로 못 간다
+    val carryOver = profile != null && data.newVehicle
+    val select: (NavTab) -> Unit = { if (profile != null && !carryOver) tab = it }
 
     val screen: @Composable () -> Unit = {
         // 탭 전환·카곰 생성 직후: 앞 화면이 먼저 옅어지고 다음 화면이 나타난다. 주행 중에는 바로 바꾼다
         AnimatedContent(
-            targetState = if (profile == null) null else current,
+            targetState = if (profile == null || carryOver) null else current,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
                 val ms = KagomMotion.ms(KagomMotion.SCREEN, gearP)
@@ -113,13 +117,15 @@ fun KagomApp(c: KagomController) = KagomTheme {
             },
             label = "screen",
         ) { target ->
-            if (profile == null || target == null) {
+            if (profile != null && carryOver) {
+                // 초기 설정이라 주행 중에는 잠근다 (가이드 5.2)
+                if (gearP) CarryOverScreen(profile, data, c.progressContext(data).drivenKm, c::carryOverKeep, c::carryOverRestart)
+                else DriveLockScreen("기어를 P에 두면 이어서 고를 수 있어요.")
+            } else if (profile == null || target == null) {
                 OnboardingFlow(onboarding, gearP) { name, answers -> c.createProfile(name, answers) }
             } else when (target) {
                 NavTab.HOME -> HomeScreen(profile, data, status, gearP) { if (gearP) sheetOpen = true }
-                NavTab.QUESTS -> QuestsScreen(
-                    Progress.all(c.progressContext(data), data.completedQuests), data.exp, Progress.boxedQuests(data.pending),
-                )
+                NavTab.QUESTS -> QuestsScreen(Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt)
                 NavTab.MAP -> MapScreen(
                     landmarkViews(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet()),
                     gearP, c::equip, mapFocus, { mapFocus = null },

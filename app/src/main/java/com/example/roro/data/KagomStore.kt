@@ -18,8 +18,10 @@ data class Profile(
     val skin: String,
     val answers: String,
     val createdDay: Long,
-    /** 카곰을 만든 뒤 처음 받은 주행거리. 도전과제 거리 = 지금 - 이 값 */
+    /** 이 차에서 처음 받은 주행거리. 이 차에서 달린 거리 = 지금 - 이 값 */
     val baseOdoKm: Float? = null,
+    /** 이전 차에서 함께 달린 거리 (SCR-00 Carry-over에서 데려올 때 더한다) */
+    val carriedKm: Float = 0f,
 )
 
 /** 착용 중인 치장 (머리·상의·하의·칭호) */
@@ -53,6 +55,12 @@ data class AppData(
     val checkupChecks: Set<String> = emptySet(),
     /** gear → P 때 재생할 팝업 (pendingPopupQueue) */
     val pending: List<PendingPopup> = emptyList(),
+    /** 도전과제 id → 달성 시각 (ms). SCR-04 카드의 "2026.11.08 달성 · 14:20". 예전 설치의 기록에는 없다 */
+    val questDoneAt: Map<String, Long> = emptyMap(),
+    /** 마지막으로 계산한 함께 달린 거리 (km). 차가 바뀌면 주행거리 신호로는 다시 계산할 수 없어서 적어 둔다 */
+    val lastDrivenKm: Int = 0,
+    /** 새 차에서 이전 카곰 기록을 찾았다 → SCR-00 Carry-over에서 고를 때까지 true */
+    val newVehicle: Boolean = false,
 ) {
     val visitedPlaces: Set<String> get() = visits.map { it.landmarkId }.toSet()
 }
@@ -74,18 +82,35 @@ class KagomStore(context: Context) {
 
     fun reset() = update { AppData() }
 
+    /**
+     * 지금 기록을 보관함에 넣고 새로 시작한다 (SCR-00 "새 카곰과 처음부터 시작하기": 기록은 삭제되지 않고 보관돼요).
+     * 보관한 기록을 다시 여는 화면은 아직 디자인에 없다.
+     */
+    @Synchronized
+    fun archiveAndReset() {
+        val current = state.value
+        if (current.profile != null) {
+            val archived = runCatching { JSONArray(prefs.getString(KEY_ARCHIVE, "[]")) }.getOrDefault(JSONArray())
+            archived.put(encode(current.copy(newVehicle = false, pending = emptyList())))
+            prefs.edit().putString(KEY_ARCHIVE, archived.toString()).apply()
+        }
+        update { AppData() }
+    }
+
     private fun load(): AppData = runCatching {
         prefs.getString(KEY, null)?.let { decode(JSONObject(it)) }
     }.getOrNull() ?: AppData()
 
     private companion object {
         const val KEY = "data_v2"
+        const val KEY_ARCHIVE = "archive_v2"
 
         fun encode(d: AppData) = JSONObject().apply {
             d.profile?.let { p ->
                 put("profile", JSONObject().apply {
                     put("name", p.name); put("skin", p.skin); put("answers", p.answers); put("createdDay", p.createdDay)
                     p.baseOdoKm?.let { put("baseOdoKm", it.toDouble()) }
+                    put("carriedKm", p.carriedKm.toDouble())
                 })
             }
             put("equipped", JSONObject().apply {
@@ -105,12 +130,16 @@ class KagomStore(context: Context) {
             })
             put("checks", JSONArray(d.checkupChecks.toList()))
             put("pending", JSONArray(d.pending.map { encodePopup(it) }))
+            put("questDoneAt", JSONObject().apply { d.questDoneAt.forEach { (id, at) -> put(id, at) } })
+            put("lastDrivenKm", d.lastDrivenKm)
+            put("newVehicle", d.newVehicle)
         }
 
         fun decode(o: JSONObject) = AppData(
             profile = o.optJSONObject("profile")?.let {
                 Profile(it.getString("name"), it.getString("skin"), it.optString("answers"), it.getLong("createdDay"),
-                    if (it.has("baseOdoKm")) it.getDouble("baseOdoKm").toFloat() else null)
+                    if (it.has("baseOdoKm")) it.getDouble("baseOdoKm").toFloat() else null,
+                    it.optDouble("carriedKm", 0.0).toFloat())
             },
             equipped = o.optJSONObject("equipped")?.let {
                 Equipped(it.optStringOrNull("head"), it.optStringOrNull("top"), it.optStringOrNull("bottom"), it.optStringOrNull("title"))
@@ -131,6 +160,9 @@ class KagomStore(context: Context) {
             } ?: MaintenanceState(),
             checkupChecks = o.optJSONArray("checks").strings().toSet(),
             pending = o.optJSONArray("pending").objects().mapNotNull { decodePopup(it) },
+            questDoneAt = o.optJSONObject("questDoneAt")?.let { m -> m.keys().asSequence().associateWith { m.optLong(it) } }.orEmpty(),
+            lastDrivenKm = o.optInt("lastDrivenKm"),
+            newVehicle = o.optBoolean("newVehicle"),
         )
 
         fun encodePopup(p: PendingPopup) = when (p) {
