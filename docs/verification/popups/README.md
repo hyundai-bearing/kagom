@@ -59,3 +59,24 @@ adb -s emulator-5554 shell am start --activity-single-top -n com.example.roro/.M
 Pleos 선물 열기→공개 동작 녹화:
 
 ![언박싱](unboxing.gif)
+
+
+## 정기 점검 후속 수정 (2026-11-10)
+
+- 최종 빌드 `:app:compileDebugKotlin :app:testDebugUnitTest :app:assembleDebug` 통과, 단위 테스트 38개/실패 0.
+- 실제 컨트롤러·저장소 경로에서 EV 9,999 km 완료 불가 → 10,000 km 세 항목 체크·완료 → 1회차 저장·완료 버튼 사라짐 → 19,999 km 완료 불가 → 20,000 km 2회차 체크·완료를 확인했다. D에서는 정비 시트가 숨겨지고 기록이 바뀌지 않았다. [검사 결과](maintenance-distance-checks.json). 테스트 전 폰 SharedPreferences 원본을 바이트 단위로 복구했다.
+- Pleos Full(1682×1210)·Split(841×1210)에서는 EX- 미리보기로 EV 항목과 완료 후 남은 거리 표시를 확인했다. 폰 Split에서는 실제 콜백으로 검증했다. 실차 주행·SDK 실시간 거리 증가 검증은 하지 않았으며 기존 Pleos odometer 구독을 사용한다.
+- 재현: 디버그 패널의 팝업 미리보기에서 **전기차 점검** / **점검 완료**를 선택하거나 아래 명령을 사용한다. 미리보기는 저장하지 않는다.
+
+```powershell
+adb -s emulator-5554 shell am start --user 10 --activity-single-top -n com.example.roro/.MainActivity --es demo_popup maintenance-ev --es demo_gear P
+adb -s emulator-5554 shell am start --user 10 --activity-single-top -n com.example.roro/.MainActivity --es demo_popup maintenance-done
+adb -s emulator-5554 shell am start --user 10 --activity-single-top -n com.example.roro/.MainActivity --es demo_popup off
+```
+
+| 상태 | Pleos Full | Pleos Split | 폰 Split (실제 콜백) |
+|---|---|---|---|
+| 전기차 점검 | ![Full EV](maintenance-distance-full-ev.png) | ![Pleos Split EV](maintenance-distance-pleos-split-ev.png) | ![Phone EV](maintenance-distance-phone-ev.png) |
+| 완료 후 대기 | ![Full 완료](maintenance-distance-full-done.png) | ![Pleos Split 완료](maintenance-distance-pleos-split-done.png) | ![Phone 완료](maintenance-distance-phone-done.png) |
+
+기존 설치에 이미 저장된 완료 회차는 임의로 되돌리지 않는다. 실제 점검 기록과 예전 시연으로 생성한 기록을 구별할 수 없기 때문이다.

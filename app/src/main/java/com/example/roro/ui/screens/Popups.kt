@@ -580,7 +580,7 @@ fun MaintenanceSheet(
                     IviButton("가까운 정비소 찾기", onFindShop, enabled = gearP)
                 }
             }
-            if (status.oilChange != null || status.engineOilAlert) {
+            if (status.engineType != com.example.roro.core.EngineType.EV && (status.oilChange != null || status.engineOilAlert)) {
                 MaintenanceSection {
                     Text("엔진오일 교체 시기", style = KagomType.Heading22, color = KagomColor.Text.primary)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -592,20 +592,28 @@ fun MaintenanceSheet(
                 }
             }
             MaintenanceSection {
-                Text("${status.checkup.round}만 km 정기 점검", style = KagomType.Heading22, color = KagomColor.Text.primary)
-                val labels = listOf("엔진룸에 기름이 새는지 확인", "타이어가 많이 닳았는지 확인", "전조등·배터리 상태 확인")
-                Checkup.items.forEachIndexed { index, item ->
-                    // 저장 키는 기존 짧은 이름을 보존하고 화면 문구만 Figma에 맞춘다.
-                    Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        IviCheckbox(item in data.checkupChecks, "", { onToggleCheck(item) },
-                            Modifier.size(64.dp).semantics { contentDescription = labels[index] }, enabled = gearP)
-                        Text(labels[index], style = KagomType.Body20, color = KagomColor.Text.primary,
-                            modifier = Modifier.weight(1f).clickable(enabled = gearP) { onToggleCheck(item) })
+                Text(if (status.checkup.due) "${status.checkup.round}만 km 정기 점검" else "정기 점검",
+                    style = KagomType.Heading22, color = KagomColor.Text.primary)
+                if (status.checkup.due) {
+                    Checkup.itemsFor(status.engineType).forEach { item ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            IviCheckbox(item.key in data.checkupChecks, "", { onToggleCheck(item.key) },
+                                Modifier.size(64.dp).semantics { contentDescription = item.label }, enabled = gearP)
+                            Text(item.label, style = KagomType.Body20, color = KagomColor.Text.primary,
+                                modifier = Modifier.weight(1f).clickable(enabled = gearP) { onToggleCheck(item.key) })
+                        }
                     }
+                    IviButton("점검 다 했어요", onCompleteCheckup, type = IviButtonType.Primary,
+                        enabled = gearP && Checkup.canComplete(status.checkup, status.engineType, data.checkupChecks))
+                } else {
+                    if (data.maintenance.checkupRoundsDone > 0) {
+                        Text("${data.maintenance.checkupRoundsDone}만 km 점검을 완료했어요",
+                            style = KagomType.Body20, color = KagomColor.Text.primary)
+                    }
+                    Text("다음 점검: ${status.checkup.round}만 km · ${status.checkup.display}",
+                        style = KagomType.Body20, color = KagomColor.Text.secondary)
                 }
-                IviButton("점검 다 했어요", onCompleteCheckup, type = IviButtonType.Primary,
-                    enabled = gearP && Checkup.items.all { it in data.checkupChecks })
             }
         }
     }

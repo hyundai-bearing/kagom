@@ -2,6 +2,7 @@ package com.example.roro.ui
 
 import android.content.Context
 import com.example.roro.core.Answer
+import com.example.roro.core.Checkup
 import com.example.roro.core.Gear
 import com.example.roro.core.Items
 import com.example.roro.core.Landmarks
@@ -262,13 +263,21 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
     fun setRecommendedOil(on: Boolean) = parked { store.update { it.copy(maintenance = it.maintenance.copy(recommendedOil = on)) } }
 
     fun toggleCheck(item: String) = parked {
-        store.update { d -> d.copy(checkupChecks = if (item in d.checkupChecks) d.checkupChecks - item else d.checkupChecks + item) }
+        store.update { d ->
+            val snapshot = signals.snapshot.value
+            val checkup = StateEngine.checkup(d.maintenance, snapshot.odometerKm)
+            if (!checkup.due || Checkup.itemsFor(snapshot.engineType).none { it.key == item }) d
+            else d.copy(checkupChecks = if (item in d.checkupChecks) d.checkupChecks - item else d.checkupChecks + item)
+        }
     }
 
     fun completeCheckup() = parked {
-        val round = status.value.checkup.round
         store.update { d ->
-            d.copy(maintenance = d.maintenance.copy(checkupRoundsDone = round, checkupDoneDay = today()), checkupChecks = emptySet())
+            // 연타·이전 화면 콜백도 최신 거리·차종·체크 상태를 확인한다.
+            val snapshot = signals.snapshot.value
+            val checkup = StateEngine.checkup(d.maintenance, snapshot.odometerKm)
+            if (!Checkup.canComplete(checkup, snapshot.engineType, d.checkupChecks)) d
+            else d.copy(maintenance = d.maintenance.copy(checkupRoundsDone = checkup.round, checkupDoneDay = today()), checkupChecks = emptySet())
         }
         checkQuests()
     }

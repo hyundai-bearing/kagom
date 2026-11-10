@@ -18,6 +18,8 @@ object Examples {
         PopupExample("EX-POP-03-PORT", "주문진항 해금", "landmark:LM-GN-03"),
         PopupExample("EX-POP-04", "레벨 업", "level"),
         PopupExample("EX-POP-05", "정비 시트", "maintenance"),
+        PopupExample("EX-POP-05-EV", "전기차 점검", "maintenance-ev"),
+        PopupExample("EX-POP-05-DONE", "점검 완료", "maintenance-done"),
     )
     const val popupName = "포근이"
     const val popupSkin = "P03"

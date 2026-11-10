@@ -41,13 +41,16 @@ fun PopupPreview(kind: String, gearP: Boolean, onClose: () -> Unit) {
     var recommended by rememberSaveable(kind) { mutableStateOf(true) }
     var refilled by rememberSaveable(kind) { mutableStateOf(false) }
     var oilChanged by rememberSaveable(kind) { mutableStateOf(false) }
-    var sheetOpen by rememberSaveable(kind) { mutableStateOf(kind == "maintenance") }
+    var sheetOpen by rememberSaveable(kind) { mutableStateOf(kind.startsWith("maintenance")) }
+    var completed by rememberSaveable(kind) { mutableStateOf(kind == "maintenance-done") }
     val maintenance = MaintenanceState(severe = severe, recommendedOil = recommended,
+        checkupRoundsDone = if (completed) 1 else 0,
         oilChangedKm = if (oilChanged) 7_840f else 0f, oilChangedDay = day, engineOilDismissed = refilled)
     val data = AppData(profile = profile, exp = 120, maintenance = maintenance,
         checkupChecks = checks.toSet(), owned = Items.all.map { it.id }.toSet())
-    val status = StateEngine.evaluate(VehicleSnapshot(fuelPercent = 72, engineOil = OilLevel.LOW,
-        brakeFluid = OilLevel.LOW, odometerKm = 7_840f), maintenance, 0, day, day)
+    val status = StateEngine.evaluate(VehicleSnapshot(fuelPercent = if (kind == "maintenance-ev") null else 72,
+        socPercent = if (kind == "maintenance-ev") 72 else null, engineOil = OilLevel.LOW,
+        brakeFluid = OilLevel.LOW, odometerKm = 10_000f), maintenance, 0, day, day)
     // 진행 중 주행 전환은 샘플을 소비하지 않고 보이지 않게만 한다.
     BackHandler { if (sheetOpen) sheetOpen = false }
     Box(Modifier.fillMaxSize().background(KagomColor.Surface.page)) {
@@ -56,7 +59,7 @@ fun PopupPreview(kind: String, gearP: Boolean, onClose: () -> Unit) {
             if (sheetOpen) MaintenanceSheet(status, data, true, { sheetOpen = false }, { refilled = true },
                 { oilChanged = true }, { severe = it }, { recommended = it },
                 { item -> checks = if (item in checks) checks - item else checks + item },
-                { sheetOpen = false }, {})
+                { completed = true; checks = emptyList() }, {})
             else when {
                 kind == "reward" || kind == "reveal" -> RewardModal(
                     Examples.popupReward(opened), profile, data.equipped,
