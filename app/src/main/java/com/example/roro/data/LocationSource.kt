@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.combine
 data class GeoPoint(val lat: Double, val lon: Double)
 
 /**
- * 차 위치 (Pleos FusedLocation SDK). 랜드마크 방문 판정(SCR-05)에만 쓰고 저장하지 않는다.
+ * 차 위치 (Pleos FusedLocation SDK). 지도 내 위치 표시와 랜드마크 방문 판정(SCR-05)에 쓰고 저장하지 않는다.
  * 저장하는 것은 방문한 랜드마크 id와 날짜뿐. 실패하거나 미지원이면 위치가 null로 남는다.
  */
 class LocationSource(private val context: Context) {

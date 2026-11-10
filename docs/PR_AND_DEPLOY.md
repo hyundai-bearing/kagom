@@ -171,7 +171,7 @@ gh release create v2.1.0 app/build/outputs/apk/release/app-release.apk \
 
 - **AI로 코드를 쓸 때**: 코드 규칙(구조, 토큰, Full/Split, 기어 P 제한, 저장 호환, 생성 에셋 등)은 `CLAUDE.md`에 있다. Claude Code는 자동으로 읽고, Codex·Cursor 등은 `AGENTS.md`를 거쳐 같은 파일을 읽는다. 다른 도구를 쓰면 `CLAUDE.md`를 프롬프트나 규칙 파일에 넣는다. 규칙이 바뀌면 `CLAUDE.md`만 고친다.
 - **디버그 전용 기능**: 시연 패널과 `demo_*` adb 옵션은 debuggable 빌드에서만 열린다. release에서 시연하려면 debug APK를 쓴다.
-- **권한**: Pleos 차량·위치 권한(`AndroidManifest.xml`)이 바뀌면 PR 본문에 적는다. 위치는 랜드마크 방문 판정에만 쓰고 저장하지 않는다.
+- **권한**: Pleos 차량·위치 권한(`AndroidManifest.xml`)이 바뀌면 PR 본문에 적는다. 위치는 지도 내 위치 표시와 랜드마크 방문 판정에 쓰고 저장하지 않는다.
 - **요구사항 문서**: `docs/requirements.md`의 "현재 데모" 열은 11/5(Figma 리빌드 전) 기준이다. 리빌드 때 빠진 기능은 문서 맨 위에 모아 두었다. 기능을 다시 넣거나 뺄 때 문서도 같이 고친다.
 - **지도 데이터 출처**: 지도 경계와 랜드마크 좌표는 OpenStreetMap(ODbL)에서 만든다. 지도 화면의 "© OpenStreetMap contributors" 표시는 지우지 않는다 (`THIRD_PARTY_NOTICES.md`).
 - **큰 바이너리**: 렌더 산출물이 계속 쌓이면 레포가 무거워진다. 한 PR에서 에셋을 여러 번 다시 만들었다면 마지막 결과만 남도록 커밋을 정리한 뒤 올린다 (리뷰 시작 전에만).
