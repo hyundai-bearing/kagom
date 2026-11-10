@@ -405,10 +405,7 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
         ItemShowcase(item.mark, if (split) 102.27.dp else 150.dp,
             Modifier.offset(x = if (split) 340.91.dp else 500.dp, y = if (split) 20.45.dp else 30.dp), item.id)
     }) {
-        Text("${q.rewardKind} 보상을 받았어요!", style = if (split) KagomType.Body16Strong else KagomType.Body18Strong, color = KagomColor.Text.secondary)
-        Spacer(Modifier.height(2.dp))
-        Text("${q.title} 달성", style = if (split) KagomType.Caption14 else KagomType.Body16, color = KagomColor.Text.tertiary)
-        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
+        // Figma 62:3263 / 64:3893 최신본: 공개 본문은 아이템명부터 시작해 카드 높이를 줄인다.
         ItemTitleRow(item.name, listOf(item.category.label to false, "NEW" to true))
         Spacer(Modifier.height(if (split) 14.dp else 16.dp))
         ExpGain(p.exp, p.expBefore, p.expAfter)
