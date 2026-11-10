@@ -155,19 +155,19 @@ class StateEngineTest {
 
     @Test fun checkupDueEvery10000Km() {
         val m = MaintenanceState()
-        assertFalse(StateEngine.checkup(m, 9_840f, today, today).due)
-        val due = StateEngine.checkup(m, 10_020f, today, today)
+        assertFalse(StateEngine.checkup(m, 9_840f).due)
+        val due = StateEngine.checkup(m, 10_020f)
         assertTrue(due.due)
         assertEquals(1, due.round)
         assertEquals("10,000 km 도래", due.display)
-        val after = StateEngine.checkup(m.copy(checkupRoundsDone = 1, checkupDoneDay = today), 10_020f, today, today)
+        val after = StateEngine.checkup(m.copy(checkupRoundsDone = 1, checkupDoneDay = today), 10_020f)
         assertFalse(after.due)
         assertEquals(2, after.round)
         assertEquals("9,980 km 남음", after.display)
     }
 
-    @Test fun checkupDueAfter12Months() {
-        assertTrue(StateEngine.checkup(MaintenanceState(), 500f, today, today - 365).due)
+    @Test fun checkupDoesNotBecomeDueByTimeAlone() {
+        assertFalse(StateEngine.checkup(MaintenanceState(checkupDoneDay = today - 365), 500f).due)
     }
 
     @Test fun checkupDueGivesTiredAndOdometerRowBadge() {
@@ -175,4 +175,30 @@ class StateEngineTest {
         assertEquals(Expression.TIRED, r.expression)
         assertEquals("점검 도래", r.rows[1].badgeLabel)
     }
+    @Test fun nextRoundRequiresNextDistanceThreshold() {
+        val done = MaintenanceState(checkupRoundsDone = 1)
+        assertFalse(StateEngine.checkup(done, 19_999f).due)
+        assertTrue(StateEngine.checkup(done, 20_000f).due)
+        assertFalse(StateEngine.checkup(done, null).due)
+        assertFalse(StateEngine.checkup(done, Float.NaN).due)
+        assertFalse(StateEngine.checkup(done, -1f).due)
+    }
+
+    @Test fun missedMilestonesCannotBeCompletedRepeatedly() {
+        val due = StateEngine.checkup(MaintenanceState(), 35_000f)
+        assertEquals(3, due.round)
+        assertFalse(StateEngine.checkup(MaintenanceState(checkupRoundsDone = due.round), 35_000f).due)
+    }
+
+    @Test fun completionRequiresDueDistanceAndCurrentEngineChecklist() {
+        val due = StateEngine.checkup(MaintenanceState(), 10_000f)
+        val checks = Checkup.itemsFor(EngineType.EV).map { it.key }.toSet()
+        assertTrue(Checkup.canComplete(due, EngineType.EV, checks))
+        assertFalse(Checkup.canComplete(due, EngineType.EV, Checkup.items.toSet()))
+        assertFalse(Checkup.canComplete(due, EngineType.EV, checks.drop(1).toSet()))
+        assertFalse(Checkup.canComplete(due.copy(due = false), EngineType.EV, checks))
+        assertTrue(Checkup.itemsFor(EngineType.EV).none { "엔진" in it.label || "기름" in it.label })
+        assertEquals(Checkup.items, Checkup.itemsFor(EngineType.GASOLINE).map { it.key })
+    }
+
 }

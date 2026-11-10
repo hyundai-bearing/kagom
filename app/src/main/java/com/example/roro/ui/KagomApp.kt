@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -78,10 +79,11 @@ fun KagomApp(c: KagomController) = KagomTheme {
     val popup by c.activePopup.collectAsState()
     val toast by c.toast.collectAsState()
     val examples by c.demoExamples.collectAsState()
+    val popupPreview by c.demoPopup.collectAsState()
     val gearP = gear.isPark
 
     var tab by rememberSaveable { mutableStateOf(NavTab.HOME) }
-    var sheetOpen by remember { mutableStateOf(false) }
+    var sheetOpen by rememberSaveable { mutableStateOf(false) }
     var debugOpen by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<Notice?>(null) }
     /** 치장 [지도에서 보기]로 넘어올 때 지도가 바로 보여 줄 랜드마크 */
@@ -92,8 +94,6 @@ fun KagomApp(c: KagomController) = KagomTheme {
 
     // gear≠P: 정비 시트 조작 차단 → 닫는다
     LaunchedEffect(gearP) { if (!gearP) sheetOpen = false }
-    // 점검 완료로 보상이 열리면 시트는 물러난다 (보상 모달이 시트 위에 겹쳐 뜨지 않게)
-    LaunchedEffect(popup != null) { if (popup != null) sheetOpen = false }
     LaunchedEffect(profile == null) { if (profile == null) tab = NavTab.HOME }
     LaunchedEffect(notice) { if (notice != null) { delay(2_500); notice = null } }
     // 뒤로 키: 다른 탭에서는 홈으로. 화면 안의 뒤로 처리(지도 단계, 치장 패널)가 먼저다 (나중에 등록한 쪽이 먼저 받는다)
@@ -171,9 +171,10 @@ fun KagomApp(c: KagomController) = KagomTheme {
         )
 
         // 팝업 큐 (기어 P에서만 activePopup이 나온다). 들어올 때는 모달이 스스로 튀어 오르고(ModalScaffold),
-        // 닫히거나 다음 팝업으로 넘어갈 때는 앞의 것이 옅어지며 사라진다. 언박싱 → 공개는 key가 같아 그 자리에서 바뀐다
+        // 닫히거나 다음 팝업으로 넘어갈 때는 앞의 것이 옅어지며 사라진다. 언박싱 → 공개는 key가 같아 그 자리에서 바뀐다.
+        // 정비 조작이 끝나기 전에는 큐를 소비하지 않고 시트 뒤에서 기다린다
         AnimatedContent(
-            targetState = popup.takeIf { profile != null },
+            targetState = popup.takeIf { profile != null && !sheetOpen },
             modifier = Modifier.fillMaxSize(),
             transitionSpec = { (EnterTransition.None togetherWith fadeOut(tween(KagomMotion.SHEET_OUT))) using null },
             contentKey = { it?.key },
@@ -209,13 +210,18 @@ fun KagomApp(c: KagomController) = KagomTheme {
 
         if (debugOpen) DebugPanel(c, gear) { debugOpen = false }
 
-        // 뒤로 키: 시연 패널 → 정비 시트 순으로 닫는다. 보상 팝업은 버튼으로만 닫는다 (뒤로 키에 앱이 닫히지 않게 받기만 한다)
+        // 뒤로 키: 시연 패널 → 정비 시트 순으로 닫는다. 보상 팝업은 버튼으로만 닫는다 (뒤로 키에 앱이 닫히지 않게 받기만 한다).
+        // 팝업은 시트가 닫힐 때까지 뒤에서 기다리므로 시트가 먼저다
         BackHandler(enabled = sheetOpen || debugOpen || popup != null) {
             when {
                 debugOpen -> debugOpen = false
-                popup != null -> Unit
-                else -> sheetOpen = false
+                sheetOpen -> sheetOpen = false
+                else -> Unit
             }
+        }
+        // 팝업 미리보기는 맨 위 레이어이고 뒤로 키도 자기가 받는다 (나중에 등록한 쪽이 먼저 받는다)
+        if (c.debug && popupPreview != null) key(popupPreview) {
+            PopupPreview(popupPreview!!, gearP) { c.demoPopup.value = null }
         }
     }
 }
