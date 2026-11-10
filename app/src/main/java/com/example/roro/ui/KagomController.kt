@@ -5,6 +5,7 @@ import com.example.roro.core.Answer
 import com.example.roro.core.Gear
 import com.example.roro.core.Items
 import com.example.roro.core.Landmarks
+import com.example.roro.core.MaintenanceState
 import com.example.roro.core.OilLevel
 import com.example.roro.core.PendingPopup
 import com.example.roro.core.Progress
@@ -81,7 +82,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
 
     /** 지금 띄울 팝업: 기어 P + 카곰 있음 + 큐 순서대로 */
     val activePopup: StateFlow<PendingPopup?> = combine(store.data, gear, deferred) { d, g, skip ->
-        if (!g.isPark || d.profile == null) null
+        if (!g.isPark || d.profile == null || d.newVehicle) null
         else Progress.ordered(d.pending).firstOrNull { it.key !in skip }
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
@@ -137,22 +138,23 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
             // [보충했어]로 숨긴 배지: 센서가 NORMAL로 돌아오면 다시 감시
             if (d.maintenance.engineOilDismissed && s.engineOil == OilLevel.NORMAL)
                 next = next.copy(maintenance = next.maintenance.copy(engineOilDismissed = false))
+            // 함께 달린 거리를 km 단위로 적어 둔다 (차가 바뀌어도 이어 가려고). 새 차를 고르기 전에는 건드리지 않는다
+            val driven = progressContext(next).drivenKm
+            if (next.profile != null && !next.newVehicle && driven != next.lastDrivenKm) next = next.copy(lastDrivenKm = driven)
             next
         }
         checkQuests()
     }
 
     fun progressContext(d: AppData): ProgressContext {
-        val odo = signals.snapshot.value.odometerKm
-        val base = d.profile?.baseOdoKm
-        val driven = if (odo != null && base != null) (odo - base).toInt().coerceAtLeast(0) else 0
+        val driven = Progress.drivenKm(signals.snapshot.value.odometerKm, d.profile?.baseOdoKm, d.profile?.carriedKm ?: 0f)
         return ProgressContext(driven, d.visits, d.maintenance.checkupRoundsDone)
     }
 
     /** 새로 달성한 도전과제가 있으면 보상 지급 + 큐에 넣기 */
     private fun checkQuests() {
         val d = store.data.value
-        if (d.profile == null) return
+        if (d.profile == null || d.newVehicle) return
         Progress.newlyAchieved(progressContext(d), d.completedQuests).forEach { grantQuest(it) }
     }
 
@@ -163,7 +165,10 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
             granted = true
             val after = d.exp + q.exp
             withExp(
-                d.copy(owned = d.owned + q.rewardItemId, completedQuests = d.completedQuests + q.id),
+                d.copy(
+                    owned = d.owned + q.rewardItemId, completedQuests = d.completedQuests + q.id,
+                    questDoneAt = d.questDoneAt + (q.id to System.currentTimeMillis()),
+                ),
                 d.exp, after,
                 PendingPopup.Reward(q.id, q.rewardItemId, q.exp, d.exp, after),
             )
@@ -220,6 +225,29 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
                     oilChangedDay = it.maintenance.oilChangedDay ?: today()),
             )
         }
+    }
+
+    /**
+     * SCR-00 Carry-over "계속 함께하기": 칭호·아이템·EXP·방문 기록은 그대로 두고, 차에 묶인 값만 새 차에 맞춘다.
+     * 주행거리 기준값은 비워 두면 새 차의 첫 신호로 다시 잡히고(onSignals), 이전 차에서 달린 거리는 carriedKm으로 넘긴다.
+     * 정비 기록(오일 교체·정기 점검)은 차마다 다르므로 새로 시작한다.
+     */
+    fun carryOverKeep() = parked {
+        store.update { d ->
+            val p = d.profile ?: return@update d.copy(newVehicle = false)
+            d.copy(
+                profile = p.copy(baseOdoKm = null, carriedKm = d.lastDrivenKm.toFloat()),
+                maintenance = MaintenanceState(), checkupChecks = emptySet(), newVehicle = false,
+            )
+        }
+        onSignals(signals.snapshot.value)
+    }
+
+    /** SCR-00 Carry-over "처음부터 시작하기": 기록을 보관함에 넣고 성향 테스트부터 다시 한다 */
+    fun carryOverRestart() = parked {
+        deferred.value = emptySet()
+        energyLevel = 0
+        store.archiveAndReset()
     }
 
     /** POP-02 언박싱 → 공개 */
@@ -281,6 +309,9 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         val cur = signals.snapshot.value.odometerKm ?: 0f
         signals.edit { it.copy(odometerKm = cur + km) }
     }
+    /** 새 차로 옮겨 탄 상황 (SCR-00 Carry-over). 실제 감지 방법은 아직 정해지지 않아 시연 훅으로만 켠다 */
+    fun demoNewVehicle(on: Boolean) = store.update { d -> if (d.profile == null) d else d.copy(newVehicle = on) }
+
     fun demoResetAll() {
         signals.clear()
         locationSource.override.value = null

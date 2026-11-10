@@ -62,6 +62,9 @@ import com.example.roro.ui.theme.KagomSize
 import com.example.roro.ui.theme.KagomSpace
 import com.example.roro.ui.theme.KagomType
 import com.example.roro.ui.theme.PleosKit
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 // ───────────── 작은 부품 ─────────────
 
@@ -196,10 +199,13 @@ fun BottomTabBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
 
 // ───────────── 프로필 헤더 ─────────────
 
-/** tierEmblem (Tier). [scale] 2.4 = POP-04 */
+/**
+ * tierEmblem (Tier). [large] = POP-04. Figma 6:1713: 높이 36, 글자 16/24 Bold.
+ * 화면 글자는 "레벨 N"이다 (Figma가 11/10에 티어 → 레벨로 바꿨다. 코드 이름은 Tier 그대로 둔다)
+ */
 @Composable
 fun TierEmblem(tier: Int, modifier: Modifier = Modifier, large: Boolean = false) {
-    val h = if (large) 96.dp else KagomSize.chipHeight
+    val h = if (large) 96.dp else 36.dp
     Row(
         modifier.height(h).background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
             .padding(horizontal = if (large) 28.dp else 12.dp),
@@ -207,7 +213,7 @@ fun TierEmblem(tier: Int, modifier: Modifier = Modifier, large: Boolean = false)
         horizontalArrangement = Arrangement.spacedBy(if (large) 20.dp else 8.dp),
     ) {
         Box(Modifier.size(if (large) 38.dp else 16.dp).background(KagomColor.Accent.tier, CircleShape))
-        Text("티어 $tier", style = if (large) KagomType.Title36 else KagomType.Caption14Strong, color = KagomColor.Text.inverse)
+        Text("레벨 $tier", style = if (large) KagomType.Title36 else KagomType.Body16Strong, color = KagomColor.Text.inverse)
     }
 }
 
@@ -217,7 +223,11 @@ fun TierEmblem(tier: Int, modifier: Modifier = Modifier, large: Boolean = false)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HeaderProfile(name: String, title: String?, tier: Int, exp: Int, nextExp: Int?, modifier: Modifier = Modifier) {
+fun HeaderProfile(
+    name: String, title: String?, tier: Int, exp: Int, nextExp: Int?, modifier: Modifier = Modifier,
+    /** 흰 카드 위에 놓일 때 (SCR-00 Carry-over): 칭호 칩이 묻히지 않게 옅은 회색으로 */
+    onCard: Boolean = false,
+) {
     FlowRow(
         modifier,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -225,7 +235,12 @@ fun HeaderProfile(name: String, title: String?, tier: Int, exp: Int, nextExp: In
         itemVerticalAlignment = Alignment.CenterVertically,
     ) {
         Text(name, style = KagomType.Title32, color = KagomColor.Text.primary, maxLines = 1)
-        if (title != null) Chip(title, KagomColor.Surface.card, KagomColor.Text.primary, height = KagomSize.chipHeight, modifier = Modifier.padding())
+        // equippedTitle (Figma 6:1711): 높이 36, 좌우 12, 글자 16/24 Bold
+        if (title != null) Box(
+            Modifier.height(36.dp).background(if (onCard) KagomColor.Surface.subtle else KagomColor.Surface.card, RoundedCornerShape(KagomRadius.full))
+                .padding(horizontal = KagomSpace.s12),
+            contentAlignment = Alignment.Center,
+        ) { Text(title, style = KagomType.Body16Strong, color = KagomColor.Text.primary, maxLines = 1) }
         TierEmblem(tier)
         Column(Modifier.width(160.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(if (nextExp != null) "EXP $exp / $nextExp" else "EXP $exp · MAX", style = KagomType.Caption14Strong, color = KagomColor.Text.secondary, maxLines = 1)
@@ -346,56 +361,61 @@ fun QuestionCard(key: String, choice: String, tag: String, selected: Boolean, en
 
 enum class QuestCardSize { Wide, Compact }
 
+private val QUEST_DATE = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+private val QUEST_TIME = DateTimeFormatter.ofPattern("HH:mm")
+
 /**
- * questCard (Size=Wide|Compact · Type=Single|Cumulative · State=InProgress|Achieved).
- * 달성 전: 보상 ? + 카테고리 텍스트 / 달성 후: 실제 아이템·칭호명 공개 (rewardPreview).
- * [boxed] = 달성했지만 보상 상자(POP-02 언박싱)를 아직 안 열었다. 주행 중에 달성하면 정차할 때까지 이 상태라,
- * 여기서 먼저 공개하면 언박싱이 김빠진다 → 상자를 열 때까지 ?로 둔다 (POP-02 각주 "열기 전에는 보상이 ? 로 표시돼요")
+ * questCard (Figma 6:2102 / 7:2102, 11/10 개편): 아이콘 칸 + 이름·조건·EXP + 오른쪽에 달성 날짜·시각 또는 진행 숫자·바.
+ * 보상 미리보기(? 또는 아이템)는 카드에서 빠졌다 (보상은 POP-02에서 공개).
+ * [doneAt] = 달성 시각(ms). 이 기록이 생기기 전에 달성한 과제는 null → 날짜 없이 "달성"만.
+ * 단발형이 진행 중일 때의 모습은 Figma에 없어서 누적형과 같이 숫자·바로 보여 준다.
  */
 @Composable
-fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifier, boxed: Boolean = false) {
-    val item = Items.byId(p.quest.rewardItemId)
-    val revealed = p.achieved && !boxed
-    val shape = RoundedCornerShape(KagomRadius.r24)
+fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifier, doneAt: Long? = null) {
     Row(
-        modifier.fillMaxWidth().height(if (p.quest.cumulative) 110.dp else 98.dp)
-            .background(KagomColor.Surface.card, shape).border(1.dp, KagomColor.Border.default, shape)
-            .padding(horizontal = KagomSpace.s28),
+        modifier.fillMaxWidth().height(124.dp)
+            .background(KagomColor.Surface.card, RoundedCornerShape(KagomRadius.r24)).padding(horizontal = KagomSpace.s28),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(KagomSpace.s20),
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-                Text(p.quest.title, style = KagomType.Title28, color = KagomColor.Text.primary, maxLines = 1)
-                if (p.achieved) Chip("달성", KagomColor.Severity.bg(Severity.OK), KagomColor.Severity.fg(Severity.OK))
-            }
-            if (p.quest.cumulative) Row(
-                if (size == QuestCardSize.Compact) Modifier.fillMaxWidth() else Modifier,
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12),
-            ) {
-                // Compact는 남은 폭에 맞춘다 (최대 240)
-                ProgressBar(p.ratio, if (size == QuestCardSize.Wide) Modifier.width(480.dp) else Modifier.weight(1f, fill = false).width(240.dp))
-                Text(p.countText, style = KagomType.Body16Strong, color = KagomColor.Text.secondary, maxLines = 1)
-            }
+        Box(
+            Modifier.size(64.dp).background(if (p.achieved) KagomColor.Surface.mintSoft else KagomColor.Surface.subtle, RoundedCornerShape(KagomRadius.r16)),
+            contentAlignment = Alignment.Center,
+        ) { QuestIconGlyph(p.quest.icon, Modifier.size(36.dp)) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(KagomSpace.s4)) {
+            Text(p.quest.name, style = KagomType.Heading24, color = KagomColor.Text.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(p.quest.title, style = KagomType.Body16, color = KagomColor.Text.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("+${p.quest.exp} EXP", style = KagomType.Caption14Strong, color = KagomColor.Text.accent)
         }
-        Spacer(Modifier.width(KagomSpace.s16))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-            if (revealed && item != null) ItemThumb(item.mark, 56.dp, locked = false, radius = KagomRadius.r16, markStyle = KagomType.Heading24, itemId = item.id)
-            else Box(Modifier.size(56.dp).background(KagomColor.Surface.subtle, RoundedCornerShape(KagomRadius.r16)), contentAlignment = Alignment.Center) {
-                Text("?", style = KagomType.Heading24, color = KagomColor.Text.primary)
+        if (p.achieved) {
+            val at = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()) }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
+                Text(if (at != null) "${at.format(QUEST_DATE)} 달성" else "달성", style = KagomType.Body18Strong, color = KagomColor.Text.primary, maxLines = 1)
+                if (at != null) Text(at.format(QUEST_TIME), style = KagomType.Body16, color = KagomColor.Text.secondary)
             }
-            Column(Modifier.widthIn(max = if (size == QuestCardSize.Compact) 150.dp else 320.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    when {
-                        revealed && item != null -> "${item.name} · ${item.category.label}"
-                        boxed -> "${item?.category?.label ?: ""} 보상 · 상자 도착"
-                        else -> "${item?.category?.label ?: ""} 보상"
-                    },
-                    style = KagomType.Caption14, color = KagomColor.Text.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                Text(if (p.achieved) "+${p.quest.exp} EXP 획득" else "+${p.quest.exp} EXP", style = KagomType.Caption14Strong, color = KagomColor.Text.accent)
+        } else {
+            Column(
+                Modifier.width(if (size == QuestCardSize.Wide) 480.dp else 240.dp),
+                horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(KagomSpace.s8),
+            ) {
+                Text(p.countText, style = KagomType.Body18Strong, color = KagomColor.Text.primary, maxLines = 1)
+                ProgressBar(p.ratio, Modifier.fillMaxWidth())
             }
         }
     }
+}
+
+/** filterChip (Figma 193:4488): 높이 40, 좌우 20. 고른 것은 검정 바탕 */
+@Composable
+fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(KagomRadius.full)
+    val bg by animateColorAsState(if (selected) KagomColor.Surface.inverse else KagomColor.Surface.card, tween(KagomMotion.FAST), label = "chipBg")
+    Box(
+        modifier.height(KagomSize.chipHeight).clip(shape).background(bg, shape)
+            .then(if (selected) Modifier else Modifier.border(1.dp, KagomColor.Border.default, shape))
+            .clickable(role = Role.Tab, onClick = onClick).padding(horizontal = KagomSpace.s20),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = KagomType.Body16Strong, color = if (selected) KagomColor.Text.inverse else KagomColor.Text.secondary, maxLines = 1) }
 }
 
 // ───────────── 치장 ─────────────

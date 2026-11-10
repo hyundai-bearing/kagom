@@ -95,6 +95,15 @@ object KagomColor {
         val stamp = Color(0xFFC0392B)
     }
 
+    /** 도전과제 달성률 카드의 곰 얼굴 (Figma avatarBear 194:4585, 벡터에 직접 들어 있는 색) */
+    object Avatar {
+        val ear = Color(0xFFB07A45)
+        val earInner = Color(0xFFE7B98A)
+        val head = Color(0xFFC8955A)
+        val muzzle = Color(0xFFF1D9B5)
+        val face = Color(0xFF2B1B10)
+    }
+
     /** 컨페티·반짝이 장식 (confettiBurst / sparkle) */
     val confetti = listOf(
         Color(0xFF6FDCC4), Color(0xFF0F6661), Color(0xFFD49C8A), Color(0xFFB9A1E0),

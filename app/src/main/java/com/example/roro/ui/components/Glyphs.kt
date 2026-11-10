@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.LandmarkGlyph
+import com.example.roro.core.QuestIcon
 import com.example.roro.ui.theme.KagomColor
 import kotlin.math.PI
 import kotlin.math.sin
@@ -115,6 +116,60 @@ private fun DrawScope.drawCup(dark: Color, light: Color) {
     drawArc(light, -90f, 180f, false, Offset(w * 0.58f, h * 0.4f), Size(w * 0.3f, h * 0.3f), style = Stroke(w * 0.07f))
     drawRect(dark, Offset(w * 0.12f, h * 0.3f), Size(w * 0.6f, h * 0.1f))
     for (i in 0..2) drawLine(light, Offset(w * (0.27f + i * 0.15f), h * 0.05f), Offset(w * (0.27f + i * 0.15f), h * 0.2f), w * 0.05f, StrokeCap.Round)
+}
+
+/** questIcon (Figma questIcon/flag 등, 194:1837 …): 도전과제 카드 아이콘. 40 격자에 선 굵기 3.33 → 크기의 1/12 */
+@Composable
+fun QuestIconGlyph(icon: QuestIcon, modifier: Modifier, color: Color = KagomColor.Text.accent) = Canvas(modifier) {
+    val w = size.width; val h = size.height
+    val line = Stroke(w / 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    fun at(x: Float, y: Float) = Offset(w * x, h * y)
+    fun stroke(build: Path.() -> Unit) = drawPath(Path().apply(build), color, style = line)
+    when (icon) {
+        QuestIcon.FLAG -> {
+            drawLine(color, at(0.18f, 0.12f), at(0.18f, 0.92f), line.width, StrokeCap.Round)
+            stroke {
+                moveTo(w * 0.18f, h * 0.16f)
+                quadraticTo(w * 0.34f, h * 0.06f, w * 0.5f, h * 0.16f); quadraticTo(w * 0.66f, h * 0.26f, w * 0.84f, h * 0.16f)
+                lineTo(w * 0.84f, h * 0.6f)
+                quadraticTo(w * 0.66f, h * 0.7f, w * 0.5f, h * 0.6f); quadraticTo(w * 0.34f, h * 0.5f, w * 0.18f, h * 0.6f)
+            }
+        }
+        QuestIcon.GAUGE -> {
+            drawArc(color, 160f, 220f, false, at(0.1f, 0.2f), Size(w * 0.8f, h * 0.8f), style = line)
+            drawLine(color, at(0.5f, 0.6f), at(0.66f, 0.42f), line.width, StrokeCap.Round)
+        }
+        QuestIcon.COMPASS -> {
+            drawCircle(color, w * 0.4f, at(0.5f, 0.5f), style = line)
+            stroke { moveTo(w * 0.64f, h * 0.36f); lineTo(w * 0.57f, h * 0.57f); lineTo(w * 0.36f, h * 0.64f); lineTo(w * 0.43f, h * 0.43f); close() }
+        }
+        QuestIcon.MAP -> {
+            stroke {
+                moveTo(w * 0.1f, h * 0.26f); lineTo(w * 0.37f, h * 0.14f); lineTo(w * 0.63f, h * 0.26f); lineTo(w * 0.9f, h * 0.14f)
+                lineTo(w * 0.9f, h * 0.74f); lineTo(w * 0.63f, h * 0.86f); lineTo(w * 0.37f, h * 0.74f); lineTo(w * 0.1f, h * 0.86f); close()
+            }
+            drawLine(color, at(0.37f, 0.14f), at(0.37f, 0.74f), line.width, StrokeCap.Round)
+            drawLine(color, at(0.63f, 0.26f), at(0.63f, 0.86f), line.width, StrokeCap.Round)
+        }
+        QuestIcon.WRENCH -> {
+            // 머리(오른쪽 위로 벌어진 고리) + 왼쪽 아래로 뻗은 자루
+            drawArc(color, -20f, 290f, false, at(0.46f, 0.1f), Size(w * 0.44f, h * 0.44f), style = line)
+            drawLine(color, at(0.52f, 0.48f), at(0.16f, 0.84f), line.width * 1.6f, StrokeCap.Round)
+        }
+    }
+}
+
+/** avatarBear (Figma 194:4585): 달성률 카드의 곰 얼굴. 40 격자 좌표를 그대로 옮겼다 */
+@Composable
+fun AvatarBearGlyph(modifier: Modifier) = Canvas(modifier) {
+    val u = size.minDimension / 40f
+    fun dot(c: Color, x: Float, y: Float, r: Float) = drawCircle(c, r * u, Offset(x * u, y * u))
+    dot(KagomColor.Avatar.ear, 10.5f, 11.5f, 6.5f); dot(KagomColor.Avatar.ear, 30.5f, 11.5f, 6.5f)
+    dot(KagomColor.Avatar.earInner, 10f, 11f, 3f); dot(KagomColor.Avatar.earInner, 30f, 11f, 3f)
+    dot(KagomColor.Avatar.head, 20.5f, 22.5f, 14.5f)
+    drawOval(KagomColor.Avatar.muzzle, Offset(13f * u, 22f * u), Size(15f * u, 11f * u))
+    dot(KagomColor.Avatar.face, 15f, 20f, 2f); dot(KagomColor.Avatar.face, 26f, 20f, 2f)
+    drawOval(KagomColor.Avatar.face, Offset(18f * u, 24f * u), Size(5f * u, 3f * u))
 }
 
 /** POP-02 언박싱 선물 상자 */

@@ -21,12 +21,12 @@ data class ProgressContext(
 
 data class QuestProgress(val quest: Quest, val current: Int, val achieved: Boolean) {
     val ratio get() = (current.toFloat() / quest.target).coerceIn(0f, 1f)
-    /** "42 / 100 km" · "1 / 3" */
-    val countText get() = buildString {
-        append("${current.coerceAtMost(quest.target)} / ${quest.target}")
-        if (quest.unit.isNotEmpty()) append(" ${quest.unit}")
-    }
+    /** "42 / 100 km" · "1 / 3곳" · "4 / 10회" */
+    val countText get() = "${current.coerceAtMost(quest.target)} / ${quest.target}${quest.unit}"
 }
+
+/** SCR-04 필터 칩 (Figma filterRow 193:4487) */
+enum class QuestFilter(val label: String) { ALL("전체"), DONE("달성"), TODO("미달성") }
 
 /** 팝업 큐 항목. gear → P 전환 때 순서대로 재생한다 */
 sealed interface PendingPopup {
@@ -91,11 +91,31 @@ object Progress {
         queue.filter { it !is PendingPopup.TierUp } + queue.filterIsInstance<PendingPopup.TierUp>().sortedBy { it.tier }
 
     /**
-     * 달성했지만 보상 상자(POP-02 언박싱)를 아직 열지 않은 도전과제. 도전과제 카드는 이 동안 보상을 ?로 둔다
-     * (주행 중 달성 → 정차해서 상자를 열 때까지)
+     * SCR-04 목록 (Figma 6:2085): 달성한 것이 위(최근에 달성한 순, 시각을 모르는 예전 기록은 그 아래), 그다음 진행 중인 것(마스터 순서).
+     * [doneAt] = 도전과제 id → 달성 시각(ms)
      */
-    fun boxedQuests(queue: List<PendingPopup>): Set<String> =
-        queue.filterIsInstance<PendingPopup.Reward>().filterNot { it.opened }.map { it.questId }.toSet()
+    fun listed(all: List<QuestProgress>, doneAt: Map<String, Long>, filter: QuestFilter): List<QuestProgress> {
+        val done = all.filter { it.achieved }.sortedByDescending { doneAt[it.quest.id] ?: Long.MIN_VALUE }
+        val todo = all.filterNot { it.achieved }
+        return when (filter) {
+            QuestFilter.ALL -> done + todo
+            QuestFilter.DONE -> done
+            QuestFilter.TODO -> todo
+        }
+    }
+
+    /**
+     * 카곰과 함께 달린 거리 (km): 이전 차에서 달린 거리 [carriedKm] + 지금 차에서 달린 거리(주행거리 − 기준값).
+     * 기준값이 아직 없으면(새 차에서 첫 신호 전) 이전 차 거리만.
+     */
+    fun drivenKm(odoKm: Float?, baseOdoKm: Float?, carriedKm: Float): Int {
+        val here = if (odoKm != null && baseOdoKm != null) (odoKm - baseOdoKm).coerceAtLeast(0f) else 0f
+        return (carriedKm + here).toInt()
+    }
+
+    /** 달성률 0..100 (달성한 수 / 전체, 반올림) */
+    fun achievedPercent(all: List<QuestProgress>): Int =
+        if (all.isEmpty()) 0 else Math.round(100f * all.count { it.achieved } / all.size)
 
     /** 같은 key는 한 번만 */
     fun enqueue(queue: List<PendingPopup>, item: PendingPopup): List<PendingPopup> =

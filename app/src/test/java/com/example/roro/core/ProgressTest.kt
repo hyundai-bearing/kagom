@@ -68,12 +68,28 @@ class ProgressTest {
         assertEquals(1, Progress.enqueue(Progress.enqueue(emptyList(), r), r).size)
     }
 
-    @Test fun rewardStaysBoxedUntilOpened() {
-        val boxed = PendingPopup.Reward("QST-01", "ITM-B-01", 100, 0, 100)
-        val opened = PendingPopup.Reward("QST-02", "ITM-T-02", 150, 100, 250, opened = true)
-        val landmark = PendingPopup.Landmark("LM-GN-01", "ITM-H-01", 150, 250, 400, 1, 0)
-        assertEquals(setOf("QST-01"), Progress.boxedQuests(listOf(boxed, opened, landmark)))
-        assertTrue(Progress.boxedQuests(emptyList()).isEmpty())
+    @Test fun questListShowsAchievedFirstNewestOnTop() {
+        // Figma 6:2085: 첫 드라이브(11.08) → 성실한 카곰 집사(11.07) → 진행 중 3개, 달성률 40%
+        val visits = listOf(Visit("LM-GN-01", 1), Visit("LM-GN-02", 2), Visit("LM-GN-01", 3), Visit("LM-GN-02", 4))
+        val all = Progress.all(ProgressContext(64, visits, 1), setOf("QST-01", "QST-05"))
+        val doneAt = mapOf("QST-05" to 1_000L, "QST-01" to 2_000L)
+        assertEquals(listOf("QST-01", "QST-05", "QST-02", "QST-03", "QST-04"), Progress.listed(all, doneAt, QuestFilter.ALL).map { it.quest.id })
+        assertEquals(listOf("QST-01", "QST-05"), Progress.listed(all, doneAt, QuestFilter.DONE).map { it.quest.id })
+        assertEquals(listOf("QST-02", "QST-03", "QST-04"), Progress.listed(all, doneAt, QuestFilter.TODO).map { it.quest.id })
+        assertEquals(40, Progress.achievedPercent(all))
+        assertEquals(listOf("64 / 100 km", "2 / 3곳", "4 / 10회"), Progress.listed(all, doneAt, QuestFilter.TODO).map { it.countText })
+        // 달성 시각을 모르는 예전 기록은 시각이 있는 것 아래
+        assertEquals(listOf("QST-05", "QST-01"), Progress.listed(all, mapOf("QST-05" to 1_000L), QuestFilter.DONE).map { it.quest.id })
+    }
+
+    @Test fun drivenDistanceCarriesOverToNewVehicle() {
+        assertEquals(42, Progress.drivenKm(1_282f, 1_240f, 0f))
+        assertEquals(0, Progress.drivenKm(null, 1_240f, 0f))
+        // 새 차: 이전 차에서 1,240 km, 새 차 기준값이 잡히기 전과 뒤
+        assertEquals(1_240, Progress.drivenKm(35f, null, 1_240f))
+        assertEquals(1_250, Progress.drivenKm(45f, 35f, 1_240f))
+        // 주행거리 신호가 기준값보다 작게 와도 줄지 않는다
+        assertEquals(1_240, Progress.drivenKm(10f, 35f, 1_240f))
     }
 
     @Test fun tiers() {
