@@ -1,0 +1,6 @@
+{
+  "reward-waits-for-maintenance": true,
+  "close-sheet-then-unbox": true,
+  "opened-stage-survives-driving": true,
+  "actual-equip-and-dequeue": true
+}

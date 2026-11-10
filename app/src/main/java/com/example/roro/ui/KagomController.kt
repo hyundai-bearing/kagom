@@ -90,6 +90,8 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
 
     /** 시연 패널 '예시 데이터': Figma 예시(치장 예시 아이템 03~12 등)를 보여 준다. 저장하지 않는다 */
     val demoExamples = MutableStateFlow(false)
+    /** POP-02~05 시연은 저장소를 건드리지 않는 별도 프리뷰로 연다. */
+    val demoPopup = MutableStateFlow<String?>(null)
     private var toastJob: Job? = null
 
     private fun showToast(t: DrivingToast) {
@@ -224,7 +226,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
 
     /** POP-02 언박싱 → 공개 */
     fun openReward(questId: String) = store.update { d ->
-        d.copy(pending = d.pending.map { if (it is PendingPopup.Reward && it.questId == questId) it.copy(opened = true) else it })
+        if (!gear.value.isPark) d else d.copy(pending = d.pending.map { if (it is PendingPopup.Reward && it.questId == questId) it.copy(opened = true) else it })
     }
 
     /** 언박싱 단계 "나중에": 큐에 남기고 이번 정차에서는 넘긴다 */
@@ -232,6 +234,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
 
     /** 공개·해금·승급 확인: 큐에서 지운다. [equip]이면 바로 장착 */
     fun finishPopup(p: PendingPopup, equip: Boolean) = store.update { d ->
+        if (!gear.value.isPark) return@update d
         val itemId = when (p) { is PendingPopup.Reward -> p.itemId; is PendingPopup.Landmark -> p.itemId; else -> null }
         val item = Items.byId(itemId)
         val equipped = if (equip && item != null && gear.value.isPark) d.equipped.with(item.category, item.id) else d.equipped
