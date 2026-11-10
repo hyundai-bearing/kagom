@@ -8,6 +8,25 @@ package com.example.roro.core
 object Examples {
     const val PREFIX = "EX-"
 
+    /** POP 프리뷰 목록은 실제 마스터 ID를 참조하지만 EX- 식별자로 구분하고 저장하지 않는다. */
+    data class PopupExample(val id: String, val label: String, val key: String)
+    val popups = listOf(
+        PopupExample("EX-POP-02-BOX", "보상 상자", "reward"),
+        PopupExample("EX-POP-02-ITEM", "보상 공개", "reveal"),
+        PopupExample("EX-POP-03-SUN", "정동진 해금", "landmark:LM-GN-01"),
+        PopupExample("EX-POP-03-COFFEE", "커피거리 해금", "landmark:LM-GN-02"),
+        PopupExample("EX-POP-03-PORT", "주문진항 해금", "landmark:LM-GN-03"),
+        PopupExample("EX-POP-04", "레벨 업", "level"),
+        PopupExample("EX-POP-05", "정비 시트", "maintenance"),
+        PopupExample("EX-POP-05-EV", "전기차 점검", "maintenance-ev"),
+        PopupExample("EX-POP-05-DONE", "점검 완료", "maintenance-done"),
+    )
+    const val popupName = "포근이"
+    const val popupSkin = "P03"
+    fun popupReward(opened: Boolean) = PendingPopup.Reward("QST-01", "ITM-B-01", 100, 120, 220, opened)
+    fun popupLandmark(lm: Landmark, day: Long) = PendingPopup.Landmark(lm.id, lm.rewardItemId, lm.exp, 220, 370, 2, day)
+    val popupLevel = PendingPopup.TierUp(2, 1_000, 400, 3, 2)
+
     private fun head(n: Int, landmark: Boolean) = Item(
         id = PREFIX + "H-%02d".format(n),
         name = "예시 머리 아이템 %02d".format(n),

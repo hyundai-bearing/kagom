@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.Gear
+import com.example.roro.core.Examples
 import com.example.roro.core.Landmarks
 import com.example.roro.core.OilLevel
 import com.example.roro.ui.theme.KagomColor
@@ -99,6 +100,11 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
             Group("데이터") {
                 Btn("신호 덮어쓰기 해제", false) { c.signals.clear() }
                 Btn("전체 초기화", false) { c.demoResetAll(); onClose() }
+            }
+            Group("팝업 미리보기 (저장 안 함)") {
+                Examples.popups.forEach { example ->
+                    Btn(example.label, false) { c.demoPopup.value = example.key; onClose() }
+                }
             }
         }
     }

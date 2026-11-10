@@ -228,10 +228,25 @@ object Tiers {
 
 object Checkup {
     const val INTERVAL_KM = 10_000
-    const val INTERVAL_DAYS = 365
 
     /** 회차마다 같은 3개 항목 (Figma POP-05) */
     val items = listOf("엔진룸 누유", "타이어 마모", "램프와 배터리")
+
+    data class Item(val key: String, val label: String)
+
+    /** 기존 저장 키의 뜻은 유지하고 전기차 점검은 별도 키로 구분한다. */
+    fun itemsFor(engine: EngineType): List<Item> = if (engine == EngineType.EV) listOf(
+        Item("EV-타이어", "타이어 공기압과 마모 상태 확인"),
+        Item("EV-차량 등", "전조등·방향지시등·브레이크등 확인"),
+        Item("EV-와이퍼", "와이퍼가 잘 작동하는지, 워셔액 확인"),
+    ) else listOf(
+        Item(items[0], "엔진룸에 기름이 새는지 확인"),
+        Item(items[1], "타이어가 많이 닳았는지 확인"),
+        Item(items[2], "전조등·배터리 상태 확인"),
+    )
+
+    fun canComplete(info: CheckupInfo, engine: EngineType, checks: Set<String>) =
+        info.due && itemsFor(engine).all { it.key in checks }
 
     fun roundLabel(round: Int) = "${round}만 km 점검"
 }

@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.roro.core.Gear
+import com.example.roro.core.Examples
 import com.example.roro.core.OilLevel
 import com.example.roro.data.LocationSource
 import com.example.roro.ui.KagomApp
@@ -27,11 +28,13 @@ import kotlinx.coroutines.cancel
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_engine_oil LOW # NORMAL/LOW/HIGH/CRITICALLY_LOW
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_brake LOW
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_washer true
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_ev true      # 전기차 신호
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ei demo_odo 10020
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_visit LM-GN-01  # 랜드마크 방문
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_reset true     # 전체 초기화
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_examples true  # Figma 예시 데이터 켜기/끄기
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_new_vehicle true # 새 차에서 이전 카곰 기록 발견 (SCR-00 Carry-over)
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_popup reward  # reward/reveal/landmark:LM-GN-01/level/maintenance/maintenance-ev/maintenance-done/off (저장 안 함)
  */
 class MainActivity : ComponentActivity() {
 
@@ -66,6 +69,9 @@ class MainActivity : ComponentActivity() {
     private fun readDemoExtras(intent: Intent?) {
         if (!debuggable || intent == null) return
         val c = controller
+        intent.getStringExtra("demo_popup")?.let { c.demoPopup.value = it.takeIf { name ->
+            Examples.popups.any { it.key == name }
+        } }
         if (intent.getBooleanExtra("demo_reset", false)) c.demoResetAll()
         intent.getStringExtra("demo_gear")?.let { g -> c.demoSetGear(Gear.entries.firstOrNull { it.name == g.uppercase() }) }
         if (intent.hasExtra("demo_fuel")) intent.getIntExtra("demo_fuel", -1).takeIf { it in 0..100 }?.let { p ->
@@ -74,6 +80,7 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra("demo_engine_oil")?.let { v -> c.signals.edit { it.copy(engineOil = OilLevel.entries.firstOrNull { o -> o.name == v }) } }
         intent.getStringExtra("demo_brake")?.let { v -> c.signals.edit { it.copy(brakeFluid = OilLevel.entries.firstOrNull { o -> o.name == v }) } }
         if (intent.hasExtra("demo_washer")) c.signals.edit { it.copy(washerLow = intent.getBooleanExtra("demo_washer", false)) }
+        if (intent.hasExtra("demo_ev")) c.signals.edit { it.copy(ev = intent.getBooleanExtra("demo_ev", false)) }
         if (intent.hasExtra("demo_odo")) c.signals.edit { it.copy(odometerKm = intent.getIntExtra("demo_odo", 0).toFloat()) }
         intent.getStringExtra("demo_visit")?.let { c.demoVisit(it.takeIf { id -> id.isNotBlank() }) }
         if (intent.hasExtra("demo_examples")) c.demoExamples.value = intent.getBooleanExtra("demo_examples", false)
