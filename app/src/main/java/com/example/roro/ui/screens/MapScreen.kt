@@ -250,13 +250,13 @@ fun MapScreen(
                         .border(1.dp, KagomColor.Border.default, CircleShape)
                         .clickable(role = Role.Button, onClickLabel = "이전 지도", onClick = ::goBack),
                     contentAlignment = Alignment.Center,
-                ) { Text("‹", style = KagomType.Title32, color = KagomColor.Text.primary) }
+                ) { Text("‹", style = KagomType.Title28, color = KagomColor.Text.primary) }
             }
             Column(Modifier.weight(1f)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Breadcrumb("전국", province?.let { { goNationwide() } })
                     province?.let {
-                        Text("›", color = KagomColor.Text.tertiary)
+                        Text("›", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
                         Breadcrumb(it.name, unit?.let { { goProvince() } })
                     }
                 }
@@ -271,7 +271,7 @@ fun MapScreen(
         } else {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 mapContent(Modifier.weight(1f).fillMaxSize())
-                panel(Modifier.width(360.dp).fillMaxSize())
+                panel(Modifier.width(400.dp).fillMaxSize())
             }
         }
     }
@@ -533,8 +533,8 @@ private fun RegionMap(
             val y = with(density) { p.y.toDp() }
             Text(
                 // 이름표는 핀 오른쪽. 오른쪽 끝에 가까워 자리가 없으면(동해안 핀, Split) 핀을 덮지 않게 핀 아래에 둔다
-                name, (if (x + 28.dp <= maxWidth - 110.dp) Modifier.offset(x = x + 28.dp, y = (y - 12.dp).coerceAtLeast(0.dp))
-                else Modifier.offset(x = (x - 40.dp).coerceIn(4.dp, maxOf(4.dp, maxWidth - 110.dp)), y = y + 28.dp))
+                name, (if (x + 28.dp <= maxWidth - 170.dp) Modifier.offset(x = x + 28.dp, y = (y - 14.dp).coerceAtLeast(0.dp))
+                else Modifier.offset(x = (x - 60.dp).coerceIn(4.dp, maxOf(4.dp, maxWidth - 170.dp)), y = y + 28.dp))
                     .clip(RoundedCornerShape(KagomRadius.full)).background(KagomColor.Surface.card)
                     .clickable(role = Role.Button) { onPin(v.landmark.id) }.padding(horizontal = 8.dp, vertical = 2.dp),
                 style = KagomType.Caption14Strong, color = KagomColor.Text.primary, maxLines = 1,
@@ -571,7 +571,7 @@ private fun RegionMap(
                             onEquip(reward.id)
                             onDismissPin()
                         },
-                    width = minOf(if (split) maxWidth - 16.dp else 440.dp, maxWidth),
+                    width = minOf(if (split) maxWidth - 16.dp else 520.dp, maxWidth),
                     itemId = reward.id,
                 )
             } else {

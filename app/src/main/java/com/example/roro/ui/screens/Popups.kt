@@ -191,12 +191,10 @@ private fun ModalScaffold(
         ) {
             Box(Modifier.fillMaxWidth().height(heroHeight).clipToBounds()) {
                 hero()
+                // Split은 hero를 600/880으로 줄여 그리지만 칩 글자는 줄이지 않는다 (Pleos 최소 글자 20px)
                 val eyebrowScale = if (split) 600f / 880f else 1f
                 Chip(heroChip, KagomColor.Accent.tier, KagomColor.Severity.fg(Severity.RECOMMEND),
-                    Modifier.padding(start = (32f * eyebrowScale).dp, top = (28f * eyebrowScale).dp),
-                    height = (28f * eyebrowScale).dp, style = KagomType.Caption14Strong.copy(
-                        fontSize = KagomType.Caption14Strong.fontSize * eyebrowScale,
-                        lineHeight = KagomType.Caption14Strong.lineHeight * eyebrowScale))
+                    Modifier.padding(start = (32f * eyebrowScale).dp, top = (28f * eyebrowScale).dp))
                 if (flash) Box(Modifier.fillMaxSize().graphicsLayer { alpha = glow.value }.background(KagomColor.Overlay.flash))
             }
             // 승인된 높이 부족 정책: 본문만 스크롤하고 선택 버튼은 항상 보이게 둔다.
@@ -472,17 +470,17 @@ fun LandmarkUnlockModal(p: PendingPopup.Landmark, profile: Profile, equipped: Eq
         }
         LandmarkPin(PinState.Unlocked, Modifier.offset(x = (470f * scale).dp, y = (150f * scale).dp).size((64f * scale).dp))
         Box(
-            Modifier.offset(x = (300f * scale).dp, y = (200f * scale).dp)
+            // Split은 도장 글자를 줄이지 않아 폭이 넓다: 핀(470)에 닿지 않게 왼쪽으로 당긴다
+            Modifier.offset(x = ((if (split) 270f else 300f) * scale).dp, y = (200f * scale).dp)
                 // 도장: 크게 떠 있다가 쿵 찍힌다
                 .graphicsLayer { val t = stamp.value; scaleX = 1.9f - 0.9f * t; scaleY = 1.9f - 0.9f * t; alpha = t.coerceIn(0f, 1f) }
                 .rotate(-10f)
                 .border((2f * scale).dp, KagomColor.Accent.stamp, RoundedCornerShape(10.dp)).padding(horizontal = (12f * scale).dp, vertical = (6f * scale).dp),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${lm.name} 방문", style = KagomType.Body18Strong.copy(fontSize = KagomType.Body18Strong.fontSize * scale,
-                    lineHeight = KagomType.Body18Strong.lineHeight * scale), color = KagomColor.Accent.stamp)
-                Text(date, style = KagomType.Caption14Strong.copy(fontSize = KagomType.Caption14Strong.fontSize * scale,
-                    lineHeight = KagomType.Caption14Strong.lineHeight * scale), color = KagomColor.Accent.stamp)
+                // 도장 글자도 Split에서 Pleos 최소(20px) 아래로 줄이지 않는다
+                Text("${lm.name} 방문", style = if (split) KagomType.Caption14Strong else KagomType.Body18Strong, color = KagomColor.Accent.stamp)
+                Text(date, style = KagomType.Caption14Strong, color = KagomColor.Accent.stamp)
             }
         }
         KagomCharacter(profile.skin, Expression.IDLE, Modifier.offset(x = if (split) 81.82.dp else 120.dp, y = if (split) 34.09.dp else 50.dp)
@@ -550,11 +548,12 @@ fun TierUpModal(p: PendingPopup.TierUp, profile: Profile, equipped: Equipped, on
                 Text("${p.tier}", style = if (split) KagomType.LevelNumberCompact else KagomType.LevelNumber,
                     color = KagomColor.Level.gold)
                 Spacer(Modifier.height(if (split) 16.dp else 20.dp))
-                Row(Modifier.height(if (split) 40.dp else 48.dp)
+                // "B" 글자(줄 높이 34)가 들어가게 Figma 28 칸을 36으로, 줄 높이를 48로 맞췄다
+                Row(Modifier.height(48.dp)
                     .background(KagomColor.Severity.bg(Severity.RECOMMEND), RoundedCornerShape(KagomRadius.full))
                     .padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(28.dp).background(KagomColor.Level.blue, RoundedCornerShape(KagomRadius.r8)),
+                    Box(Modifier.size(36.dp).background(KagomColor.Level.blue, RoundedCornerShape(KagomRadius.r8)),
                         contentAlignment = Alignment.Center) {
                         Text("B", style = KagomType.Body18Strong, color = KagomColor.Text.inverse)
                     }

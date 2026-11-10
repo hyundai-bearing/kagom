@@ -218,7 +218,7 @@ fun TierEmblem(tier: Int, modifier: Modifier = Modifier, large: Boolean = false)
 }
 
 /**
- * headerProfile (kagomName · equippedTitle · tierBadge · expProgress 160×6).
+ * headerProfile (kagomName · equippedTitle · tierBadge · expProgress 200×6).
  * 한 줄에 안 들어가면 뒤쪽부터 다음 줄로 내린다: Split(폭 600)에서 이름이 길면(10자) EXP가 눌려 글자가 잘렸다.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -242,7 +242,8 @@ fun HeaderProfile(
             contentAlignment = Alignment.Center,
         ) { Text(title, style = KagomType.Body16Strong, color = KagomColor.Text.primary, maxLines = 1) }
         TierEmblem(tier)
-        Column(Modifier.width(160.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Pleos 글자 단계(20px)에서 "EXP 1250 / 2000"이 한 줄에 들어가는 폭 (Figma 160은 14px 기준)
+        Column(Modifier.width(200.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(if (nextExp != null) "EXP $exp / $nextExp" else "EXP $exp · MAX", style = KagomType.Caption14Strong, color = KagomColor.Text.secondary, maxLines = 1)
             ProgressBar(if (nextExp != null) exp.toFloat() / nextExp else 1f, Modifier.fillMaxWidth(), height = 6.dp)
         }
@@ -343,7 +344,7 @@ fun QuestionCard(key: String, choice: String, tag: String, selected: Boolean, en
             .background(if (selected) KagomColor.Surface.mintSoft else KagomColor.Surface.card, shape)
             .border(if (selected) 2.dp else 1.dp, if (selected) KagomColor.Progress.fill else KagomColor.Border.default, shape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = KagomSpace.s36),
+            .padding(horizontal = KagomSpace.s36, vertical = KagomSpace.s16),
         verticalArrangement = Arrangement.Center,
     ) {
         Box(
@@ -373,7 +374,7 @@ private val QUEST_TIME = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifier, doneAt: Long? = null) {
     Row(
-        modifier.fillMaxWidth().height(124.dp)
+        modifier.fillMaxWidth().height(140.dp)
             .background(KagomColor.Surface.card, RoundedCornerShape(KagomRadius.r24)).padding(horizontal = KagomSpace.s28),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(KagomSpace.s20),
@@ -395,7 +396,7 @@ fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifi
             }
         } else {
             Column(
-                Modifier.width(if (size == QuestCardSize.Wide) 480.dp else 240.dp),
+                Modifier.width(if (size == QuestCardSize.Wide) 480.dp else 160.dp),
                 horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(KagomSpace.s8),
             ) {
                 Text(p.countText, style = KagomType.Body18Strong, color = KagomColor.Text.primary, maxLines = 1)
@@ -422,7 +423,11 @@ fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: 
 
 enum class CellState { Owned, Equipped, Locked }
 
-/** itemGridCell (State=Owned|Equipped|Locked · Mark/Name/Source/Caption). 180×232 */
+/**
+ * itemGridCell (State=Owned|Equipped|Locked · Mark/Name/Source/Caption). 192×252.
+ * Figma는 180×232인데 Pleos 글자 단계(이름 24px, 설명 20px)로는 이름이 잘려서 칸을 넓히고 이름을 두 줄까지 쓴다.
+ * 192 = Split(600)에 세 칸, 252 = Full 1080 높이에 세 줄이 들어가는 가장 큰 값이다 (썸네일은 88 → 80)
+ */
 @Composable
 fun ItemGridCell(item: Item, state: CellState, caption: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(KagomRadius.r24)
@@ -431,28 +436,27 @@ fun ItemGridCell(item: Item, state: CellState, caption: String, selected: Boolea
     val borderColor by animateColorAsState(if (highlighted) KagomColor.Progress.fill else KagomColor.Border.default, tween(KagomMotion.FAST), label = "cellBorder")
     Column(
         modifier
-            .size(180.dp, 232.dp)
+            .size(192.dp, 252.dp)
             .clip(shape)
             .background(KagomColor.Surface.card, shape)
             .border(if (highlighted) 2.dp else 1.dp, borderColor, shape)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(top = KagomSpace.s16, start = 8.dp, end = 8.dp),
+            .padding(top = KagomSpace.s12, start = 8.dp, end = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ItemThumb(if (locked) null else item.mark, 88.dp, locked, itemId = item.id)
-        Spacer(Modifier.height(KagomSpace.s16))
+        ItemThumb(if (locked) null else item.mark, 80.dp, locked, itemId = item.id)
+        Spacer(Modifier.height(10.dp))
         Text(item.name, style = KagomType.Body16Strong, color = if (locked) KagomColor.Text.secondary else KagomColor.Text.primary,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(KagomSpace.s8))
+            textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(6.dp))
         Chip(
             item.source.chip,
             if (locked) KagomColor.Severity.bg(Severity.RECOMMEND) else KagomColor.Surface.subtle,
             if (locked) KagomColor.Severity.fg(Severity.RECOMMEND) else KagomColor.Text.secondary,
-            height = 24.dp,
         )
-        Spacer(Modifier.height(KagomSpace.s8))
+        Spacer(Modifier.height(6.dp))
         Text(caption, style = KagomType.Caption14, color = if (locked) KagomColor.Text.secondary else KagomColor.Text.tertiary,
-            textAlign = TextAlign.Center, maxLines = 2)
+            textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

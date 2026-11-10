@@ -34,34 +34,71 @@ private fun style(size: Int, line: Int, bold: Boolean, tracking: Float = 0f) = T
     lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
 )
 
+/**
+ * Pleos Connect 글자 단계 (크기/줄 높이 px, 1920 기준). ivi_* 키트 typo 컬렉션과 같은 값이다.
+ * 출처: Pleos Connect Developer Guide > Designing the UI > Typography (document.pleos.ai, 2026-11-10 확인).
+ * 같은 문서가 실제 화면 18px 이상을 권하므로 가장 작은 단계(Label/Small 20)보다 작은 글자는 쓰지 않는다.
+ */
+private enum class Pleos(val size: Int, val line: Int) {
+    HeadlineMedium(56, 72),
+    HeadlineSmall(48, 64),
+    TitleLarge(40, 52),
+    TitleMedium(36, 44),
+    TitleSmall(32, 40),
+    BodyLarge(30, 38),
+    BodyMedium(28, 36),
+    BodySmall(26, 34),
+    LabelMedium(24, 28),
+    LabelSmall(20, 24),
+}
+
+private fun style(p: Pleos, bold: Boolean, tracking: Float = 0f) = style(p.size, p.line, bold, tracking)
+
+/**
+ * 이름은 Figma Kagom 텍스트 스타일(괄호 안 크기/줄 높이)이고, 값은 같은 순서의 Pleos 단계다.
+ * Figma 원본은 14~22px 본문이 많아 차 화면에서 너무 작다 (Pleos Full 창 1682px에서 14px → 실제 12px).
+ * 작은 쪽부터 한 단계씩 Pleos 단계에 대응시켜 위계는 그대로 두고 모두 Pleos 최소 이상으로 올렸다.
+ * Figma를 보고 스타일을 고르면 그대로 Pleos 크기가 나온다.
+ */
 object KagomType {
-    // Figma POP-04 levelUpTitle / levelNumber 전용이며 다른 화면 타이포는 유지한다.
+    // Figma POP-04 levelUpTitle / levelNumber 전용. 이미 Pleos Headline보다 커서 Figma 값 그대로 둔다
     val LevelTitle = style(64, 70, true)
     val LevelTitleCompact = style(44, 48, true)
     val LevelNumber = style(144, 144, true)
     val LevelNumberCompact = style(104, 104, true)
-    val Display40 = style(40, 48, true, -0.5f)
-    val Title36 = style(36, 44, true, -0.5f)
-    val Title32 = style(32, 40, true, -0.5f)
-    val Title28 = style(28, 36, true, -0.25f)
-    val Heading24 = style(24, 32, true)
-    val Heading22 = style(22, 30, true)
-    val Heading20 = style(20, 28, true)
-    val Body20 = style(20, 28, false)
-    val Body18 = style(18, 26, false)
-    val Body18Strong = style(18, 26, true)
-    val Body16 = style(16, 24, false)
-    val Body16Strong = style(16, 24, true)
-    val Caption14 = style(14, 20, false)
-    val Caption14Strong = style(14, 20, true)
+    /** Figma Display40 (40/48) */
+    val Display40 = style(Pleos.HeadlineMedium, true, -0.5f)
+    /** Figma Title36 (36/44) */
+    val Title36 = style(Pleos.HeadlineSmall, true, -0.5f)
+    /** Figma Title32 (32/40) */
+    val Title32 = style(Pleos.TitleLarge, true, -0.5f)
+    /** Figma Title28 (28/36) */
+    val Title28 = style(Pleos.TitleMedium, true, -0.25f)
+    /** Figma Heading24 (24/32) */
+    val Heading24 = style(Pleos.TitleSmall, true)
+    /** Figma Heading22 (22/30) */
+    val Heading22 = style(Pleos.BodyLarge, true)
+    /** Figma Heading20 (20/28) */
+    val Heading20 = style(Pleos.BodyMedium, true)
+    /** Figma Body20 (20/28) */
+    val Body20 = style(Pleos.BodyMedium, false)
+    /** Figma Body18 (18/26) */
+    val Body18 = style(Pleos.BodySmall, false)
+    val Body18Strong = style(Pleos.BodySmall, true)
+    /** Figma Body16 (16/24) */
+    val Body16 = style(Pleos.LabelMedium, false)
+    val Body16Strong = style(Pleos.LabelMedium, true)
+    /** Figma Caption14 (14/20) */
+    val Caption14 = style(Pleos.LabelSmall, false)
+    val Caption14Strong = style(Pleos.LabelSmall, true)
 
     // Pleos ivi_* 키트 타이포 (typo 컬렉션)
     /** Title/Small/Strong 32/40 — ivi_basic_button Large, 탭 */
-    val PleosTitleSmallStrong = style(32, 40, true)
+    val PleosTitleSmallStrong = style(Pleos.TitleSmall, true)
     /** Body/Large/Strong 30/38 — ivi_basic_button Medium */
-    val PleosBodyLargeStrong = style(30, 38, true)
+    val PleosBodyLargeStrong = style(Pleos.BodyLarge, true)
     /** Body/Small/Strong 26/34 — ivi_toast_popup */
-    val PleosBodySmallStrong = style(26, 34, true)
-    /** ivi_text_field 입력 글자 */
-    val PleosField = style(36, 44, false)
+    val PleosBodySmallStrong = style(Pleos.BodySmall, true)
+    /** Title/Medium 36/44 — ivi_text_field 입력 글자 */
+    val PleosField = style(Pleos.TitleMedium, false)
 }
