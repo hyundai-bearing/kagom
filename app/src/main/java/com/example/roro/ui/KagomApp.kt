@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -67,10 +68,11 @@ fun KagomApp(c: KagomController) = KagomTheme {
     val popup by c.activePopup.collectAsState()
     val toast by c.toast.collectAsState()
     val examples by c.demoExamples.collectAsState()
+    val popupPreview by c.demoPopup.collectAsState()
     val gearP = gear.isPark
 
     var tab by rememberSaveable { mutableStateOf(NavTab.HOME) }
-    var sheetOpen by remember { mutableStateOf(false) }
+    var sheetOpen by rememberSaveable { mutableStateOf(false) }
     var debugOpen by remember { mutableStateOf(false) }
     val onboarding = remember { OnboardingState() }
     val profile = data.profile
@@ -129,12 +131,13 @@ fun KagomApp(c: KagomController) = KagomTheme {
         )
 
         // 팝업 큐 (기어 P에서만 activePopup이 나온다)
-        if (profile != null) when (val p = popup) {
+        // 정비 조작이 끝나기 전에는 큐를 소비하지 않고 시트 뒤에서 기다린다.
+        if (profile != null && !sheetOpen) key(popup?.key) { when (val p = popup) {
             is PendingPopup.Reward -> RewardModal(p, profile, data.equipped, { c.openReward(p.questId) }, { c.deferPopup(p) }) { equip -> c.finishPopup(p, equip) }
             is PendingPopup.Landmark -> LandmarkUnlockModal(p, profile, data.equipped) { equip -> c.finishPopup(p, equip) }
             is PendingPopup.TierUp -> TierUpModal(p, profile, data.equipped) { c.finishPopup(p, false) }
             null -> Unit
-        }
+        } }
 
         // POP-01 주행 중 토스트
         var lastToast by remember { mutableStateOf<DrivingToast?>(null) }
@@ -148,5 +151,8 @@ fun KagomApp(c: KagomController) = KagomTheme {
         }
 
         if (debugOpen) DebugPanel(c, gear) { debugOpen = false }
+        if (c.debug && popupPreview != null) key(popupPreview) {
+            PopupPreview(popupPreview!!, gearP) { c.demoPopup.value = null }
+        }
     }
 }

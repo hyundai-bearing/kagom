@@ -35,6 +35,11 @@ private fun style(size: Int, line: Int, bold: Boolean, tracking: Float = 0f) = T
 )
 
 object KagomType {
+    // Figma POP-04 levelUpTitle / levelNumber 전용이며 다른 화면 타이포는 유지한다.
+    val LevelTitle = style(64, 70, true)
+    val LevelTitleCompact = style(44, 48, true)
+    val LevelNumber = style(144, 144, true)
+    val LevelNumberCompact = style(104, 104, true)
     val Display40 = style(40, 48, true, -0.5f)
     val Title36 = style(36, 44, true, -0.5f)
     val Title32 = style(32, 40, true, -0.5f)

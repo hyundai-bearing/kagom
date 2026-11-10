@@ -58,6 +58,7 @@ data class VehicleStatus(
     val engineOilAlert: Boolean,
     /** SEN-04/06: 정비소 안내 블록 */
     val shopGuide: StatusBadge?,
+    val engineType: EngineType,
 )
 
 object StateEngine {
@@ -114,16 +115,15 @@ object StateEngine {
         return OilChangeInfo(severity, ratio.coerceIn(0f, 1f), display, intervalKm, intervalDays)
     }
 
-    /** MNT-02 정기 점검 (매 10,000 km 또는 12개월) */
-    fun checkup(m: MaintenanceState, odoKm: Float?, today: Long, createdDay: Long): CheckupInfo {
-        val odo = odoKm ?: 0f
+    /** 승인된 MNT-02 정책: 차량 누적 거리 1만 km마다 한 번. 신호가 없으면 완료를 허용하지 않는다. */
+    fun checkup(m: MaintenanceState, odoKm: Float?): CheckupInfo {
+        val known = odoKm != null && odoKm.isFinite() && odoKm >= 0f
+        val odo = if (known) odoKm else 0f
         val byKm = floor(odo / Checkup.INTERVAL_KM).toInt()
         val round = maxOf(m.checkupRoundsDone + 1, byKm)
         val dueKm = round * Checkup.INTERVAL_KM
-        val lastDay = m.checkupDoneDay ?: createdDay
-        val dueByDate = today - lastDay >= Checkup.INTERVAL_DAYS
-        val due = odoKm != null && odo >= dueKm || dueByDate
-        val display = if (due) "${fmt(dueKm)} km 도래" else "${fmt((dueKm - odo).toInt())} km 남음"
+        val due = known && odo >= dueKm
+        val display = if (!known) "주행거리 확인 불가" else if (due) "${fmt(dueKm)} km 도래" else "${fmt((dueKm - odo).toInt())} km 남음"
         return CheckupInfo(due, round, dueKm, display)
     }
 
@@ -204,7 +204,7 @@ object StateEngine {
         }
 
         // MNT-02 정기 점검
-        val checkup = checkup(m, s.odometerKm, today, createdDay)
+        val checkup = checkup(m, s.odometerKm)
         if (checkup.due) {
             badges += StatusBadge(StatusId.MNT_02, Severity.RECOMMEND, "정기 점검")
             expressions += Expression.TIRED
@@ -236,6 +236,7 @@ object StateEngine {
             checkup = checkup,
             engineOilAlert = engineOilSeverity != null,
             shopGuide = shopGuide,
+            engineType = engine,
         )
     }
 

@@ -93,6 +93,15 @@ object KagomColor {
         val stamp = Color(0xFFC0392B)
     }
 
+    /** POP-04 level/emblem gradient · level/number · brand/blue (Figma 7:2542 / 64:4135). */
+    object Level {
+        val glow = Color(0xFF5C5445)
+        val mid = Color(0xFF42403D)
+        val edge = Color(0xFF2B2B30)
+        val gold = Color(0xFFE6BE4D)
+        val blue = Color(0xFF0066FF)
+    }
+
     /** 컨페티·반짝이 장식 (confettiBurst / sparkle) */
     val confetti = listOf(
         Color(0xFF6FDCC4), Color(0xFF0F6661), Color(0xFFD49C8A), Color(0xFFB9A1E0),
@@ -128,6 +137,7 @@ object KagomSpace {
 object KagomRadius {
     val r8 = 8.dp; val r12 = 12.dp; val r16 = 16.dp; val r20 = 20.dp; val r24 = 24.dp
     val r32 = 32.dp
+    val r28 = 28.dp
     val full = 999.dp
 }
 

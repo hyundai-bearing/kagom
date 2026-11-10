@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,10 +21,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -46,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -67,6 +71,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -84,6 +90,7 @@ import com.example.roro.data.AppData
 import com.example.roro.data.Equipped
 import com.example.roro.data.Profile
 import com.example.roro.ui.DrivingToast
+import com.example.roro.ui.josa
 import com.example.roro.ui.components.Chip
 import com.example.roro.ui.components.ConfettiLayer
 import com.example.roro.ui.components.GiftBoxGlyph
@@ -101,9 +108,6 @@ import com.example.roro.ui.components.LandmarkGlyphView
 import com.example.roro.ui.components.LandmarkPin
 import com.example.roro.ui.components.PinState
 import com.example.roro.ui.components.SparkleGlyph
-import com.example.roro.ui.components.SpeechBubble
-import com.example.roro.ui.components.TierEmblem
-import com.example.roro.ui.josa
 import com.example.roro.ui.theme.KagomColor
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomSkinPalette
@@ -143,6 +147,7 @@ private fun ModalScaffold(
     heroChip: String,
     enter: Boolean = true,
     flash: Boolean = false,
+    actions: @Composable () -> Unit,
     hero: @Composable BoxScope.() -> Unit,
     body: @Composable ColumnScope.() -> Unit,
 ) {
@@ -153,15 +158,17 @@ private fun ModalScaffold(
         launch { appear.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 320f)) }
         glow.animateTo(0f, tween(Motion.FLASH_OUT_MS, easing = FastOutSlowInEasing))
     }
-    Box(
+    BackHandler {}
+    BoxWithConstraints(
         Modifier.fillMaxSize().graphicsLayer { alpha = appear.value.coerceIn(0f, 1f) }
             .background(KagomColor.Overlay.dim).clickable(remember0(), null) {},
         contentAlignment = Alignment.Center,
     ) {
         ConfettiLayer()
-        val shape = RoundedCornerShape(KagomRadius.r32)
+        val shape = RoundedCornerShape(if (split) KagomRadius.r28 else KagomRadius.r32)
         Column(
             Modifier.width(if (split) 600.dp else 880.dp)
+                .heightIn(max = maxHeight - 48.dp)
                 .graphicsLayer {
                     val t = appear.value
                     scaleX = 0.9f + 0.1f * t; scaleY = 0.9f + 0.1f * t
@@ -172,11 +179,20 @@ private fun ModalScaffold(
         ) {
             Box(Modifier.fillMaxWidth().height(heroHeight).clipToBounds()) {
                 hero()
+                val eyebrowScale = if (split) 600f / 880f else 1f
                 Chip(heroChip, KagomColor.Accent.tier, KagomColor.Severity.fg(Severity.RECOMMEND),
-                    Modifier.padding(start = if (split) 24.dp else 32.dp, top = if (split) 20.dp else 28.dp))
+                    Modifier.padding(start = (32f * eyebrowScale).dp, top = (28f * eyebrowScale).dp),
+                    height = (28f * eyebrowScale).dp, style = KagomType.Caption14Strong.copy(
+                        fontSize = KagomType.Caption14Strong.fontSize * eyebrowScale,
+                        lineHeight = KagomType.Caption14Strong.lineHeight * eyebrowScale))
                 if (flash) Box(Modifier.fillMaxSize().graphicsLayer { alpha = glow.value }.background(Color.White.copy(alpha = 0.9f)))
             }
-            Column(Modifier.padding(horizontal = if (split) 24.dp else 40.dp, vertical = if (split) 24.dp else 32.dp), content = body)
+            // 승인된 높이 부족 정책: 본문만 스크롤하고 선택 버튼은 항상 보이게 둔다.
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
+                .padding(start = if (split) 24.dp else 40.dp, end = if (split) 24.dp else 40.dp,
+                    top = if (split) 24.dp else 28.dp), content = body)
+            Column(Modifier.padding(horizontal = if (split) 24.dp else 40.dp)
+                .padding(top = if (split) 14.dp else 16.dp, bottom = if (split) 24.dp else 28.dp)) { actions() }
         }
     }
 }
@@ -230,13 +246,13 @@ private fun ItemShowcase(mark: String, size: Dp, modifier: Modifier = Modifier, 
     val loop = rememberInfiniteTransition(label = "showcase")
     val spin by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(14_000, easing = LinearEasing)), label = "spin")
     val glow by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "glow")
-    Box(modifier.size(size * 1.3f), contentAlignment = Alignment.Center) {
+    Box(modifier.size(size * 1.6f), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize().graphicsLayer {
             rotationZ = spin
             val s = 0.7f + 0.3f * pop.value.coerceAtMost(1f); scaleX = s; scaleY = s
         }) {
             drawCircle(KagomColor.Surface.card.copy(alpha = 0.25f + 0.2f * glow), radius = this.size.minDimension / 2.1f)
-            drawCircle(KagomColor.Surface.card, radius = this.size.minDimension / 2.1f,
+            drawCircle(KagomColor.Surface.card, radius = this.size.minDimension * 0.39f,
                 style = Stroke(3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))))
         }
         Box(
@@ -282,14 +298,14 @@ private fun ExpGain(gain: Int, before: Int, after: Int) {
         fill.animateTo(after.toFloat(), tween(Motion.EXP_FILL_MS, easing = FastOutSlowInEasing))
     }
     val now = fill.value.roundToInt()
-    Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
+    Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Chip("+$gain EXP", KagomColor.Surface.mint, KagomColor.Text.accent, height = 32.dp)
-            Spacer(Modifier.weight(1f))
+            Chip("+$gain EXP", KagomColor.Surface.mint, KagomColor.Text.accent)
             Text(
-                if (next == null) "$now EXP · 최고 티어" else if (now >= next) "$now / $next EXP · 티어 승급!"
-                else "$now / $next EXP · 다음 티어까지 ${next - now} EXP",
-                style = KagomType.Caption14Strong, color = KagomColor.Text.secondary,
+                if (next == null) "$now EXP · 최고 레벨" else if (now >= next) "$now / $next EXP · 레벨 업!"
+                else "$now / $next EXP · 다음 레벨까지 ${next - now} EXP",
+                style = KagomType.Caption14, color = KagomColor.Text.secondary,
+                modifier = Modifier.weight(1f).padding(start = KagomSpace.s8), textAlign = TextAlign.End,
             )
         }
         val denom = (next ?: after).coerceAtLeast(1).toFloat()
@@ -302,24 +318,18 @@ private fun ExpGain(gain: Int, before: Int, after: Int) {
 
 /** 하단 버튼 (Full: 가로 [주 버튼 | 나중에], Split: 세로) + 각주 */
 @Composable
-private fun ModalActions(primary: String, onPrimary: () -> Unit, secondary: String?, onSecondary: () -> Unit, footnote: String?) {
+private fun ModalActions(primary: String, onPrimary: () -> Unit, secondary: String?, onSecondary: () -> Unit) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
     if (split) {
-        if (footnote != null) Text(footnote, style = KagomType.Caption14, color = KagomColor.Text.tertiary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(KagomSpace.s16))
-        IviButton(primary, onPrimary, Modifier.fillMaxWidth(), size = IviButtonSize.Large)
+        IviButton(primary, onPrimary, Modifier.fillMaxWidth(), size = IviButtonSize.Medium)
         if (secondary != null) {
             Spacer(Modifier.height(10.dp))
-            IviButton(secondary, onSecondary, Modifier.fillMaxWidth(), type = IviButtonType.Primary, size = IviButtonSize.Large)
+            IviButton(secondary, onSecondary, Modifier.fillMaxWidth(), type = IviButtonType.Primary, size = IviButtonSize.Medium)
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
             IviButton(primary, onPrimary, Modifier.weight(1f), size = IviButtonSize.Large)
-            if (secondary != null) IviButton(secondary, onSecondary, type = IviButtonType.Primary, size = IviButtonSize.Large)
-        }
-        if (footnote != null) {
-            Spacer(Modifier.height(KagomSpace.s20))
-            Text(footnote, style = KagomType.Caption14, color = KagomColor.Text.tertiary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            if (secondary != null) IviButton(secondary, onSecondary, Modifier.width(163.dp), type = IviButtonType.Primary, size = IviButtonSize.Large)
         }
     }
 }
@@ -333,8 +343,9 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
     val item = Items.byId(p.itemId) ?: return
     val palette = KagomSkinPalette.of(profile.skin)
     val heroH = if (split) 260.dp else 300.dp
+    var unboxing by remember(p.key) { mutableStateOf(!p.opened) }
 
-    if (!p.opened) {
+    if (!p.opened || unboxing) {
         // 상자 열기: 크게 흔들리다 부풀며 빛이 번진 뒤 공개 화면으로 (공개 화면은 그 빛이 걷히며 시작)
         val scope = rememberCoroutineScope()
         val opening = remember { Animatable(0f) }
@@ -342,59 +353,66 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
         val open: () -> Unit = {
             if (!busy) {
                 busy = true
-                scope.launch { opening.animateTo(1f, tween(Motion.OPEN_MS, easing = LinearEasing)); onOpen() }
+                // 공개 상태를 먼저 보존해 주행 전환·Activity 재생성 중 보상이 처음으로 되돌아가지 않게 한다.
+                onOpen()
+                scope.launch { opening.animateTo(1f, tween(Motion.OPEN_MS, easing = LinearEasing)); unboxing = false }
             }
         }
-        ModalScaffold(heroH, "보상 도착", hero = {
-            Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(listOf(palette.heroGlow, palette.heroTint), center, size.height * 0.95f)) })
+        ModalScaffold(heroH, "보상 도착", actions = {
+            ModalActions("선물 열기", open, "나중에", onLater)
+        }, hero = {
+            Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(listOf(palette.heroGlow, palette.body), center, size.width * 0.32f)) })
             Sparkles(Modifier.fillMaxSize(), listOf(0.33f to 0.15f, 0.5f to 0.08f, 0.66f to 0.22f, 0.3f to 0.83f, 0.68f to 0.8f))
-            WobblingGift(Modifier.align(Alignment.Center).size(if (split) 160.dp else 220.dp, if (split) 150.dp else 200.dp).offset(y = 10.dp), opening.value)
+            WobblingGift(Modifier.offset(x = if (split) 225.dp else 330.dp, y = if (split) 47.73.dp else 70.dp)
+                .size(if (split) 150.dp else 220.dp, if (split) 136.36.dp else 200.dp), opening.value)
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = opening.value.let { it * it * it } }.background(Color.White.copy(alpha = 0.9f)))
-            KagomCharacter(profile.skin, Expression.IDLE, Modifier.align(Alignment.BottomEnd).padding(end = if (split) 16.dp else 80.dp)
-                .size(if (split) 120.dp else 160.dp, if (split) 170.dp else 210.dp).offset(y = 20.dp), worn = equipped.layers())
+            KagomCharacter(profile.skin, Expression.IDLE, Modifier.offset(x = if (split) 436.36.dp else 640.dp,
+                y = if (split) 71.45.dp else 104.8.dp)
+                .size(if (split) 103.09.dp else 151.2.dp, if (split) 160.36.dp else 235.2.dp), worn = equipped.layers())
         }) {
-            Text("${q.rewardKind} 보상이 도착했어요", style = KagomType.Title32, color = KagomColor.Text.primary)
+            Text("${q.rewardKind} 보상이 도착했어요", style = if (split) KagomType.Title28 else KagomType.Title32, color = KagomColor.Text.primary)
             Spacer(Modifier.height(KagomSpace.s8))
-            Text("${q.title} 달성 · 정차한 지금 열어볼 수 있어요", style = KagomType.Body18, color = KagomColor.Text.secondary)
-            Spacer(Modifier.height(KagomSpace.s20))
-            SpeechBubble(profile.name, "안에 뭐가 들었을까요? 같이 열어봐요!")
+            Text("${q.title} 달성", style = if (split) KagomType.Caption14 else KagomType.Body16, color = KagomColor.Text.secondary)
             Spacer(Modifier.height(KagomSpace.s16))
-            ModalActions("상자 열어보기", open, "나중에", onLater, "열기 전에는 보상이 ? 로 표시돼요. 넘기면 큐에 보관돼요")
+            PopupQuote("안에 뭐가 들었을까요? 같이 열어봐요!")
         }
         return
     }
 
-    ModalScaffold(heroH, "보상 획득!", enter = false, flash = true, hero = {
-        Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(listOf(palette.heroGlow, palette.heroTint), center, size.height * 0.95f)) })
-        KagomCharacter(profile.skin, Expression.IDLE, Modifier.align(Alignment.BottomStart).padding(start = if (split) 60.dp else 120.dp)
-            .size(if (split) 130.dp else 180.dp, if (split) 190.dp else 260.dp), worn = equipped.layersWith(item.id))
+    ModalScaffold(heroH, "보상 획득!", enter = false, flash = true, actions = {
+        ModalActions("바로 장착하기", { onFinish(true) }, "나중에", { onFinish(false) })
+    }, hero = {
+        Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(listOf(palette.heroGlow, palette.body),
+            Offset(size.width * 0.7727f, size.height / 2), size.width * 0.29545f)) })
+        KagomCharacter(profile.skin, Expression.IDLE, Modifier.offset(x = if (split) 81.82.dp else 120.dp, y = if (split) 34.09.dp else 50.dp)
+            .size(if (split) 122.73.dp else 180.dp, if (split) 190.91.dp else 280.dp), worn = equipped.layers())
         Sparkles(Modifier.fillMaxSize(), listOf(0.6f to 0.2f, 0.75f to 0.08f, 0.88f to 0.18f, 0.58f to 0.72f, 0.9f to 0.75f))
-        ItemShowcase(item.mark, if (split) 100.dp else 140.dp, Modifier.align(Alignment.CenterEnd).padding(end = if (split) 70.dp else 150.dp), item.id)
+        ItemShowcase(item.mark, if (split) 102.27.dp else 150.dp,
+            Modifier.offset(x = if (split) 340.91.dp else 500.dp, y = if (split) 20.45.dp else 30.dp), item.id)
     }) {
-        Text("${q.rewardKind} 보상을 받았어요!", style = KagomType.Title32, color = KagomColor.Text.primary)
-        Spacer(Modifier.height(KagomSpace.s8))
-        Text("${q.title} 달성 · ${q.flavor}", style = KagomType.Body18, color = KagomColor.Text.secondary)
-        Spacer(Modifier.height(KagomSpace.s16))
+        Text("${q.rewardKind} 보상을 받았어요!", style = if (split) KagomType.Body16Strong else KagomType.Body18Strong, color = KagomColor.Text.secondary)
+        Spacer(Modifier.height(2.dp))
+        Text("${q.title} 달성", style = if (split) KagomType.Caption14 else KagomType.Body16, color = KagomColor.Text.tertiary)
+        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
         ItemTitleRow(item.name, listOf(item.category.label to false, "NEW" to true))
-        Spacer(Modifier.height(KagomSpace.s16))
+        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
         ExpGain(p.exp, p.expBefore, p.expAfter)
-        Spacer(Modifier.height(KagomSpace.s16))
-        SpeechBubble(profile.name, item.line.ifEmpty { "멋진 보상이에요! 바로 해 볼까요?" })
-        Spacer(Modifier.height(KagomSpace.s16))
-        ModalActions("바로 장착하기", { onFinish(true) }, "나중에", { onFinish(false) }, "넘긴 보상은 치장 옷장에서 언제든 입을 수 있어요")
+        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
+        PopupQuote(item.line.ifEmpty { "멋진 보상이에요! 바로 해 볼까요?" })
     }
 }
 
 @Composable
 private fun ItemTitleRow(name: String, chips: List<Pair<String, Boolean>>, limited: Boolean = false) {
+    val split = LocalLayoutMode.current == LayoutMode.SPLIT
     FlowRow(verticalArrangement = Arrangement.Center, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-        Text(name, style = KagomType.Heading22, color = KagomColor.Text.primary, modifier = Modifier.align(Alignment.CenterVertically))
+        Text(name, style = if (split) KagomType.Title28 else KagomType.Title32, color = KagomColor.Text.primary, modifier = Modifier.align(Alignment.CenterVertically))
         chips.forEach { (t, isNew) ->
-            if (isNew) Chip(t, KagomColor.Severity.bg(Severity.URGENT), KagomColor.Severity.fg(Severity.URGENT), Modifier.align(Alignment.CenterVertically), height = 32.dp)
-            else Chip(t, KagomColor.Surface.subtle, KagomColor.Text.secondary, Modifier.align(Alignment.CenterVertically), height = 32.dp)
+            if (isNew) Chip(t, KagomColor.Severity.bg(Severity.URGENT), KagomColor.Severity.fg(Severity.URGENT), Modifier.align(Alignment.CenterVertically))
+            else Chip(t, KagomColor.Surface.subtle, KagomColor.Text.secondary, Modifier.align(Alignment.CenterVertically))
         }
         if (limited) Chip("랜드마크 한정", KagomColor.Severity.bg(Severity.RECOMMEND), KagomColor.Severity.fg(Severity.RECOMMEND),
-            Modifier.align(Alignment.CenterVertically), height = 32.dp)
+            Modifier.align(Alignment.CenterVertically))
     }
 }
 
@@ -406,114 +424,115 @@ fun LandmarkUnlockModal(p: PendingPopup.Landmark, profile: Profile, equipped: Eq
     val lm = Landmarks.byId(p.landmarkId) ?: return
     val item = Items.byId(p.itemId) ?: return
     val date = LocalDate.ofEpochDay(p.day).format(DateTimeFormatter.ofPattern("yyyy. MM. dd"))
+    val scale = if (split) 600f / 880f else 1f
 
-    ModalScaffold(if (split) 260.dp else 300.dp, "안개가 걷혔어요", hero = {
-        // 컬러로 바뀐 지도 장면 + 오른쪽 바다에 보상 쇼케이스
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(KagomColor.Map.landUnlocked)
+    ModalScaffold(if (split) 260.dp else 300.dp, "보상 도착", actions = {
+        ModalActions("바로 장착하기", { onFinish(true) }, "나중에", { onFinish(false) })
+    }, hero = {
+        // Split은 원본 지형 비율을 유지하고 남은 hero 아래쪽을 바다색으로 채운다.
+        Box(Modifier.fillMaxSize().background(KagomColor.Map.sea))
+        AssetImage("popups/landmark-terrain.png", Modifier.size((651.547f * scale).dp, (300f * scale).dp))
+        Canvas(Modifier.fillMaxWidth().height((300f * scale).dp)) {
             val dark = KagomColor.Accent.positive.copy(alpha = 0.22f)
             drawOval(dark, Offset(size.width * 0.07f, size.height * 0.13f), androidx.compose.ui.geometry.Size(size.width * 0.3f, size.height * 0.37f))
             drawOval(dark, Offset(size.width * 0.44f, size.height * 0.5f), androidx.compose.ui.geometry.Size(size.width * 0.3f, size.height * 0.37f))
             drawLine(KagomColor.Surface.card, Offset(0f, size.height * 0.37f), Offset(size.width, size.height * 0.37f), 2.dp.toPx())
-            val sea = Path().apply {
-                moveTo(size.width * 0.72f, 0f)
-                quadraticTo(size.width * 0.66f, size.height * 0.25f, size.width * 0.72f, size.height * 0.5f)
-                quadraticTo(size.width * 0.78f, size.height * 0.75f, size.width * 0.70f, size.height)
-                lineTo(size.width, size.height); lineTo(size.width, 0f); close()
-            }
-            drawPath(sea, KagomColor.Map.sea)
         }
-        LandmarkGlyphView(lm.glyph, Modifier.align(Alignment.TopCenter).padding(top = 56.dp).offset(x = (-20).dp).size(80.dp, 60.dp))
-        LandmarkPin(PinState.Unlocked, Modifier.align(Alignment.Center).offset(x = 54.dp, y = 22.dp))
+        LandmarkGlyphView(lm.glyph, Modifier.offset(x = (420f * scale).dp, y = (20f * scale).dp).size((160f * scale).dp, (90f * scale).dp))
+        LandmarkPin(PinState.Unlocked, Modifier.offset(x = (470f * scale).dp, y = (150f * scale).dp).size((64f * scale).dp))
         Box(
-            Modifier.align(Alignment.Center).offset(x = (-72).dp, y = 70.dp).rotate(-10f)
-                .border(3.dp, KagomColor.Accent.stamp, RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 6.dp),
+            Modifier.offset(x = (300f * scale).dp, y = (200f * scale).dp).rotate(-10f)
+                .border((2f * scale).dp, KagomColor.Accent.stamp, RoundedCornerShape(10.dp)).padding(horizontal = (12f * scale).dp, vertical = (6f * scale).dp),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${lm.name} 방문", style = KagomType.Heading20, color = KagomColor.Accent.stamp)
-                Text(date, style = KagomType.Caption14Strong, color = KagomColor.Accent.stamp)
+                Text("${lm.name} 방문", style = KagomType.Body18Strong.copy(fontSize = KagomType.Body18Strong.fontSize * scale,
+                    lineHeight = KagomType.Body18Strong.lineHeight * scale), color = KagomColor.Accent.stamp)
+                Text(date, style = KagomType.Caption14Strong.copy(fontSize = KagomType.Caption14Strong.fontSize * scale,
+                    lineHeight = KagomType.Caption14Strong.lineHeight * scale), color = KagomColor.Accent.stamp)
             }
         }
-        KagomCharacter(profile.skin, Expression.IDLE, Modifier.align(Alignment.BottomStart).padding(start = if (split) 30.dp else 120.dp)
-            .size(if (split) 130.dp else 180.dp, if (split) 190.dp else 260.dp), worn = equipped.layersWith(item.id))
+        KagomCharacter(profile.skin, Expression.IDLE, Modifier.offset(x = if (split) 81.82.dp else 120.dp, y = if (split) 34.09.dp else 50.dp)
+            .size(if (split) 122.73.dp else 180.dp, if (split) 190.91.dp else 280.dp), worn = equipped.layers())
         Sparkles(Modifier.fillMaxSize(), listOf(0.72f to 0.25f, 0.85f to 0.12f, 0.93f to 0.3f, 0.75f to 0.75f, 0.92f to 0.8f))
-        ItemShowcase(item.mark, if (split) 90.dp else 130.dp, Modifier.align(Alignment.CenterEnd).padding(end = if (split) 8.dp else 50.dp), item.id)
+        ItemShowcase(item.mark, (130f * scale).dp, Modifier.offset(x = (620f * scale).dp, y = (60f * scale).dp), item.id)
     }) {
-        Text("${lm.name}에 도착했어요!", style = KagomType.Title32, color = KagomColor.Text.primary)
-        Spacer(Modifier.height(KagomSpace.s8))
-        Text("강릉 랜드마크 ${p.visitedPlaces} / ${Landmarks.all.size} 방문 · ${item.name.josa("을", "를")} 받았어요",
-            style = KagomType.Body18, color = KagomColor.Text.secondary)
-        Spacer(Modifier.height(KagomSpace.s16))
+        Text("${lm.name}에 도착했어요!", style = if (split) KagomType.Body16Strong else KagomType.Body18Strong, color = KagomColor.Text.secondary)
+        Spacer(Modifier.height(2.dp))
+        Text("강릉 랜드마크 ${p.visitedPlaces} / ${Landmarks.all.size} 방문",
+            style = if (split) KagomType.Caption14 else KagomType.Body16, color = KagomColor.Text.tertiary)
+        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
         ItemTitleRow(item.name, listOf(item.category.label to false, "NEW" to true), limited = true)
-        Spacer(Modifier.height(KagomSpace.s16))
+        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
         ExpGain(p.exp, p.expBefore, p.expAfter)
-        Spacer(Modifier.height(KagomSpace.s16))
-        SpeechBubble(profile.name, item.line)
-        Spacer(Modifier.height(KagomSpace.s16))
-        ModalActions("바로 장착하기", { onFinish(true) }, "나중에", { onFinish(false) }, "지도에서 ${lm.name}의 안개가 걷히고 컬러로 바뀌어요")
+        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
+        PopupQuote(item.line)
     }
 }
 
 // ───────────── POP-04 티어 승급 ─────────────
 
+/** Figma 7:2542 / 64:4135: 월계관과 광선은 원본 노드에서 내보낸 에셋을 쓴다. */
 @Composable
 fun TierUpModal(p: PendingPopup.TierUp, profile: Profile, equipped: Equipped, onConfirm: () -> Unit) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
-    val threshold = Tiers.thresholds.getOrElse(p.tier - 1) { 0 }
-    ModalScaffold(if (split) 260.dp else 300.dp, "TIER UP", hero = {
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(KagomColor.Surface.inverse)
-            val c = Offset(size.width / 2, size.height / 2)
-            val r = size.width
-            for (i in 0 until 24 step 2) {
-                val a0 = Math.toRadians(i * 15.0); val a1 = Math.toRadians((i + 1) * 15.0)
-                drawPath(Path().apply {
-                    moveTo(c.x, c.y)
-                    lineTo(c.x + (r * Math.cos(a0)).toFloat(), c.y + (r * Math.sin(a0)).toFloat())
-                    lineTo(c.x + (r * Math.cos(a1)).toFloat(), c.y + (r * Math.sin(a1)).toFloat())
-                    close()
-                }, KagomColor.Accent.tier)
+    BackHandler {}
+    BoxWithConstraints(Modifier.fillMaxSize().background(KagomColor.Overlay.dim).clickable(remember0(), null) {},
+        contentAlignment = Alignment.Center) {
+        ConfettiLayer()
+        val shape = RoundedCornerShape(if (split) KagomRadius.r28 else KagomRadius.r32)
+        Column(Modifier.width(if (split) 600.dp else 880.dp).heightIn(max = maxHeight - 48.dp)
+            .shadow(24.dp, shape).clip(shape)
+            .background(Brush.radialGradient(listOf(KagomColor.Level.glow, KagomColor.Level.mid, KagomColor.Level.edge)))) {
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                val suffix = if (split) "split" else "full"
+                Box(Modifier.fillMaxWidth().height(if (split) 250.dp else 330.dp)) {
+                    AssetImage("popups/level-rays-$suffix.png", Modifier.align(Alignment.TopCenter)
+                        .offset(y = if (split) (-117).dp else (-155).dp)
+                        .wrapContentSize(Alignment.TopCenter, unbounded = true).size(if (split) 500.dp else 660.dp))
+                    AssetImage("popups/level-laurel-$suffix.png", Modifier.align(Alignment.TopCenter)
+                        .offset(y = if (split) 23.dp else 25.dp).size(if (split) 220.dp else 300.dp))
+                    Canvas(Modifier.align(Alignment.TopCenter).offset(y = if (split) 61.dp else 77.dp)
+                        .size(if (split) 144.dp else 196.dp)) {
+                        drawCircle(KagomColor.sparkle.copy(alpha = 0.08f))
+                        drawCircle(KagomColor.sparkle, style = Stroke(2.dp.toPx()))
+                    }
+                    KagomCharacter(profile.skin, Expression.IDLE, Modifier.align(Alignment.TopCenter)
+                        .offset(y = if (split) 80.dp else 102.dp)
+                        .size(if (split) 70.dp else 95.dp, if (split) 110.dp else 150.dp), worn = equipped.layers())
+                    Sparkles(Modifier.fillMaxSize(), listOf(0.49f to 0f, 0.25f to 0.47f, 0.74f to 0.17f, 0.77f to 0.8f))
+                }
+                Text("LEVEL UP!", style = if (split) KagomType.LevelTitleCompact else KagomType.LevelTitle,
+                    color = KagomColor.sparkle)
+                Text("${p.tier}", style = if (split) KagomType.LevelNumberCompact else KagomType.LevelNumber,
+                    color = KagomColor.Level.gold)
+                Spacer(Modifier.height(if (split) 16.dp else 20.dp))
+                Row(Modifier.height(if (split) 40.dp else 48.dp)
+                    .background(KagomColor.Severity.bg(Severity.RECOMMEND), RoundedCornerShape(KagomRadius.full))
+                    .padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(28.dp).background(KagomColor.Level.blue, RoundedCornerShape(KagomRadius.r8)),
+                        contentAlignment = Alignment.Center) {
+                        Text("B", style = KagomType.Body18Strong, color = KagomColor.Text.inverse)
+                    }
+                    Text("블루멤버스 +${StateEngine.fmt(p.points)}P", style = if (split) KagomType.Body16Strong else KagomType.Body18Strong, color = KagomColor.Text.primary)
+                }
+                Spacer(Modifier.height(if (split) 28.dp else 52.dp))
             }
-            drawCircle(Brush.radialGradient(listOf(KagomColor.Surface.inverse.copy(alpha = 0.85f), KagomColor.Surface.inverse.copy(alpha = 0f)), c, size.height * 0.6f), size.height * 0.6f, c)
+            Column(Modifier.padding(horizontal = if (split) 24.dp else 40.dp)
+                .padding(top = if (split) 16.dp else 0.dp, bottom = if (split) 24.dp else 36.dp)) {
+                ModalActions("확인", onConfirm, null, {})
+            }
         }
-        Sparkles(Modifier.fillMaxSize(), listOf(0.5f to 0.1f, 0.68f to 0.2f, 0.25f to 0.78f, 0.74f to 0.74f))
-        TierEmblem(p.tier, Modifier.align(Alignment.Center), large = true)
-        KagomCharacter(profile.skin, Expression.IDLE, Modifier.align(Alignment.BottomEnd).padding(end = if (split) 12.dp else 50.dp)
-            .size(if (split) 110.dp else 140.dp, if (split) 160.dp else 200.dp).offset(y = 12.dp), worn = equipped.layers())
-    }) {
-        Text("티어 ${p.tier}에 올랐어요!", style = KagomType.Title32, color = KagomColor.Text.primary)
-        Spacer(Modifier.height(KagomSpace.s8))
-        val nth = if (p.tier == 2) "첫" else "${p.tier - 1}번째"
-        Text("경험치 ${"$threshold".josa("을", "를")} 넘겼어요 · ${profile.name.josa("과", "와")} 함께한 $nth 승급",
-            style = KagomType.Body18, color = KagomColor.Text.secondary)
-        Spacer(Modifier.height(KagomSpace.s16))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-            Chip("블루멤버스 +${StateEngine.fmt(p.points)} P", KagomColor.Severity.bg(Severity.OBSERVE), KagomColor.Severity.fg(Severity.OBSERVE),
-                height = 32.dp, style = KagomType.Body16Strong)
-            Text("지급 완료 · 현대 앱에서 확인할 수 있어요", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-        }
-        Spacer(Modifier.height(KagomSpace.s16))
-        Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-            StatTile("${p.totalExp}", "누적 EXP", Modifier.weight(1f))
-            StatTile("${p.ownedItems}", "획득 아이템", Modifier.weight(1f))
-            StatTile("${p.visitedPlaces} / ${Landmarks.all.size}", "방문 랜드마크", Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(KagomSpace.s16))
-        SpeechBubble(profile.name, "우리 벌써 티어 ${"${p.tier}".josa("이에요", "예요")}! 다음엔 어디로 드라이브 갈까요?")
-        Spacer(Modifier.height(KagomSpace.s16))
-        ModalActions("확인", onConfirm, null, {}, null)
     }
 }
 
+/** Figma kagomSays에는 이름 접두어가 없어 공용 SpeechBubble을 바꾸지 않고 팝업 안에서만 맞춘다. */
 @Composable
-private fun StatTile(value: String, label: String, modifier: Modifier) {
-    Column(
-        modifier.height(76.dp).background(KagomColor.Surface.subtle, RoundedCornerShape(KagomRadius.r16)),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-    ) {
-        Text(value, style = KagomType.Heading24, color = KagomColor.Text.primary)
-        Text(label, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-    }
+private fun PopupQuote(text: String) {
+    Text(text, style = KagomType.Body16, color = KagomColor.Text.secondary,
+        modifier = Modifier.fillMaxWidth().background(KagomColor.Surface.subtle, RoundedCornerShape(KagomRadius.r16))
+            .padding(horizontal = 16.dp, vertical = 12.dp))
 }
 
 // ───────────── POP-05 정비 시트 ─────────────
@@ -538,67 +557,71 @@ fun MaintenanceSheet(
         Box(Modifier.fillMaxSize().background(KagomColor.Overlay.dim).clickable(remember0(), null, onClick = onClose))
         val shape = if (split) RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp) else RoundedCornerShape(0.dp)
         Column(
-            (if (split) Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(top = 138.dp)
+            (if (split) Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(top = 128.dp).heightIn(max = 952.dp)
             else Modifier.align(Alignment.CenterEnd).width(640.dp).fillMaxHeight())
                 .background(KagomColor.Surface.card, shape)
+                .clip(shape)
                 .clickable(remember0(), null) {}
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = if (split) 20.dp else 28.dp, vertical = if (split) 24.dp else 32.dp),
-            verticalArrangement = Arrangement.spacedBy(KagomSpace.s16),
+                .padding(start = if (split) 20.dp else 28.dp, end = if (split) 20.dp else 28.dp,
+                    top = if (split) 24.dp else 32.dp, bottom = if (split) 20.dp else 32.dp),
+            verticalArrangement = Arrangement.spacedBy(if (split) 10.dp else 20.dp),
         ) {
             Text("정비", style = KagomType.Title32, color = KagomColor.Text.primary)
 
-            // SEN-04 / SEN-06: 정비소 안내 블록
+            // Figma 7:2433 / 7:2471: 섹션은 차량 상태로 고르고 스타일·문구는 같은 카드를 쓴다.
             status.shopGuide?.let { g ->
-                Column(
-                    Modifier.fillMaxWidth().background(KagomColor.Severity.bg(Severity.URGENT), RoundedCornerShape(KagomRadius.r24)).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(KagomSpace.s12),
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s24)) {
-                        Text(g.label, style = KagomType.Body16Strong, color = KagomColor.Severity.fg(Severity.URGENT))
-                        Text("긴급", style = KagomType.Body16Strong, color = KagomColor.Severity.fg(Severity.URGENT))
+                MaintenanceSection(KagomColor.Severity.bg(Severity.URGENT)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(g.label, style = KagomType.Body18Strong, color = KagomColor.Severity.fg(Severity.URGENT))
+                        com.example.roro.ui.components.StatusBadge(Severity.URGENT, "긴급")
                     }
-                    Text(
-                        if (g.id == com.example.roro.core.StatusId.SEN_04) "센서가 브레이크액 부족을 감지했어요. 보충으로 해결되지 않으니 가까운 정비소에서 바로 점검받으세요."
-                        else "엔진 출력 저하 경고등이 켜졌어요. 가까운 정비소에서 바로 점검받으세요.",
-                        style = KagomType.Body16, color = KagomColor.Text.secondary,
-                    )
+                    Text("가까운 정비소에서 바로 점검받으세요.", style = KagomType.Body16, color = KagomColor.Text.secondary)
                     IviButton("가까운 정비소 찾기", onFindShop, enabled = gearP)
                 }
             }
-
-            // SEN-03 / MNT-01 엔진오일
-            if (status.oilChange != null) {
-                Text("엔진오일", style = KagomType.Heading20, color = KagomColor.Text.primary)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (status.engineOilAlert && !data.maintenance.engineOilDismissed) IviButton("보충했어", onRefilled, enabled = gearP)
-                    IviButton("오일 교체 완료", onOilChanged, type = IviButtonType.Primary, enabled = gearP)
-                }
-                Text("교체 완료를 누르면 주행거리·기간 기준이 0부터 다시 계산돼요 (MNT-01 초기화)", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-                ToggleRow("가혹 조건", data.maintenance.severe, gearP, onSevere)
-                ToggleRow("추천 오일 사용", data.maintenance.recommendedOil, gearP, onRecommendedOil)
-                Text("교체 주기 ${StateEngine.fmt(status.oilChange.intervalKm)} km · ${if (status.oilChange.intervalDays > 200) 12 else 6}개월 · 남은 거리 ${status.oilChange.display}",
-                    style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-            }
-
-            // MNT-02 정기 점검 체크리스트
-            Text(Checkup.roundLabel(status.checkup.round), style = KagomType.Heading20, color = KagomColor.Text.primary)
-            Text(if (status.checkup.due) "점검할 차례예요. 항목을 확인하고 점검 완료를 눌러 주세요." else "다음 점검까지 ${status.checkup.display}",
-                style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-            Column {
-                Checkup.items.forEach { item ->
-                    IviCheckbox(item in data.checkupChecks, item, { onToggleCheck(item) }, Modifier.padding(start = 8.dp), enabled = gearP)
+            if (status.engineType != com.example.roro.core.EngineType.EV && (status.oilChange != null || status.engineOilAlert)) {
+                MaintenanceSection {
+                    Text("엔진오일 교체 시기", style = KagomType.Heading22, color = KagomColor.Text.primary)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IviButton("보충했어요", onRefilled, enabled = gearP && status.engineOilAlert && !data.maintenance.engineOilDismissed)
+                        IviButton("오일 교체했어요", onOilChanged, type = IviButtonType.Primary, enabled = gearP)
+                    }
+                    ToggleRow("짧은 거리 위주로 타거나 험한 길을 자주 달려요", data.maintenance.severe, gearP, onSevere)
+                    ToggleRow("제조사 추천(순정) 오일을 써요", data.maintenance.recommendedOil, gearP, onRecommendedOil)
                 }
             }
-            IviButton("점검 완료", onCompleteCheckup, type = IviButtonType.Primary,
-                enabled = gearP && Checkup.items.all { it in data.checkupChecks })
+            MaintenanceSection {
+                Text(if (status.checkup.due) "${status.checkup.round}만 km 정기 점검" else "정기 점검",
+                    style = KagomType.Heading22, color = KagomColor.Text.primary)
+                if (status.checkup.due) {
+                    Checkup.itemsFor(status.engineType).forEach { item ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            IviCheckbox(item.key in data.checkupChecks, "", { onToggleCheck(item.key) },
+                                Modifier.size(64.dp).semantics { contentDescription = item.label }, enabled = gearP)
+                            Text(item.label, style = KagomType.Body20, color = KagomColor.Text.primary,
+                                modifier = Modifier.weight(1f).clickable(enabled = gearP) { onToggleCheck(item.key) })
+                        }
+                    }
+                    IviButton("점검 다 했어요", onCompleteCheckup, type = IviButtonType.Primary,
+                        enabled = gearP && Checkup.canComplete(status.checkup, status.engineType, data.checkupChecks))
+                } else {
+                    if (data.maintenance.checkupRoundsDone > 0) {
+                        Text("${data.maintenance.checkupRoundsDone}만 km 점검을 완료했어요",
+                            style = KagomType.Body20, color = KagomColor.Text.primary)
+                    }
+                    Text("다음 점검: ${status.checkup.round}만 km · ${status.checkup.display}",
+                        style = KagomType.Body20, color = KagomColor.Text.secondary)
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = KagomType.Body20, color = KagomColor.Text.primary, modifier = Modifier.weight(1f))
         IviSwitch(checked, onChange, enabled = enabled)
     }
@@ -608,8 +631,9 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChang
 /** 착용 레이어 (하의 → 상의 → 머리) */
 private fun Equipped.layers() = wornLayers(head, top, bottom)
 
-/** 새 아이템을 입혀 본 레이어 (보상 공개·해금 hero) */
-private fun Equipped.layersWith(itemId: String): List<String> {
-    val item = Items.byId(itemId) ?: return layers()
-    return with(item.category, item.id).layers()
+/** 정비 시트의 세 카드만 감싸 공용 화면 스타일에 영향을 주지 않는다. */
+@Composable
+private fun MaintenanceSection(color: Color = KagomColor.Surface.subtle, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().background(color, RoundedCornerShape(KagomRadius.r16)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
 }
