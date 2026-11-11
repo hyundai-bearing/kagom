@@ -162,7 +162,7 @@ enum class NavTab(val label: String) { HOME("홈"), QUESTS("도전"), MAP("지�
 
 /** navItem (State=Default|Selected · Label). 72×58 */
 @Composable
-fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, closetText: Boolean = false) {
+fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(KagomRadius.r16)
     val bg by animateColorAsState(if (selected) KagomColor.Surface.inverse else KagomColor.Surface.card, tween(KagomMotion.FAST), label = "navBg")
     val fg by animateColorAsState(if (selected) KagomColor.Text.inverse else KagomColor.Text.secondary, tween(KagomMotion.FAST), label = "navFg")
@@ -175,7 +175,7 @@ fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Mod
             .semantics { contentDescription = "$label 탭" },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = if (closetText) KagomType.ClosetSmallStrong else KagomType.Caption14Strong, color = fg, maxLines = 1)
+        Text(label, style = KagomType.Caption14Strong, color = fg, maxLines = 1)
     }
 }
 
@@ -187,7 +187,7 @@ fun NavRail(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = M
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }, closetText = selected == NavTab.CLOSET) }
+        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }) }
     }
 }
 
@@ -199,7 +199,7 @@ fun BottomTabBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }, closetText = selected == NavTab.CLOSET) }
+        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }) }
     }
 }
 
