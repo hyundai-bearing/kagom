@@ -9,6 +9,8 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
@@ -32,6 +34,10 @@ private fun style(size: Int, line: Int, bold: Boolean, tracking: Float = 0f) = T
     letterSpacing = if (tracking == 0f) TextUnit.Unspecified else tracking.sp,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
     lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+    // 줄은 어절(띄어쓰기) 단위로 넘긴다. 기본값은 한글을 글자마다 끊어서 "향할까 / 요?"처럼 한 글자만 다음 줄로 떨어진다.
+    // 어절 단위 규칙은 한국어 로캘에서만 적용되므로 시스템 언어와 상관없이 ko로 고정한다 (UI 글자가 전부 한국어다)
+    lineBreak = LineBreak(LineBreak.Strategy.Simple, LineBreak.Strictness.Default, LineBreak.WordBreak.Phrase),
+    localeList = LocaleList("ko-KR"),
 )
 
 /**

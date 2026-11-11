@@ -81,6 +81,7 @@
   - SCR-00/01 Split 선택 카드: 높이 고정(200/220) → 최소 높이 (글자가 두 줄이면 카드가 늘어난다).
   - POP-04 포인트 칩: "B" 칸 28 → 36, 칩 높이 Split 40 → 48.
   - 돌려보기 안내는 Split 프리뷰(폭 240)보다 길어 한 줄로 캔버스 밖까지 넘쳐 그린다.
+- **줄바꿈은 어절 단위** (`Type.kt` 공통 `style()`, 2026-11-11): 기본값은 한글을 글자마다 끊어 "향할까 / 요?"처럼 한 글자만 다음 줄로 떨어진다. `LineBreak.WordBreak.Phrase`와 한국어 로캘(`ko-KR`) 고정을 같이 넣어야 한다. 로캘을 빼면 시스템 언어가 한국어가 아닌 기기에서 적용되지 않는다. Android 13(API 33) 미만에서는 효과가 없고 전처럼 보인다 (Pleos Connect 에뮬레이터는 API 34). 확인 화면: `docs/verification/korean-word-wrap/README.md`.
 - 확인 화면: `docs/verification/pleos-type-scale/README.md`.
 
 ## Figma 2026-11-10 반영 (SCR-04 개편, SCR-00 Carry-over, 티어 → 레벨)
