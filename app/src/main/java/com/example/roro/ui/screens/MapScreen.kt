@@ -597,12 +597,13 @@ private fun RegionMap(
                 }
             }
         }
-        val labels = remember(regions, district, camera, w, h, measurer, labelStyle, split, sceneId, overlays) {
+        val labels = remember(regions, district, camera, w, h, measurer, labelStyle, split, sceneId, overlays, pinLabels) {
             val gap = with(density) { KagomSpace.s4.toPx() }
             val inset = with(density) { KagomSpace.s10.toPx() }
             val radius = with(density) { 26.dp.toPx() }
             val placed = mutableListOf<RegionLabel>()
-            val keepClear = pinLocations.values.map { Rect(it - Offset(radius, radius), Size(radius * 2, radius * 2)) } + overlays
+            val keepClear = pinLocations.values.map { Rect(it - Offset(radius, radius), Size(radius * 2, radius * 2)) } +
+                pinLabels.map { it.rect } + overlays
             val ordered = regions.sortedWith(
                 compareByDescending<RegionProgress> { it.region.id == district?.region?.id }
                     .thenByDescending { it.landmarks.isNotEmpty() }
@@ -728,6 +729,7 @@ private fun RegionMap(
             val diameter = with(density) { 68.dp.toPx() }
             // 카곰은 위치점 둘레에서 이름표·핀·지도 위 글을 가리지 않는 첫 자리에 둔다 (위 → 옆 → 대각선 → 아래, 가까운 쪽부터).
             // 다 막혀 있으면 가장 덜 가리는 자리. 단계 이동 중에 자리가 바뀌지 않게 도착한 시점 기준으로 정한다
+            val lastShift = remember(camera) { arrayOfNulls<Offset>(1) }
             val avatarShift = remember(here, camera, w, h, labels, pinLabels, overlays) {
                 val at = point(here.lon.toFloat(), here.lat.toFloat())
                 val pinRadius = with(density) { 24.dp.toPx() }
@@ -740,11 +742,15 @@ private fun RegionMap(
                 )
                 // 둘째 거리는 위치점에 핀이 있을 때 그 핀 바깥이다 (차가 랜드마크에 도착한 경우). 셋째는 이름표가 몰린 곳에서 한 칸 더
                 val spots = listOf(near, near + pinRadius, near + 2 * pinRadius).flatMap { reach -> directions.map { it * reach } }
-                spots.minBy { shift ->
+                fun covered(shift: Offset): Float {
                     val box = Rect(at + shift, diameter / 2)
-                    if (box.left < 0f || box.top < 0f || box.right > w || box.bottom > h) Float.MAX_VALUE
-                    else blocked.filter { it.overlaps(box) }.map { it.intersect(box) }.sumOf { (it.width * it.height).toDouble() }.toFloat()
+                    if (box.left < 0f || box.top < 0f || box.right > w || box.bottom > h) return Float.MAX_VALUE
+                    return blocked.filter { it.overlaps(box) }.map { it.intersect(box) }
+                        .sumOf { (it.width * it.height).toDouble() }.toFloat()
                 }
+                val best = spots.minBy(::covered)
+                // 차가 움직이는 동안 카곰이 이리저리 튀지 않게, 쓰던 자리가 새로 고른 자리만큼 비어 있으면 그대로 둔다
+                (lastShift[0]?.takeIf { covered(it) <= covered(best) } ?: best).also { lastShift[0] = it }
             }
             Box(
                 Modifier.offset {
@@ -798,13 +804,16 @@ private fun RegionMap(
             if (locationStatus != null) Text(locationStatus, style = KagomType.Caption14, color = KagomColor.Text.secondary)
             Text(attribution, style = KagomType.Caption14, color = KagomColor.Text.secondary)
         }
-        if (!split) Text(
+        val reward = Items.byId(selectedPin?.landmark?.rewardItemId)
+        // 위쪽 핀의 상세 카드는 지도 아래쪽에 뜬다. 그동안은 안내 글을 숨긴다 (카드가 안내 글의 끝을 덮었다)
+        val detailOverHint = gearP && !moving && reward != null &&
+            selectedPin?.let { pinLocations.getValue(it.landmark.id).y < h / 2 } == true
+        if (!split && !detailOverHint) Text(
             hint, Modifier.align(Alignment.BottomStart).padding(KagomSpace.s24)
                 .background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
                 .padding(horizontal = KagomSpace.s16, vertical = KagomSpace.s10),
             style = KagomType.Caption14, color = KagomColor.Text.inverse,
         )
-        val reward = Items.byId(selectedPin?.landmark?.rewardItemId)
         if (!moving && selectedPin != null && reward != null) {
             val pinOnLowerHalf = pinLocations.getValue(selectedPin.landmark.id).y >= h / 2
             val detailPosition = if (pinOnLowerHalf) {
@@ -824,9 +833,12 @@ private fun RegionMap(
                     itemId = reward.id,
                 )
             } else if (split) {
-                // Full은 왼쪽 아래 안내가 주행 중에 같은 말을 하고 있어 따로 띄우지 않는다 (둘이 겹쳐 보였다)
+                // Full은 왼쪽 아래 안내가 주행 중에 같은 말을 하고 있어 따로 띄우지 않는다 (둘이 겹쳐 보였다).
+                // 아래쪽에 뜰 때는 오른쪽 아래 위치 안내·출처 글(overlays의 첫 칸) 위로 올린다 (그 글과 겹쳤다)
+                val noticePosition = if (pinOnLowerHalf) detailPosition else Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = with(density) { overlays.first().height.toDp() } + KagomSpace.s4)
                 Text("기어 P에서 핀 상세를 볼 수 있어요",
-                    detailPosition
+                    noticePosition
                         .background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     style = KagomType.Caption14Strong, color = KagomColor.Text.inverse)
