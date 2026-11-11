@@ -138,8 +138,9 @@ fun ClosetScreen(
     var draft by remember(data.equipped) { mutableStateOf(data.equipped) }
     var selectedSlot by remember { mutableStateOf(data.savedOutfits.indexOf(data.equipped).takeIf { it >= 0 }) }
     var tab by remember { mutableIntStateOf(0) }
-    var lockedSel by remember { mutableStateOf<Item?>(null) }
-    var popupLocked by remember { mutableStateOf(false) }
+    /** 마지막으로 누른 아이템. 그리드 아래 정보 줄에 보이고, 정보 줄을 누르면 팝업([popupOpen])으로 자세히 본다 */
+    var selected by remember { mutableStateOf<Item?>(null) }
+    var popupOpen by remember { mutableStateOf(false) }
     var page by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
     var lastToast by remember { mutableStateOf("") }
@@ -152,13 +153,15 @@ fun ClosetScreen(
     val pageCount = maxOf(1, (items.size + pageSize - 1) / pageSize)
     val shownPage = page.coerceIn(0, pageCount - 1)
 
-    /** 패널을 열거나 닫아도 선택한 아이템이 있는 페이지를 유지한다. */
+    /** 선택을 바꾸거나 지워도 선택한 아이템이 있는 페이지를 유지한다. 선택을 지우면 팝업도 닫는다 */
     fun select(sel: Item?) {
         val anchor = sel?.let { s -> items.indexOfFirst { it.id == s.id } }?.takeIf { it >= 0 } ?: (shownPage * pageSize)
-        lockedSel = sel
+        selected = sel
+        if (sel == null) popupOpen = false
         page = anchor / pageSize
     }
-    BackHandler(enabled = lockedSel != null) { select(null) }
+    // 뒤로 키: 팝업 → 선택(정보 줄) 순서로 닫는다
+    BackHandler(enabled = selected != null) { if (popupOpen) popupOpen = false else select(null) }
     LaunchedEffect(gearP) { if (!gearP) select(null) }
 
     fun owns(item: Item) = item.id in data.owned || (Examples.isExample(item.id) && item.id in Examples.owned)
@@ -169,23 +172,21 @@ fun ClosetScreen(
         else -> CellState.Owned
     }
 
+    /**
+     * 누를 때마다 팝업이 화면을 덮어 [닫기]를 한 번 더 눌러야 했다 (옷을 갈아입어 볼수록 피로하다).
+     * 보유 아이템은 바로 입혀 보고, 잠긴 아이템은 얻는 방법을 그리드 아래 정보 줄에 보인다. 팝업은 정보 줄을 눌러야 열린다
+     */
     fun onCell(item: Item) {
         if (!gearP) { toast = "주차 중에 이용할 수 있어요"; return }
         val s = stateOf(item)
-        if (s == CellState.Locked) {
-            popupLocked = true
-            select(item)
-            return
-        }
-        if (lockedSel != null) select(null)
-        if (!Examples.isExample(item.id)) {
+        if (s != CellState.Locked && !Examples.isExample(item.id)) {
             draft = when {
                 s == CellState.Owned -> draft.with(item.category, item.id)
                 item.category == Category.TITLE -> draft
                 else -> draft.with(item.category, null)
             }
         }
-        popupLocked = false
+        popupOpen = false
         select(item)
     }
 
@@ -246,7 +247,7 @@ fun ClosetScreen(
                         row.forEach { item ->
                             key(item.id) {
                                 val s = stateOf(item)
-                                ClosetItemCard(item, s, lockedSel?.id == item.id, split, { onCell(item) }, Modifier.weight(1f))
+                                ClosetItemCard(item, s, selected?.id == item.id, split, { onCell(item) }, Modifier.weight(1f))
                             }
                         }
                         repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
@@ -259,7 +260,23 @@ fun ClosetScreen(
         Pagination(shownPage, pageCount, { page = it }, m)
     }
     val tabs: @Composable (Modifier) -> Unit = { m ->
-        GhostSegmentedTabs(Category.entries.map { it.label }, tab, { tab = it; lockedSel = null; page = 0 }, m, itemWidth = null, gap = if (split) 8.dp else 15.dp)
+        GhostSegmentedTabs(Category.entries.map { it.label }, tab, { tab = it; select(null); page = 0 }, m, itemWidth = null, gap = if (split) 8.dp else 15.dp)
+    }
+    // 고른 아이템의 정보: 보유 = 받은 날·곳, 잠금 = 얻는 조건과 진행 + 획득처로 가는 버튼
+    val infoLine: @Composable (Modifier) -> Unit = { m ->
+        if (gearP) selected?.let { item ->
+            val state = stateOf(item)
+            val locked = state == CellState.Locked
+            val info = unlockInfo(item, ctx, data.completedQuests)
+            val hasTarget = !Examples.isExample(item.id) && (info.landmarkId != null || Quests.byId(item.sourceId) != null)
+            val text = popupDescription(item, locked, data) +
+                if (locked && !Examples.isExample(item.id) && info.progressValue.isNotBlank()) " · ${info.progressValue}" else ""
+            ClosetInfoLine(item, state, text, if (locked && hasTarget) info.cta else null, split,
+                onNavigate = { select(null); onNavigate(info.target, info.landmarkId) },
+                onDetails = { popupOpen = true },
+                modifier = m,
+            )
+        }
     }
     // 주행 중에는 저장 버튼이 꺼져 있는 까닭을 알려 준다 (가이드 5.2: 치장 저장은 기어 P에서만)
     val hint = if (gearP) "잠긴 아이템을 누르면 얻는 방법을 알려드려요" else "주행 중에는 돌려보기와 저장을 할 수 없어요"
@@ -285,6 +302,7 @@ fun ClosetScreen(
                 grid(Modifier.fillMaxWidth())
                 // 그리드 아래 가운데 페이지 넘김, 버튼은 오른쪽 끝 (가이드 v1.2 2.1)
                 Box(Modifier.fillMaxWidth().padding(top = KagomSpace.s12), contentAlignment = Alignment.Center) { pagination(Modifier) }
+                infoLine(Modifier.padding(top = KagomSpace.s16))
                 Spacer(Modifier.weight(1f))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
             }
@@ -297,8 +315,10 @@ fun ClosetScreen(
                 Column(Modifier.weight(1f).fillMaxHeight().padding(start = 76.dp)) {
                     tabs(Modifier.fillMaxWidth())
                     Spacer(Modifier.height(KagomSpace.s16))
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                    // 그리드(두 줄) 아래 남는 자리에 정보 줄을 둔다 (페이지 넘김·버튼 줄과 겹치지 않는다)
+                    Column(Modifier.weight(1f).fillMaxWidth()) {
                         grid(Modifier)
+                        infoLine(Modifier.padding(top = KagomSpace.s24))
                     }
                     // closetFooter: 페이지 넘김 | 빈칸 | 원래대로·저장하기 (버튼은 늘 오른쪽 끝, 가이드 v1.2 2.1)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -311,11 +331,11 @@ fun ClosetScreen(
             }
         }
 
-        if (gearP) lockedSel?.let { item ->
+        if (gearP && popupOpen) selected?.let { item ->
             val info = unlockInfo(item, ctx, data.completedQuests)
             val hasTarget = !Examples.isExample(item.id) && (info.landmarkId != null || Quests.byId(item.sourceId) != null)
-            ClosetItemPopup(item, popupLocked, profile, data, split, if (hasTarget) info.cta else null,
-                onDismiss = { select(null) },
+            ClosetItemPopup(item, stateOf(item) == CellState.Locked, profile, data, split, if (hasTarget) info.cta else null,
+                onDismiss = { popupOpen = false },
                 onNavigate = { select(null); onNavigate(info.target, info.landmarkId) },
             )
         }
@@ -348,11 +368,61 @@ private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, comp
         Spacer(Modifier.height(if (compact) 4.dp else 9.dp))
         Text(item.name, style = KagomType.ClosetItemName, color = KagomColor.Text.primary, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
-        val label = when (state) { CellState.Equipped -> "착용중"; CellState.Owned -> "보유중"; CellState.Locked -> "잠금" }
-        val color = when (state) { CellState.Equipped -> KagomColor.Closet.equipped; CellState.Owned -> KagomColor.Closet.owned; CellState.Locked -> KagomColor.Closet.locked }
-        val textColor = when (state) { CellState.Equipped -> KagomColor.Closet.equippedText; CellState.Owned -> KagomColor.Closet.ownedText; CellState.Locked -> KagomColor.Closet.lockedText }
-        Chip(label, color, textColor, height = 40.dp, style = KagomType.ClosetSmallStrong)
+        ClosetStateChip(state)
         Spacer(Modifier.height(if (compact) 0.dp else 10.dp))
+    }
+}
+
+@Composable
+private fun ClosetStateChip(state: CellState) {
+    val label = when (state) { CellState.Equipped -> "착용중"; CellState.Owned -> "보유중"; CellState.Locked -> "잠금" }
+    val color = when (state) { CellState.Equipped -> KagomColor.Closet.equipped; CellState.Owned -> KagomColor.Closet.owned; CellState.Locked -> KagomColor.Closet.locked }
+    val textColor = when (state) { CellState.Equipped -> KagomColor.Closet.equippedText; CellState.Owned -> KagomColor.Closet.ownedText; CellState.Locked -> KagomColor.Closet.lockedText }
+    Chip(label, color, textColor, height = 40.dp, style = KagomType.ClosetSmallStrong)
+}
+
+/**
+ * 그리드 아래 정보 줄: 고른 아이템의 이름·상태와 한 줄 설명 (보유 = 받은 날·곳, 잠금 = 얻는 조건·진행).
+ * 잠긴 아이템은 획득처로 가는 버튼([cta])을 같이 둔다. 줄 전체를 누르면 팝업(Figma 2021:5094 / 2071:7596)으로 자세히 본다.
+ * 화면을 덮지 않아서 닫을 필요가 없고, 다른 아이템을 누르면 내용만 바뀐다 (디자인에 없는 자리, 가정)
+ */
+@Composable
+private fun ClosetInfoLine(
+    item: Item, state: CellState, text: String, cta: String?, compact: Boolean,
+    onNavigate: () -> Unit, onDetails: () -> Unit, modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(KagomRadius.r24)
+    val header: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s10)) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s10)) {
+                Text(item.name, Modifier.weight(1f, fill = false), style = KagomType.ClosetItemName, color = KagomColor.Text.primary,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ClosetStateChip(state)
+            }
+            Text("자세히 ›", style = KagomType.ClosetSmallStrong, color = KagomColor.Closet.selected, maxLines = 1)
+        }
+    }
+    val body: @Composable () -> Unit = { Text(text, style = KagomType.ClosetSmallText, color = KagomColor.Text.secondary) }
+    val box = modifier.fillMaxWidth().clip(shape).background(KagomColor.Surface.card).border(1.dp, KagomColor.Border.default, shape)
+        .clickable(onClickLabel = "자세히 보기", onClick = onDetails)
+        .padding(horizontal = if (compact) 20.dp else 28.dp, vertical = if (compact) 16.dp else 20.dp)
+    if (compact) {
+        // Split은 폭이 좁아 버튼을 설명 아래 오른쪽 끝에 둔다 (버튼은 늘 오른쪽 끝, 가이드 v1.2 2.1)
+        Column(box, verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
+            header()
+            body()
+            if (cta != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IviButton(cta, onNavigate, size = IviButtonSize.Medium)
+            }
+        }
+    } else {
+        Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
+                header()
+                body()
+            }
+            if (cta != null) IviButton(cta, onNavigate, size = IviButtonSize.Medium)
+        }
     }
 }
 
