@@ -341,7 +341,7 @@ fun MapScreen(
         } else {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16)) {
                 mapContent(Modifier.weight(1f).fillMaxSize())
-                panel(Modifier.width(360.dp).fillMaxSize())
+                panel(Modifier.width(400.dp).fillMaxSize())
             }
         }
     }
@@ -751,7 +751,7 @@ private fun RegionMap(
                             onEquip(reward.id)
                             onDismissPin()
                         },
-                    width = minOf(if (split) maxWidth - 16.dp else 440.dp, maxWidth),
+                    width = minOf(if (split) maxWidth - 16.dp else 520.dp, maxWidth),
                     itemId = reward.id,
                 )
             } else {

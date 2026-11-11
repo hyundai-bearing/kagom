@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -200,8 +201,8 @@ fun CarryOverScreen(profile: Profile, data: AppData, drivenKm: Int, onKeep: () -
         }
         // choiceCards
         if (split) {
-            choiceA(Modifier.fillMaxWidth().height(200.dp))
-            choiceB(Modifier.fillMaxWidth().height(200.dp))
+            choiceA(Modifier.fillMaxWidth().heightIn(min = 200.dp))
+            choiceB(Modifier.fillMaxWidth().heightIn(min = 200.dp))
         } else {
             Row(Modifier.fillMaxWidth().height(380.dp), horizontalArrangement = Arrangement.spacedBy(KagomSpace.s24)) {
                 choiceA(Modifier.weight(1f).fillMaxHeight())
@@ -263,7 +264,7 @@ fun PersonalityScreen(state: OnboardingState) {
                     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                         choices.forEach { c ->
                             QuestionCard(c.key.name, c.text, c.tag, selected(c.key), enabled,
-                                { state.picked = c.key }, Modifier.fillMaxWidth().height(220.dp))
+                                { state.picked = c.key }, Modifier.fillMaxWidth().heightIn(min = 220.dp))
                         }
                     }
                 } else {

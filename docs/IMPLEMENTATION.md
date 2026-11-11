@@ -16,7 +16,7 @@
 | `core/Examples.kt` | Figma 예시 데이터 (치장 03~14). 시연 패널 스위치로만 보임 | 9 |
 | `data/` | Pleos 차량·위치 어댑터, Mock/시연 덮어쓰기, 저장소(SharedPreferences JSON) | 9 |
 | `ui/theme/Tokens.kt` | Kagom Tokens/Primitives (색 HEX는 이 파일에만) | 4.1, 부록 B |
-| `ui/theme/Type.kt` | 텍스트 스타일 램프 (Asta Sans, OFL) | 4.2 |
+| `ui/theme/Type.kt` | 텍스트 스타일 램프 (Asta Sans, OFL). 이름은 Figma 스타일, 크기는 Pleos Connect 글자 단계 | 4.2 |
 | `ui/theme/Theme.kt` | Full/Split 감지 + 디자인 스케일(1dp = Figma 1px), 터치 범위 최소 64 | 5.1, 8.1 |
 | `ui/theme/Motion.kt` | 움직임 시간 `KagomMotion` (주행 중에는 0) | – |
 | `ui/components/PleosKit.kt` | ivi_* 대응 (버튼·입력창·스위치·체크박스·탭·토스트) | 4.4 |
@@ -50,6 +50,38 @@
 - **Split 홈에서 정비 시트 열기**: Split에는 빠른 정비 카드가 없어서 "이상 없음" 배지도 눌러 열 수 있게 했다 (Figma는 이상 배지만 그려져 있다).
 - **프로필 헤더가 한 줄에 안 들어갈 때** (Split, 이름 10자): EXP부터 다음 줄로 내린다.
 - **도전과제 보상 공개 시점**: 달성해도 보상 상자를 열기 전에는 카드에 ? 와 "상자 도착"으로 둔다 (spec은 "달성 후 공개", POP-02 각주는 "열기 전에는 ?" → 각주를 따랐다).
+
+## 글자 크기 = Pleos Connect 글자 단계 (2026-11-10)
+
+차 안 화면에서 운전자가 읽는 앱이라 글자를 Pleos Connect 공식 글자 단계에 맞췄다. Figma 텍스트 스타일(14~40px)은 그대로 옮기면 차 화면에서 너무 작다 (Pleos Full 창 1682px에서 Figma 14px → 실제 12px).
+
+- **기준**: Pleos Connect Developer Guide > Designing the UI > Typography (`document.pleos.ai/en/docs/connect/guide/docs-design/foundations/typography`, 2026-11-10 확인). 폰트 Asta Sans(이미 쓰는 폰트), 실제 화면 18px 이상 권장. 크기/줄 높이: Headline 60/80 · 56/72 · 48/64, Title 40/52 · 36/44 · 32/40, Body 30/38 · 28/36 · 26/34, Label 24/28 · 20/24.
+- **대응** (`ui/theme/Type.kt`): `KagomType` 이름은 Figma 스타일 이름 그대로 두고 값만 같은 순서의 Pleos 단계로 바꿨다. 화면 코드는 Figma를 보고 스타일을 고르면 된다.
+
+| Figma 스타일 (px) | Pleos 단계 (px) |
+|---|---|
+| Caption14 14/20 | Label/Small 20/24 |
+| Body16 16/24 | Label/Medium 24/28 |
+| Body18 18/26 | Body/Small 26/34 |
+| Body20·Heading20 20/28 | Body/Medium 28/36 |
+| Heading22 22/30 | Body/Large 30/38 |
+| Heading24 24/32 | Title/Small 32/40 |
+| Title28 28/36 | Title/Medium 36/44 |
+| Title32 32/40 | Title/Large 40/52 |
+| Title36 36/44 | Headline/Small 48/64 |
+| Display40 40/48 | Headline/Medium 56/72 |
+
+- POP-04 `LevelTitle`·`LevelNumber`(64~144px)와 ivi_* 키트 글자(`Pleos…`)는 원래 Pleos 단계 이상이라 그대로다.
+- Split에서 hero를 600/880으로 줄여 그릴 때도 글자(보상 칩, 방문 도장)는 줄이지 않는다 (최소 20px).
+- **글자에 맞춰 Figma와 달라진 치수** (가정):
+  - `ItemGridCell` 180×232 → 192×252, 썸네일 88 → 80, 이름 두 줄까지. 192 = Split(600)에 세 칸, 252 = Full 1080 높이에 세 줄이 들어가는 가장 큰 값.
+  - `QuestCard` 높이 124 → 140, Split 진행 칸 240 → 160 (이름이 잘리지 않게).
+  - `HeaderProfile` EXP 칸 160 → 200.
+  - SCR-05: 오른쪽 패널 360 → 400, 핀 상세 카드(Full) 440 → 520. 핀 이름표는 글자 폭을 재서 그리므로 따로 고치지 않는다.
+  - SCR-00/01 Split 선택 카드: 높이 고정(200/220) → 최소 높이 (글자가 두 줄이면 카드가 늘어난다).
+  - POP-04 포인트 칩: "B" 칸 28 → 36, 칩 높이 Split 40 → 48.
+  - 돌려보기 안내는 Split 프리뷰(폭 240)보다 길어 한 줄로 캔버스 밖까지 넘쳐 그린다.
+- 확인 화면: `docs/verification/pleos-type-scale/README.md`.
 
 ## Figma 2026-11-10 반영 (SCR-04 개편, SCR-00 Carry-over, 티어 → 레벨)
 
