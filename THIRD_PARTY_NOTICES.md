@@ -22,5 +22,6 @@
 
 ## 확인이 필요한 것
 
+- 치장 팝업 진열대 배경 (`app/src/main/res/drawable-nodpi/closet_display_stage.png`): 팀 디자인으로 전달받은 이미지이며, 외부 공개 전 출처와 이용 조건을 확인한다.
 - **곰 3D 모델과 스킨 텍스처** (`tools/closet3d/source/`)와 거기서 렌더한 캐릭터 이미지(`app/src/main/assets/kagom/**`): 출처와 이용 조건을 아직 이 문서에 적지 않았다. 외부에 공개하기 전에 확인해서 적는다.
 - **기획·디자인 자료** (`docs/spec.pdf`, `docs/design/**`): 팀이 받은 자료다. 레포를 공개로 바꾸기 전에 공개해도 되는지 확인한다.

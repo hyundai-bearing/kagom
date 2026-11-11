@@ -67,6 +67,13 @@ private fun style(p: Pleos, bold: Boolean, tracking: Float = 0f) = style(p.size,
  * Figma를 보고 스타일을 고르면 그대로 Pleos 크기가 나온다.
  */
 object KagomType {
+    /** 치장 팝업 이름·설명·상태 (Figma 2021:5094). */
+    val ClosetPopupTitle = style(42, 50, true)
+    val ClosetPopupBody = style(30, 38, false)
+    val ClosetPopupBadge = style(28, 34, true)
+    val ClosetItemName = style(30, 36, true)
+    val ClosetSmallText = style(28, 34, false)
+    val ClosetSmallStrong = style(28, 34, true)
     // Figma POP-04 levelUpTitle / levelNumber 전용. 이미 Pleos Headline보다 커서 Figma 값 그대로 둔다
     val LevelTitle = style(64, 70, true)
     val LevelTitleCompact = style(44, 48, true)

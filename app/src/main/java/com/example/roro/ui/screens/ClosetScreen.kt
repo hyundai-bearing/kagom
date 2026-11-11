@@ -4,17 +4,15 @@ package com.example.roro.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,10 +22,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +39,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.Category
 import com.example.roro.core.Examples
@@ -53,9 +61,10 @@ import com.example.roro.data.AppData
 import com.example.roro.data.Equipped
 import com.example.roro.data.Profile
 import com.example.roro.ui.components.CellState
+import com.example.roro.ui.components.AssetImage
+import com.example.roro.ui.components.Chip
+import com.example.roro.ui.components.KagomRenders
 import com.example.roro.ui.components.GhostSegmentedTabs
-import com.example.roro.ui.components.ItemGridCell
-import com.example.roro.ui.components.ItemUnlockPanel
 import com.example.roro.ui.components.IviButton
 import com.example.roro.ui.components.IviButtonSize
 import com.example.roro.ui.components.IviButtonType
@@ -63,13 +72,11 @@ import com.example.roro.ui.components.IviToast
 import com.example.roro.ui.components.KagomTurntable
 import com.example.roro.ui.components.NavTab
 import com.example.roro.ui.components.Pagination
-import com.example.roro.ui.components.unlockLabel
 import com.example.roro.ui.components.wornLayers
 import com.example.roro.ui.josa
 import com.example.roro.ui.theme.KagomColor
 import com.example.roro.ui.theme.KagomMotion
 import com.example.roro.ui.theme.KagomRadius
-import com.example.roro.ui.theme.KagomSkinPalette
 import com.example.roro.ui.theme.KagomSpace
 import com.example.roro.ui.theme.KagomType
 import com.example.roro.ui.theme.LayoutMode
@@ -112,7 +119,7 @@ private fun unlockInfo(item: Item, ctx: ProgressContext, completed: Set<String>)
 
 /**
  * SCR-06 치장 옷장 (tab=head|top|bottom|title, lockedItem=selected|sheet, grid=overflow).
- * 한 페이지 = 열 수 × 줄 수: Full 4×3 = 12칸, 획득 안내 패널이 열리면 3×3 = 9칸, Split 3칸 (가이드 v1.2 2.1).
+ * 라벤더 스튜디오 (Figma 2027:10015): Full 3×2, Split 3칸.
  * [examples] = 시연 패널의 '예시 데이터' (Figma 예시 아이템 03~12, 페이지 넘김 확인용)
  */
 @Composable
@@ -122,15 +129,17 @@ fun ClosetScreen(
     ctx: ProgressContext,
     gearP: Boolean,
     onSave: (Equipped) -> Unit,
+    onSaveOutfit: (Int, Equipped) -> Unit,
     examples: Boolean = false,
     /** CTA: 탭 이동. 랜드마크 아이템이면 두 번째 값 = 지도에서 바로 보여 줄 랜드마크 id */
     onNavigate: (NavTab, String?) -> Unit,
 ) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
-    val palette = KagomSkinPalette.of(profile.skin)
     var draft by remember(data.equipped) { mutableStateOf(data.equipped) }
+    var selectedSlot by remember { mutableStateOf(data.savedOutfits.indexOf(data.equipped).takeIf { it >= 0 }) }
     var tab by remember { mutableIntStateOf(0) }
     var lockedSel by remember { mutableStateOf<Item?>(null) }
+    var popupLocked by remember { mutableStateOf(false) }
     var page by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
     var lastToast by remember { mutableStateOf("") }
@@ -138,23 +147,19 @@ fun ClosetScreen(
     fun itemsOf(category: Category) = Items.of(category) + if (examples) Examples.of(category) else emptyList()
     val items = itemsOf(Category.entries[tab])
 
-    fun pageSizeFor(panelOpen: Boolean) = when {
-        split -> 3
-        panelOpen -> 9
-        else -> 12
-    }
-    val cols = if (split || lockedSel != null) 3 else 4
-    val pageSize = pageSizeFor(lockedSel != null)
+    val pageSize = if (split) 3 else 6
+    val cols = 3
     val pageCount = maxOf(1, (items.size + pageSize - 1) / pageSize)
     val shownPage = page.coerceIn(0, pageCount - 1)
 
-    /** 패널이 열리고 닫히면 칸 수가 바뀐다 → 선택한 아이템(없으면 보던 첫 칸)이 있는 페이지로 */
+    /** 패널을 열거나 닫아도 선택한 아이템이 있는 페이지를 유지한다. */
     fun select(sel: Item?) {
         val anchor = sel?.let { s -> items.indexOfFirst { it.id == s.id } }?.takeIf { it >= 0 } ?: (shownPage * pageSize)
         lockedSel = sel
-        page = anchor / pageSizeFor(sel != null)
+        page = anchor / pageSize
     }
     BackHandler(enabled = lockedSel != null) { select(null) }
+    LaunchedEffect(gearP) { if (!gearP) select(null) }
 
     fun owns(item: Item) = item.id in data.owned || (Examples.isExample(item.id) && item.id in Examples.owned)
 
@@ -164,39 +169,72 @@ fun ClosetScreen(
         else -> CellState.Owned
     }
 
-    fun captionOf(item: Item, s: CellState): String = when (s) {
-        CellState.Equipped -> "착용 중"
-        CellState.Owned -> if (Examples.isExample(item.id)) "보유 · 예시 데이터" else "보유"
-        CellState.Locked -> {
-            val q = Quests.byId(item.sourceId)
-            if (q != null && q.cumulative && item.source != Source.LANDMARK) "${item.condition} (${Progress.questProgress(q, ctx, data.completedQuests).countText})"
-            else item.condition
-        }
-    }
-
     fun onCell(item: Item) {
+        if (!gearP) { toast = "주차 중에 이용할 수 있어요"; return }
         val s = stateOf(item)
         if (s == CellState.Locked) {
+            popupLocked = true
             select(item)
-            val info = unlockInfo(item, ctx, data.completedQuests)
-            toast = if (split) info.toastSplit else info.toastFull
             return
         }
         if (lockedSel != null) select(null)
-        if (Examples.isExample(item.id)) { toast = "예시 아이템이라 입어 볼 수 없어요"; return }   // 렌더가 없다
-        draft = when {
-            s == CellState.Owned -> draft.with(item.category, item.id)
-            item.category == Category.TITLE -> draft             // 칭호는 하나는 꼭 단다
-            else -> draft.with(item.category, null)
+        if (!Examples.isExample(item.id)) {
+            draft = when {
+                s == CellState.Owned -> draft.with(item.category, item.id)
+                item.category == Category.TITLE -> draft
+                else -> draft.with(item.category, null)
+            }
         }
+        popupLocked = false
+        select(item)
     }
 
     // 시착: 저장 전 draft를 입혀 본다 (스킨 + 하의 + 상의 + 머리). 밀면 돌려 볼 수 있다.
     // 가이드 v1.2: 프리뷰 아래 장착 아이템 칩 줄은 없앴다
     val preview: @Composable (Modifier, Boolean) -> Unit = { m, compact ->
-        Box(m, contentAlignment = Alignment.Center) {
+        Box(m.clip(RoundedCornerShape(KagomRadius.r28)).background(KagomColor.Closet.studio), contentAlignment = Alignment.Center) {
+            val shift = if (compact) 50.dp else 70.dp
+            Box(Modifier.offset(x = shift).size(if (compact) 320.dp else 600.dp).background(KagomColor.Closet.halo, CircleShape))
+            // 회전하는 렌더와 분리해 발밑 그림자의 크기와 위치를 고정한다.
+            Canvas(Modifier.align(Alignment.BottomCenter).offset(x = shift).padding(bottom = if (compact) 42.dp else 142.dp)
+                .size(if (compact) 140.dp else 280.dp, if (compact) 24.dp else 48.dp)) {
+                val radius = size.width / 2f
+                val center = Offset(radius, radius)
+                val shadow = Brush.radialGradient(
+                    0f to KagomColor.Closet.shadow.copy(alpha = 0.30f),
+                    0.45f to KagomColor.Closet.shadow.copy(alpha = 0.16f),
+                    1f to KagomColor.Closet.shadow.copy(alpha = 0f),
+                    center = center, radius = radius,
+                )
+                scale(scaleX = 1f, scaleY = size.height / size.width, pivot = Offset.Zero) {
+                    drawCircle(shadow, radius = radius, center = center)
+                }
+            }
             KagomTurntable(profile.skin, wornLayers(draft.head, draft.top, draft.bottom),
-                if (compact) Modifier.size(240.dp, 376.dp) else Modifier.size(480.dp, 754.dp), enabled = gearP)
+                if (compact) Modifier.offset(x = shift).size(240.dp, 376.dp) else Modifier.offset(x = shift).size(360.dp, 560.dp), enabled = gearP, showControls = false)
+            SavedOutfitSlots(data.savedOutfits.size, selectedSlot, gearP, compact,
+                onSelect = { index ->
+                    if (!gearP) { toast = "주차 중에 이용할 수 있어요" }
+                    else if (index > data.savedOutfits.size) { toast = "빈 칸은 순서대로 저장해요" }
+                    else {
+                        selectedSlot = index
+                        data.savedOutfits.getOrNull(index)?.let { outfit ->
+                            draft = outfit
+                            onSave(outfit)
+                            select(null)
+                        }
+                    }
+                },
+                onSave = {
+                    val index = selectedSlot ?: data.savedOutfits.size
+                    if (index < 3) {
+                        onSaveOutfit(index, draft)
+                        selectedSlot = index
+                        toast = "${index + 1}번 착장을 저장했어요"
+                    }
+                },
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = if (compact) 8.dp else 30.dp),
+            )
         }
     }
     val grid: @Composable (Modifier) -> Unit = { m ->
@@ -208,30 +246,27 @@ fun ClosetScreen(
                         row.forEach { item ->
                             key(item.id) {
                                 val s = stateOf(item)
-                                ItemGridCell(item, s, captionOf(item, s), lockedSel?.id == item.id, { onCell(item) })
+                                ClosetItemCard(item, s, lockedSel?.id == item.id, split, { onCell(item) }, Modifier.weight(1f))
                             }
                         }
+                        repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
         }
     }
     val pagination: @Composable (Modifier) -> Unit = { m ->
-        if (pageCount > 1) Pagination(shownPage, pageCount, { page = it }, m)
+        Pagination(shownPage, pageCount, { page = it }, m)
     }
     val tabs: @Composable (Modifier) -> Unit = { m ->
-        GhostSegmentedTabs(Category.entries.map { it.label }, tab, { tab = it; lockedSel = null; page = 0 }, m, itemWidth = if (split) null else 160.dp)
+        GhostSegmentedTabs(Category.entries.map { it.label }, tab, { tab = it; lockedSel = null; page = 0 }, m, itemWidth = null, gap = if (split) 8.dp else 15.dp)
     }
     // 주행 중에는 저장 버튼이 꺼져 있는 까닭을 알려 준다 (가이드 5.2: 치장 저장은 기어 P에서만)
     val hint = if (gearP) "잠긴 아이템을 누르면 얻는 방법을 알려드려요" else "주행 중에는 돌려보기와 저장을 할 수 없어요"
-    // 패널·시트가 닫히며 사라지는 동안에도 마지막 아이템을 그린다
-    val lastLocked = remember { arrayOfNulls<Item>(1) }
-    lockedSel?.let { lastLocked[0] = it }
-    val panelItem = lockedSel ?: lastLocked[0]
     val actions: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
             val size = if (split) IviButtonSize.Medium else IviButtonSize.Large
-            IviButton("원래대로", { draft = data.equipped; select(null) }, type = IviButtonType.Primary, size = size)
+            IviButton("초기화", { draft = draft.copy(head = null, top = null, bottom = null); select(null) }, type = IviButtonType.Primary, size = size, enabled = gearP)
             // 치장 저장은 기어 P에서만 (가이드 5.2)
             IviButton("저장하기", { onSave(draft); toast = "저장했어요" }, type = IviButtonType.Secondary, size = size, enabled = gearP)
         }
@@ -240,10 +275,10 @@ fun ClosetScreen(
     Box(Modifier.fillMaxSize().background(KagomColor.Surface.page)) {
         if (split) {
             Column(Modifier.fillMaxSize().padding(20.dp)) {
-                preview(Modifier.fillMaxWidth().height(400.dp).background(palette.canvasTint, RoundedCornerShape(KagomRadius.r24)).padding(12.dp), true)
+                preview(Modifier.fillMaxWidth().height(360.dp), true)
                 Spacer(Modifier.height(KagomSpace.s16))
-                Text("치장", style = KagomType.Heading22, color = KagomColor.Text.primary)
-                Text(hint, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
+                Text("옷장", style = KagomType.PleosTitleSmallStrong, color = KagomColor.Text.primary)
+                Text(hint, style = KagomType.ClosetSmallText, color = KagomColor.Text.tertiary)
                 Spacer(Modifier.height(KagomSpace.s12))
                 tabs(Modifier.fillMaxWidth())
                 Spacer(Modifier.height(KagomSpace.s12))
@@ -254,30 +289,16 @@ fun ClosetScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
             }
         } else {
-            Row(Modifier.fillMaxSize()) {
-                preview(Modifier.width(824.dp).fillMaxHeight().background(palette.canvasTint), false)
-                Column(Modifier.weight(1f).fillMaxHeight().padding(start = 36.dp, end = 36.dp, top = 28.dp, bottom = 28.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("치장", style = KagomType.Heading24, color = KagomColor.Text.primary, modifier = Modifier.weight(1f))
-                        Text(hint, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-                    }
-                    Spacer(Modifier.height(KagomSpace.s16))
-                    tabs(Modifier)
+            Column(Modifier.fillMaxSize().padding(start = 32.dp, end = 8.dp, top = 24.dp, bottom = 68.dp)) {
+                Text("옷장", style = KagomType.PleosTitleSmallStrong, color = KagomColor.Text.primary)
+                Spacer(Modifier.height(45.dp))
+                Row(Modifier.weight(1f)) {
+                preview(Modifier.width(740.dp).height(820.dp), false)
+                Column(Modifier.weight(1f).fillMaxHeight().padding(start = 76.dp)) {
+                    tabs(Modifier.fillMaxWidth())
                     Spacer(Modifier.height(KagomSpace.s16))
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         grid(Modifier)
-                        // itemUnlockPanel: 오른쪽에서 밀려 들어온다 (바깥 Column의 AnimatedVisibility가 아니라 일반 것을 쓴다)
-                        androidx.compose.animation.AnimatedVisibility(
-                            lockedSel != null, Modifier.align(Alignment.TopEnd),
-                            enter = fadeIn(tween(KagomMotion.SHEET)) + slideInHorizontally(tween(KagomMotion.SHEET, easing = FastOutSlowInEasing)) { it / 3 },
-                            exit = fadeOut(tween(KagomMotion.SHEET_OUT)) + slideOutHorizontally(tween(KagomMotion.SHEET_OUT)) { it / 3 },
-                        ) {
-                            panelItem?.let { item ->
-                                val info = unlockInfo(item, ctx, data.completedQuests)
-                                ItemUnlockPanel(item, item.source.unlockLabel(), info.progressValue, info.ratio, info.hint, info.cta, true,
-                                    { onNavigate(info.target, info.landmarkId) }, Modifier.width(320.dp))
-                            }
-                        }
                     }
                     // closetFooter: 페이지 넘김 | 빈칸 | 원래대로·저장하기 (버튼은 늘 오른쪽 끝, 가이드 v1.2 2.1)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -286,40 +307,78 @@ fun ClosetScreen(
                         actions()
                     }
                 }
+                }
             }
         }
 
-        // Split: 바텀시트 (딤 위). 딤이 깔리며 아래에서 올라온다
-        if (split) {
-            AnimatedVisibility(lockedSel != null, enter = fadeIn(tween(KagomMotion.SHEET)), exit = fadeOut(tween(KagomMotion.SHEET_OUT))) {
-                Box(Modifier.fillMaxSize().background(KagomColor.Overlay.dim).clickable(remember { MutableInteractionSource() }, null) { select(null) })
-            }
-            AnimatedVisibility(
-                lockedSel != null, Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(tween(KagomMotion.SHEET, easing = FastOutSlowInEasing)) { it },
-                exit = slideOutVertically(tween(KagomMotion.SHEET_OUT, easing = FastOutSlowInEasing)) { it },
-            ) {
-                panelItem?.let { item ->
-                    val info = unlockInfo(item, ctx, data.completedQuests)
-                    Column(
-                        Modifier.fillMaxWidth()
-                            .background(KagomColor.Surface.card, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                            .clickable(remember { MutableInteractionSource() }, null) {}
-                            .padding(start = 44.dp, end = 44.dp, top = 12.dp, bottom = 28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(Modifier.size(40.dp, 5.dp).background(KagomColor.Border.divider, RoundedCornerShape(KagomRadius.full)))
-                        Spacer(Modifier.height(32.dp))
-                        ItemUnlockPanel(item, item.source.unlockLabel(), info.progressValue, info.ratio, info.hint, info.cta, true,
-                            { select(null); onNavigate(info.target, info.landmarkId) }, Modifier.fillMaxWidth(), framed = false)
-                    }
-                }
-            }
+        if (gearP) lockedSel?.let { item ->
+            val info = unlockInfo(item, ctx, data.completedQuests)
+            val hasTarget = !Examples.isExample(item.id) && (info.landmarkId != null || Quests.byId(item.sourceId) != null)
+            ClosetItemPopup(item, popupLocked, profile, data, split, if (hasTarget) info.cta else null,
+                onDismiss = { select(null) },
+                onNavigate = { select(null); onNavigate(info.target, info.landmarkId) },
+            )
         }
 
         AnimatedVisibility(toast != null, Modifier.align(Alignment.TopCenter).padding(top = if (split) 16.dp else 24.dp),
             enter = fadeIn() + slideInVertically { -it }, exit = fadeOut() + slideOutVertically { -it }) {
             IviToast(toast ?: lastToast, Modifier.padding(horizontal = 20.dp))
+        }
+    }
+}
+
+/** Figma 2027:10043: 실제 아이템 상태에 따라 썸네일과 상태만 바꾼다. */
+@Composable
+private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, compact: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(KagomRadius.r24)
+    val highlighted = selected || state == CellState.Equipped
+    val context = LocalContext.current
+    val path = KagomRenders.thumbPath(item.id)
+    Column(
+        modifier.height(if (compact) 230.dp else 326.dp).clip(shape)
+            .background(KagomColor.Surface.card)
+            .border(if (highlighted) 3.dp else 1.dp, if (highlighted) KagomColor.Closet.selected else KagomColor.Border.default, shape)
+            .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = if (compact) 8.dp else 15.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.fillMaxWidth().height(if (compact) 90.dp else 160.dp), contentAlignment = Alignment.Center) {
+            if (KagomRenders.exists(context, path)) AssetImage(path, Modifier.fillMaxSize())
+            else Text(item.mark, style = KagomType.Heading24, color = KagomColor.Text.tertiary)
+        }
+        Spacer(Modifier.height(if (compact) 4.dp else 9.dp))
+        Text(item.name, style = KagomType.ClosetItemName, color = KagomColor.Text.primary, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.weight(1f))
+        val label = when (state) { CellState.Equipped -> "착용중"; CellState.Owned -> "보유중"; CellState.Locked -> "잠금" }
+        val color = when (state) { CellState.Equipped -> KagomColor.Closet.equipped; CellState.Owned -> KagomColor.Closet.owned; CellState.Locked -> KagomColor.Closet.locked }
+        val textColor = when (state) { CellState.Equipped -> KagomColor.Closet.equippedText; CellState.Owned -> KagomColor.Closet.ownedText; CellState.Locked -> KagomColor.Closet.lockedText }
+        Chip(label, color, textColor, height = 40.dp, style = KagomType.ClosetSmallStrong)
+        Spacer(Modifier.height(if (compact) 0.dp else 10.dp))
+    }
+}
+
+/** 2071:7849: 빈 칸은 차례대로 고르고 저장 버튼으로 현재 시착을 기록한다. */
+@Composable
+private fun SavedOutfitSlots(count: Int, selected: Int?, enabled: Boolean, compact: Boolean, onSelect: (Int) -> Unit, onSave: () -> Unit, modifier: Modifier = Modifier) {
+    val size = if (compact) 64.dp else 120.dp
+    val shape = RoundedCornerShape(KagomRadius.r24)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 16.dp)) {
+        Text("저장 착장", style = KagomType.ClosetSmallStrong, color = KagomColor.Text.primary)
+        repeat(3) { index ->
+            val filled = index < count
+            Box(Modifier.size(size).clip(shape)
+                .background(if (filled) KagomColor.Surface.card else KagomColor.Closet.slotEmpty)
+                .border(if (selected == index) 3.dp else 1.dp, if (selected == index) KagomColor.Closet.selected else KagomColor.Closet.slotBorder, shape)
+                .clickable { onSelect(index) }
+                .semantics { contentDescription = if (filled) "저장 착장 ${index + 1}번" else "빈 착장 ${index + 1}번" }, contentAlignment = Alignment.Center) {
+                Text(if (filled) "${index + 1}" else "+", style = if (compact) KagomType.PleosTitleSmallStrong else KagomType.Display40,
+                    color = if (filled) KagomColor.Text.primary else KagomColor.Text.tertiary)
+            }
+        }
+        val canSave = enabled && (selected != null || count < 3)
+        Box(Modifier.width(if (compact) 112.dp else 120.dp).height(64.dp).clip(RoundedCornerShape(KagomRadius.r16))
+            .background(if (canSave) KagomColor.Closet.slotSave else KagomColor.Surface.disabled)
+            .clickable(enabled = canSave, onClick = onSave), contentAlignment = Alignment.Center) {
+            Text("저장하기", style = KagomType.Heading24, color = if (canSave) KagomColor.Text.inverse else KagomColor.Text.disabled, maxLines = 1)
         }
     }
 }

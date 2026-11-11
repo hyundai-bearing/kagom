@@ -142,7 +142,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
                         )
                     }
                 }
-                NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, examples) { next, landmarkId ->
+                NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, c::saveOutfit, examples) { next, landmarkId ->
                     mapFocus = landmarkId.takeIf { next == NavTab.MAP }
                     tab = next
                 }

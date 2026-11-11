@@ -291,6 +291,7 @@ fun KagomTurntable(
     worn: List<String>,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    showControls: Boolean = true,
 ) {
     val state = remember { TurnState(0) }
     val frames = rememberTurnFrames(skinCode, worn, state, active = true)
@@ -307,10 +308,10 @@ fun KagomTurntable(
 
         // 안내 (처음 한 번) / 정면으로
         // Split 프리뷰(폭 240)보다 안내 글이 길다: 줄을 바꾸지 않고 캔버스 밖으로 넘쳐 가운데에 놓는다
-        AnimatedVisibility(enabled && !state.touched, Modifier.align(Alignment.BottomCenter).wrapContentWidth(unbounded = true), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(showControls && enabled && !state.touched, Modifier.align(Alignment.BottomCenter).wrapContentWidth(unbounded = true), enter = fadeIn(), exit = fadeOut()) {
             Pill("‹  좌우·위아래로 밀어서 돌려보기  ›")
         }
-        AnimatedVisibility(enabled && (state.frame != 0 || state.row != 0), Modifier.align(Alignment.BottomEnd), enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(showControls && enabled && (state.frame != 0 || state.row != 0), Modifier.align(Alignment.BottomEnd), enter = fadeIn(), exit = fadeOut()) {
             Pill("정면", Modifier.clickable { scope.launch { state.reset() } })
         }
     }

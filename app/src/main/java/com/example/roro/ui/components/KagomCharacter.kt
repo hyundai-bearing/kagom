@@ -139,13 +139,13 @@ object KagomRenders {
  * 같은 자리에서 path만 바뀌면(옷장 탭 전환 등) 다른 아이템 이미지가 남아 있었다.
  */
 @Composable
-fun AssetImage(path: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit) {
+fun AssetImage(path: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, colorFilter: androidx.compose.ui.graphics.ColorFilter? = null) {
     val context = LocalContext.current
     val image = remember(path) { mutableStateOf(KagomRenders.peek(path)) }
     LaunchedEffect(path) {
         if (image.value == null) image.value = withContext(Dispatchers.IO) { KagomRenders.load(context, path) }
     }
-    image.value?.let { Image(it, contentDescription = null, contentScale = contentScale, modifier = modifier) }
+    image.value?.let { Image(it, contentDescription = null, contentScale = contentScale, colorFilter = colorFilter, modifier = modifier) }
 }
 
 /** 착용 레이어 그리는 순서: 하의 → 상의 → 머리 (바깥 옷이 위) */

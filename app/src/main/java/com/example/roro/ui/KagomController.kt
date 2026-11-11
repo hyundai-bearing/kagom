@@ -22,6 +22,7 @@ import com.example.roro.data.DrivingStateSource
 import com.example.roro.data.Equipped
 import com.example.roro.data.GeoPoint
 import com.example.roro.data.KagomStore
+import com.example.roro.data.saveOutfit
 import com.example.roro.data.LocationSource
 import com.example.roro.data.MockVehicleSignalSource
 import com.example.roro.data.OverridableSignalSource
@@ -274,6 +275,11 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
 
     /** SCR-06 저장하기 */
     fun saveEquipped(e: Equipped) = parked { store.update { d -> d.copy(equipped = e.sanitized(d.owned)) } }
+
+    /** 저장 착장도 실제 보유 아이템과 주차 상태를 다시 확인한다. */
+    fun saveOutfit(index: Int, e: Equipped) = parked {
+        store.update { d -> d.copy(savedOutfits = saveOutfit(d.savedOutfits, index, e.sanitized(d.owned))) }
+    }
 
     /** 지도 팝업에서 바로 장착 */
     fun equip(itemId: String) = parked {

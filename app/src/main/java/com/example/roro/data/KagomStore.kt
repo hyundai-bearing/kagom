@@ -45,6 +45,8 @@ data class Equipped(
 data class AppData(
     val profile: Profile? = null,
     val equipped: Equipped = Equipped(),
+    /** 저장 순서대로 최대 세 착장. 기존 저장 데이터에는 없을 수 있다. */
+    val savedOutfits: List<Equipped> = emptyList(),
     val owned: Set<String> = setOf(Items.DEFAULT_TITLE),
     val exp: Int = 0,
     val points: Int = 0,
@@ -117,6 +119,10 @@ class KagomStore(context: Context) {
                 d.equipped.head?.let { put("head", it) }; d.equipped.top?.let { put("top", it) }
                 d.equipped.bottom?.let { put("bottom", it) }; d.equipped.title?.let { put("title", it) }
             })
+            put("savedOutfits", JSONArray(d.savedOutfits.take(3).map { outfit -> JSONObject().apply {
+                outfit.head?.let { put("head", it) }; outfit.top?.let { put("top", it) }
+                outfit.bottom?.let { put("bottom", it) }; outfit.title?.let { put("title", it) }
+            } }))
             put("owned", JSONArray(d.owned.toList()))
             put("exp", d.exp); put("points", d.points)
             put("visits", JSONArray(d.visits.map { JSONObject().put("id", it.landmarkId).put("day", it.day) }))
@@ -144,6 +150,9 @@ class KagomStore(context: Context) {
             equipped = o.optJSONObject("equipped")?.let {
                 Equipped(it.optStringOrNull("head"), it.optStringOrNull("top"), it.optStringOrNull("bottom"), it.optStringOrNull("title"))
             } ?: Equipped(),
+            savedOutfits = o.optJSONArray("savedOutfits").objects().take(3).map {
+                Equipped(it.optStringOrNull("head"), it.optStringOrNull("top"), it.optStringOrNull("bottom"), it.optStringOrNull("title"))
+            },
             owned = o.optJSONArray("owned").strings().toSet().ifEmpty { setOf(Items.DEFAULT_TITLE) },
             exp = o.optInt("exp"), points = o.optInt("points"),
             visits = o.optJSONArray("visits").objects().map { Visit(it.getString("id"), it.getLong("day")) },
