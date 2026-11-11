@@ -170,6 +170,8 @@ object Quests {
 
 enum class LandmarkGlyph { SUNRISE, COFFEE, BOAT }
 
+enum class LandmarkScenery { COAST, TOWER, SIGHTSEEING }
+
 data class Landmark(
     val id: String,
     val name: String,
@@ -182,6 +184,7 @@ data class Landmark(
     val unitId: String,
     /** 속한 읍·면·동 (지도 L3 구획 이름, 가이드 v1.2). 구획 id = "<unitId>/<areaName>" */
     val areaName: String,
+    val scenery: LandmarkScenery,
 ) {
     val areaId: String get() = "$unitId/$areaName"
 }
@@ -195,9 +198,9 @@ object Landmarks {
 
     /** 위도 순(북→남) = 지도 위→아래 순 */
     val all = listOf(
-        Landmark("LM-GN-03", "주문진항", "ITM-T-01", 150, 37.8930, 128.8312, LandmarkGlyph.BOAT, Landmarks.GANGNEUNG, "주문진읍"),
-        Landmark("LM-GN-02", "커피거리", "ITM-H-02", 150, 37.7722, 128.9476, LandmarkGlyph.COFFEE, Landmarks.GANGNEUNG, "송정동"),
-        Landmark("LM-GN-01", "정동진", "ITM-H-01", 150, 37.6910, 129.0343, LandmarkGlyph.SUNRISE, Landmarks.GANGNEUNG, "강동면"),
+        Landmark("LM-GN-03", "주문진항", "ITM-T-01", 150, 37.8930, 128.8312, LandmarkGlyph.BOAT, GANGNEUNG, "주문진읍", LandmarkScenery.COAST),
+        Landmark("LM-GN-02", "커피거리", "ITM-H-02", 150, 37.7722, 128.9476, LandmarkGlyph.COFFEE, GANGNEUNG, "송정동", LandmarkScenery.COAST),
+        Landmark("LM-GN-01", "정동진", "ITM-H-01", 150, 37.6910, 129.0343, LandmarkGlyph.SUNRISE, GANGNEUNG, "강동면", LandmarkScenery.COAST),
     )
 
     fun byId(id: String?) = all.firstOrNull { it.id == id }

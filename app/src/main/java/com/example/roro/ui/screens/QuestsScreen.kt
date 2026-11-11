@@ -1,5 +1,6 @@
 package com.example.roro.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,13 +47,24 @@ import com.example.roro.ui.theme.LocalLayoutMode
  * [doneAt] = 도전과제 id → 달성 시각(ms)
  */
 @Composable
-fun QuestsScreen(quests: List<QuestProgress>, doneAt: Map<String, Long>) {
+fun QuestsScreen(quests: List<QuestProgress>, doneAt: Map<String, Long>, gearP: Boolean, avatar: DetailAvatar) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
     val pad = if (split) 20.dp else 36.dp
     var filter by rememberSaveable { mutableStateOf(QuestFilter.ALL) }
+    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    val listScroll = rememberScrollState()
+    val detail = quests.firstOrNull { it.achieved && it.quest.id == detailId && gearP }
+    LaunchedEffect(gearP) { if (!gearP) detailId = null }
+    if (detail != null) {
+        BackHandler { detailId = null }
+        key(detail.quest.id) {
+            QuestDetail(detail.quest, doneAt[detail.quest.id], avatar, split) { detailId = null }
+        }
+        return
+    }
     val shown = Progress.listed(quests, doneAt, filter)
     Column(
-        Modifier.fillMaxSize().background(KagomColor.Surface.page).verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().background(KagomColor.Surface.page).verticalScroll(listScroll)
             .padding(start = pad, end = pad, top = if (split) 20.dp else 28.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(KagomSpace.s16),
     ) {
@@ -68,7 +81,13 @@ fun QuestsScreen(quests: List<QuestProgress>, doneAt: Map<String, Long>) {
         }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
             shown.forEach { p ->
-                key(p.quest.id) { QuestCard(p, if (split) QuestCardSize.Compact else QuestCardSize.Wide, doneAt = doneAt[p.quest.id]) }
+                key(p.quest.id) {
+                    QuestCard(
+                        p, if (split) QuestCardSize.Compact else QuestCardSize.Wide,
+                        doneAt = doneAt[p.quest.id],
+                        onClick = if (p.achieved && gearP) ({ detailId = p.quest.id }) else null,
+                    )
+                }
             }
             // 필터에 걸리는 과제가 없을 때 (Figma에 없는 상태)
             if (shown.isEmpty()) Text(
