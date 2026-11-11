@@ -614,6 +614,9 @@ private fun RegionMap(
                 if (split && sceneId == "nationwide" && entry.visited == 0 &&
                     region.name !in setOf("서울특별시", "강원특별자치도", "부산광역시", "제주특별자치도")
                 ) continue
+                // Split 지도는 작아서(Pleos 세로 슬롯에서 높이 약 230) 20px 이름표를 다 달면 구획 모양이 덮인다.
+                // 시·군·구획 지도도 전국처럼 추려서, 랜드마크가 있는 곳과 고른 구획만 단다. 나머지 이름은 아래 목록에 있다
+                if (split && sceneId != "nationwide" && entry.landmarks.isEmpty() && region.id != district?.region?.id) continue
                 val p = point(region.labelLon, region.labelLat)
                 val caption = buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(region.name.shortRegionName()) }
