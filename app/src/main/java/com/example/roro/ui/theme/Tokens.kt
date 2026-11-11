@@ -140,13 +140,13 @@ object PleosKit {
 
 /** space/4 … space/40 */
 object KagomSpace {
-    val s4 = 4.dp; val s8 = 8.dp; val s12 = 12.dp; val s16 = 16.dp; val s20 = 20.dp
+    val s4 = 4.dp; val s8 = 8.dp; val s10 = 10.dp; val s12 = 12.dp; val s16 = 16.dp; val s20 = 20.dp
     val s24 = 24.dp; val s28 = 28.dp; val s32 = 32.dp; val s36 = 36.dp; val s40 = 40.dp
 }
 
 /** radius/8 … radius/full */
 object KagomRadius {
-    val r8 = 8.dp; val r12 = 12.dp; val r16 = 16.dp; val r20 = 20.dp; val r24 = 24.dp
+    val r8 = 8.dp; val r12 = 12.dp; val r14 = 14.dp; val r16 = 16.dp; val r20 = 20.dp; val r24 = 24.dp
     val r32 = 32.dp
     val r28 = 28.dp
     val full = 999.dp

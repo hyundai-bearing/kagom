@@ -826,6 +826,18 @@ def show_only(objs_visible, bear_mode):
                 o.hide_render = o.name not in vis
 
 
+# 아이템 레이어에는 옷이 몸에 드리우는 그림자가 같이 들어가고, 그 그림자는 몸 재질을 따라간다.
+# 돌려보기·동작 레이어를 몸 렌더가 끝난 스킨(P08 금속) 그대로 찍었더니 턱 밑에 반사 무늬 같은 진한 그림자가 생겨
+# 정지 레이어(P03)와 달랐다 (움직이면 목이 일그러져 보이던 문제) → 레이어는 늘 이 무광 스킨으로 찍는다
+LAYER_SKIN = "P03"
+
+
+def render_layer(sc, objs, path):
+    set_skin(LAYER_SKIN)
+    show_only(objs, "catcher")
+    render(sc, path)
+
+
 class Rig:
     """
     돌려보기 카메라: yaw(곰 축 Z 둘레, 조명도 같이 돈다) → pitch(곰 가운데를 지나는 X축) → 카메라.
@@ -1125,8 +1137,7 @@ def render_motion(sc, rig, items, codes, acts):
                 show_only([], "normal")
                 render(sc, os.path.join(out, f"b_{code}_{nn:02d}.webp"))
             for key, objs in items.items():
-                show_only(objs, "catcher")
-                render(sc, os.path.join(out, f"i_{key}_{nn:02d}.webp"))
+                render_layer(sc, objs, os.path.join(out, f"i_{key}_{nn:02d}.webp"))
     pose_rest()
     unmotion_view(rig)
 
@@ -1232,11 +1243,9 @@ def main():
 
     if what in ("all", "items"):
         rig.view(0, HOME_YAW, W, H)
-        set_skin("P03")
         set_expression({})
         for key, objs in items.items():
-            show_only(objs, "catcher")
-            render(sc, os.path.join(A.out, f"item_{key}.webp"))
+            render_layer(sc, objs, os.path.join(A.out, f"item_{key}.webp"))
 
     if what in ("all", "thumbs"):
         # 옷은 보이지 않는 몸이 입은 모양으로 (곰 = holdout), 메달은 곰 없이
@@ -1265,8 +1274,7 @@ def main():
                     render(sc, os.path.join(out, f"b_{code}_{row}_{i:02d}.webp"))
                 if A.turn_items:
                     for key, objs in items.items():
-                        show_only(objs, "catcher")
-                        render(sc, os.path.join(out, f"i_{key}_{row}_{i:02d}.webp"))
+                        render_layer(sc, objs, os.path.join(out, f"i_{key}_{row}_{i:02d}.webp"))
 
 
 main()

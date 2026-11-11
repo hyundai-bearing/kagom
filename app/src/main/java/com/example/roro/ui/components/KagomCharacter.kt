@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -182,6 +184,8 @@ private class IdleMotion(
     val shift: Dp = 0.dp,
     val tiltDeg: Float = 0f,
     val squash: Float = 0f,
+    /** 눌렀을 때 바로 한 번 하는 몸짓 (이상 상태의 터치 반응). null이면 [gesture]를 쓴다 */
+    val touch: KeyframesSpec<Float>? = null,
 )
 
 /** 배가 꼬르륵: 짧게 출렁이다 잦아든다 */
@@ -193,16 +197,26 @@ private val SHIVER = keyframes<Float> {
 }
 /** 꾸벅: 천천히 기울다가 잠깐 멈추고 화들짝 돌아온다 */
 private val NOD = keyframes<Float> { durationMillis = 2100; 0f at 0 using FastOutSlowInEasing; 1f at 1200; 1f at 1600; -0.15f at 1850; 0f at 2100 }
+/** 꾸벅했다 화들짝: [NOD]를 눌렀을 때 바로 보이게 줄인 것 */
+private val DOZE = keyframes<Float> { durationMillis = 900; 0f at 0 using FastOutSlowInEasing; 1f at 350; 1f at 500; -0.15f at 700; 0f at 900 }
+/** 갸우뚱: 좌우로 한 번씩 기울다 잦아든다 */
+private val WOBBLE = keyframes<Float> { durationMillis = 700; 1f at 140; -0.7f at 320; 0.35f at 500; 0f at 700 }
 
 private val IDLE_PLAIN = IdleMotion()
-private val IDLE_TIRED = IdleMotion(breathMs = 4600, breathAmp = 0.018f, gesture = NOD, restMs = 2600L..5200L, tiltDeg = 2.4f, squash = 0.012f)
+private val IDLE_TIRED = IdleMotion(breathMs = 4600, breathAmp = 0.018f, gesture = NOD, restMs = 2600L..5200L, tiltDeg = 2.4f, squash = 0.012f, touch = DOZE)
+/** 얼룩은 가만히 있을 때 몸짓이 없고 눌렀을 때만 갸우뚱한다 */
+private val IDLE_STAIN = IdleMotion(tiltDeg = 1.5f, touch = WOBBLE)
 private val IDLE_HUNGRY_1 = IdleMotion(gesture = RUMBLE, restMs = 4200L..6400L, squash = 0.012f)
 private val IDLE_HUNGRY_2 = IdleMotion(gesture = RUMBLE, restMs = 3000L..4600L, squash = 0.017f)
 private val IDLE_HUNGRY_3 = IdleMotion(breathMs = 3800, breathAmp = 0.009f, gesture = RUMBLE, restMs = 2000L..3200L, squash = 0.022f)
 private val IDLE_SICK = IdleMotion(breathMs = 3600, breathAmp = 0.009f, gesture = SHIVER, restMs = 2200L..3600L, shift = 2.5.dp)
 
+/** 눌렀을 때의 몸짓은 가만히 있을 때의 이 배 크기로 (배고픔 1의 1.2%는 눌러도 티가 안 난다) */
+private const val TOUCH_GESTURE_SCALE = 2f
+
 private fun idleMotion(expression: Expression) = when (expression) {
-    Expression.IDLE, Expression.STAIN -> IDLE_PLAIN
+    Expression.IDLE -> IDLE_PLAIN
+    Expression.STAIN -> IDLE_STAIN
     Expression.TIRED -> IDLE_TIRED
     Expression.HUNGRY_1 -> IDLE_HUNGRY_1
     Expression.HUNGRY_2 -> IDLE_HUNGRY_2
@@ -306,7 +320,7 @@ fun KagomCharacter(
     expression: Expression,
     modifier: Modifier = Modifier,
     worn: List<String> = emptyList(),
-    /** null이면 터치 반응 없음 (주행 중 등) */
+    /** null이면 터치 반응 없음 (주행 중 등). 대기 표정이면 3D 동작, 이상 상태면 그 표정의 몸짓으로 답한다 */
     onTouch: (() -> Unit)? = null,
     /** true면 좌우·위아래로 밀어 돌려 볼 수 있고, 손을 떼면 잠시 뒤 제자리로 돌아온다 (홈, 기어 P + 대기 표정) */
     turnable: Boolean = false,
@@ -330,10 +344,24 @@ fun KagomCharacter(
     }
     // 표정별 몸짓: 배고픔 = 배가 꼬르륵, 아픔 = 오들오들, 피곤함 = 꾸벅 (쉬었다가 되풀이)
     val gesture = remember { Animatable(0f) }
-    LaunchedEffect(alive, idle) {
+    // 이상 상태에서 누르면 그 표정의 몸짓을 바로 한 번, 평소보다 크게 한다 (누른 것이 보이게. 배율은 가정).
+    // 3D 동작 프레임은 대기 얼굴뿐이라 이상 상태에 틀면 동작하는 동안 표정·소품이 사라진다
+    var poke by remember { mutableIntStateOf(0) }
+    val poked = remember { intArrayOf(0) }
+    var gestureScale by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(alive, idle, poke) {
         gesture.snapTo(0f)
-        val once = idle.gesture
-        if (!alive || once == null) return@LaunchedEffect
+        gestureScale = 1f
+        if (!alive) return@LaunchedEffect
+        val touch = idle.touch ?: idle.gesture
+        val fresh = poked[0] != poke
+        poked[0] = poke
+        if (fresh && touch != null) {
+            gestureScale = TOUCH_GESTURE_SCALE
+            gesture.animateTo(0f, touch)
+            gestureScale = 1f
+        }
+        val once = idle.gesture ?: return@LaunchedEffect
         while (true) {
             delay(Random.nextLong(idle.restMs.first, idle.restMs.last))
             gesture.animateTo(0f, once)
@@ -366,21 +394,31 @@ fun KagomCharacter(
     }
     val turning = !turn.atRest && frames.hasAny
 
-    // 다음 반응은 미리 정해 두고, 탭할 수 있는 동안(홈, 기어 P + 대기 표정) 앞부분을 합성해 둔다 → 탭하면 바로 움직인다
+    // 다음 반응은 미리 정해 두고, 3D 동작을 틀 수 있는 동안(홈, 기어 P + 대기 표정) 앞부분을 합성해 둔다 → 탭하면 바로 움직인다
+    val canAct = onTouch != null && expression == Expression.IDLE
     var nextAct by remember { mutableStateOf(TouchAct.entries.random()) }
     var head by remember { mutableStateOf<MotionHead?>(null) }
-    LaunchedEffect(onTouch != null, nextAct, skinCode, worn) {
+    LaunchedEffect(canAct, nextAct, skinCode, worn) {
         head = null
-        if (onTouch != null) head = preloadMotion(context.applicationContext, nextAct, skinCode, worn)
+        if (canAct) head = preloadMotion(context.applicationContext, nextAct, skinCode, worn)
     }
 
-    /** 바로 전과 다른 반응을 고른다. 반응 중에 또 누르면 새 반응으로 바로 바꾼다 */
+    /** 대기 표정: 바로 전과 다른 3D 동작을 고른다 (반응 중에 또 누르면 새 반응으로 바로 바꾼다). 이상 상태: 표정 몸짓 */
     fun react() {
+        if (!canAct) { poke++; return }
         val act = nextAct
         val ready = head
         nextAct = TouchAct.entries.filter { it != act }.random()
         motionJob?.cancel()
-        motionJob = scope.launch { playMotion(context.applicationContext, act, skinCode, worn, ready) { motionFrame = it } }
+        motionJob = scope.launch {
+            // 돌려 둔 채로 누르면 정면으로 빨리 돌려놓고 시작한다: 동작 프레임은 정면(HOME_YAW)뿐이라 돌아간 그림 위에 겹쳐 잔상처럼 보였다.
+            // 제자리로 돌아오려고 기다리던 settleJob은 끈다 (동작 중에 다시 돌려보기 그림이 올라오지 않게). 0.2초는 가정
+            if (!turn.atRest) {
+                turn.settleJob?.cancel()
+                turn.reset(200)
+            }
+            playMotion(context.applicationContext, act, skinCode, worn, ready) { motionFrame = it }
+        }
     }
     val playing = motionFrame != null
 
@@ -404,7 +442,7 @@ fun KagomCharacter(
                 .graphicsLayer {
                     transformOrigin = FEET
                     val b = breath.value
-                    val g = gesture.value
+                    val g = gesture.value * gestureScale
                     scaleX = 1f - idle.breathAmp / 2 * b + idle.squash * g
                     scaleY = 1f + idle.breathAmp * b - idle.squash * g
                     translationX = idle.shift.toPx() * g
@@ -427,9 +465,11 @@ fun KagomCharacter(
                     }
                 }
             }
-            if (turning) TurnImage(frames, turn, Modifier.fillMaxSize())
+            // 둘을 같이 그리지 않는다 (각도가 다른 두 그림이 겹친다)
+            if (turning && !playing) TurnImage(frames, turn, Modifier.fillMaxSize())
             motionFrame?.let { img -> Spacer(Modifier.fillMaxSize().drawBehind { drawMotionFrame(img) }) }
         }
     }
-    LaunchedEffect(expression) { motionJob?.cancel() }
+    // 표정이 바뀌거나 터치 반응이 막히면(주행 시작) 하던 동작도 바로 멈춘다
+    LaunchedEffect(expression, onTouch != null) { motionJob?.cancel() }
 }
