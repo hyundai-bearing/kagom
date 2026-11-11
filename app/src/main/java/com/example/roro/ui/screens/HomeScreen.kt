@@ -73,7 +73,7 @@ fun HomeScreen(
         KagomCharacter(
             profile.skin, status.expression, m,
             worn = wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom),
-            onTouch = if (gearP && status.expression == Expression.IDLE) ({}) else null,
+            onTouch = if (gearP) ({}) else null,
             turnable = gearP && status.expression == Expression.IDLE,
             alive = gearP,
         )

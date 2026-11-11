@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -306,7 +307,8 @@ fun KagomTurntable(
         TurnImage(frames, state, Modifier.fillMaxSize())
 
         // 안내 (처음 한 번) / 정면으로
-        AnimatedVisibility(showControls && enabled && !state.touched, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
+        // Split 프리뷰(폭 240)보다 안내 글이 길다: 줄을 바꾸지 않고 캔버스 밖으로 넘쳐 가운데에 놓는다
+        AnimatedVisibility(showControls && enabled && !state.touched, Modifier.align(Alignment.BottomCenter).wrapContentWidth(unbounded = true), enter = fadeIn(), exit = fadeOut()) {
             Pill("‹  좌우·위아래로 밀어서 돌려보기  ›")
         }
         AnimatedVisibility(showControls && enabled && (state.frame != 0 || state.row != 0), Modifier.align(Alignment.BottomEnd), enter = fadeIn(), exit = fadeOut()) {
@@ -322,7 +324,7 @@ private fun Pill(text: String, modifier: Modifier = Modifier) {
             .background(KagomColor.Surface.card.copy(alpha = 0.9f), RoundedCornerShape(KagomRadius.full))
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = KagomType.Caption14Strong, color = KagomColor.Text.secondary) }
+    ) { Text(text, style = KagomType.Caption14Strong, color = KagomColor.Text.secondary, maxLines = 1, softWrap = false) }
 }
 
 /** 프레임 합성: 기본 몸 위에 착용 레이어를 차례로 */

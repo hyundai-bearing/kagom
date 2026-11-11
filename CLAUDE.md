@@ -20,6 +20,7 @@
 - 주변 스타일을 따른다: 들여쓰기 4칸, 여러 줄 인자 목록은 끝에 쉼표, 식별자는 영어, KDoc·주석은 한국어로 "왜"를 적는다(디자인 출처 "Figma 149:4593", "가이드 v1.2 SCR-05" 또는 세운 가정). "무엇을"은 적지 않는다.
 - Gradle 의존성은 사용자 확인 없이 추가하지 않는다. Material3는 `Text`만 쓴다. UI는 Material `Button`, `Card`, `Scaffold` 등이 아니라 `PleosKit`/`KagomComponents`로 만든다.
 - 색·모서리·간격·글자는 `ui/theme`의 `KagomColor`, `KagomRadius`, `KagomSpace`, `KagomType`만 쓴다. `Color(0x…)`는 `Tokens.kt`, 숫자 `sp`는 `Type.kt` 밖에서 쓰지 않는다. 토큰이 없으면 Figma 변수 경로 이름으로 `Tokens.kt`에 추가한다.
+- 글자 크기는 Pleos Connect 글자 단계다(최소 20px, `Type.kt`). `KagomType` 이름은 Figma 스타일 이름이고 값은 그보다 크다. Figma에서 본 스타일 이름을 그대로 고르고, 글자가 안 들어가면 글자를 줄이지 말고 칸을 키운 뒤 `docs/IMPLEMENTATION.md`에 적는다.
 - `1.dp` = Figma 1px이다(`KagomTheme`이 밀도를 맞춘다). Figma 숫자를 그대로 옮긴다.
 - 모든 화면은 레이아웃이 두 벌이다: `LocalLayoutMode.current`가 FULL(가로 1920 기준)과 SPLIT(세로, 640 기준). 둘 다 고치고 둘 다 확인한다.
 - 주행 중 제한: 화면은 `gearP`를 받는다. 데이터를 바꾸거나 운전자의 주의를 끄는 것(저장, 장착, 돌려보기, 캐릭터 터치 반응, 팝업, 상세 카드)은 기어가 P가 아니면 막거나 숨긴다. 팝업은 P가 될 때까지 큐에서 기다린다(`KagomController.activePopup`).
