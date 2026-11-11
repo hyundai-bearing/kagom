@@ -35,6 +35,13 @@ private fun style(size: Int, line: Int, bold: Boolean, tracking: Float = 0f) = T
 )
 
 object KagomType {
+    /** 치장 팝업 이름·설명·상태 (Figma 2021:5094). */
+    val ClosetPopupTitle = style(42, 50, true)
+    val ClosetPopupBody = style(30, 38, false)
+    val ClosetPopupBadge = style(28, 34, true)
+    val ClosetItemName = style(30, 36, true)
+    val ClosetSmallText = style(28, 34, false)
+    val ClosetSmallStrong = style(28, 34, true)
     // Figma POP-04 levelUpTitle / levelNumber 전용이며 다른 화면 타이포는 유지한다.
     val LevelTitle = style(64, 70, true)
     val LevelTitleCompact = style(44, 48, true)

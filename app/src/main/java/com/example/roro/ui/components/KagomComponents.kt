@@ -156,7 +156,7 @@ enum class NavTab(val label: String) { HOME("홈"), QUESTS("도전"), MAP("지�
 
 /** navItem (State=Default|Selected · Label). 72×58 */
 @Composable
-fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, closetText: Boolean = false) {
     val shape = RoundedCornerShape(KagomRadius.r16)
     val bg by animateColorAsState(if (selected) KagomColor.Surface.inverse else KagomColor.Surface.card, tween(KagomMotion.FAST), label = "navBg")
     val fg by animateColorAsState(if (selected) KagomColor.Text.inverse else KagomColor.Text.secondary, tween(KagomMotion.FAST), label = "navFg")
@@ -169,7 +169,7 @@ fun NavItem(label: String, selected: Boolean, onClick: () -> Unit, modifier: Mod
             .semantics { contentDescription = "$label 탭" },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = KagomType.Caption14Strong, color = fg)
+        Text(label, style = if (closetText) KagomType.ClosetSmallStrong else KagomType.Caption14Strong, color = fg, maxLines = 1)
     }
 }
 
@@ -181,7 +181,7 @@ fun NavRail(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = M
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }) }
+        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }, closetText = selected == NavTab.CLOSET) }
     }
 }
 
@@ -193,7 +193,7 @@ fun BottomTabBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }) }
+        NavTab.entries.forEach { NavItem(it.label, it == selected, { onSelect(it) }, closetText = selected == NavTab.CLOSET) }
     }
 }
 
@@ -592,8 +592,14 @@ fun PinTooltip(title: String, body: String, modifier: Modifier = Modifier) {
 fun Pagination(current: Int, count: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
         PageArrow(next = false, enabled = current > 0) { onSelect(current - 1) }
-        val start = (current - 2).coerceIn(0, maxOf(0, count - 5))
-        for (i in start until minOf(count, start + 5)) {
+        for (entry in paginationEntries(current, count)) {
+            if (entry == null) {
+                Box(Modifier.width(24.dp).height(56.dp), contentAlignment = Alignment.Center) {
+                    Text("…", style = KagomType.ClosetSmallText, color = KagomColor.Text.tertiary)
+                }
+                continue
+            }
+            val i = entry
             val on = i == current
             Box(
                 Modifier.size(56.dp).clip(CircleShape)
@@ -601,7 +607,7 @@ fun Pagination(current: Int, count: Int, onSelect: (Int) -> Unit, modifier: Modi
                     .clickable(enabled = !on, role = Role.Button) { onSelect(i) }
                     .semantics { contentDescription = "${i + 1}페이지" + if (on) ", 지금 페이지" else "" },
                 contentAlignment = Alignment.Center,
-            ) { Text("${i + 1}", style = KagomType.Body18, color = if (on) KagomColor.Text.inverse else KagomColor.Text.secondary) }
+            ) { Text("${i + 1}", style = KagomType.ClosetSmallText, color = if (on) KagomColor.Text.inverse else KagomColor.Text.secondary, maxLines = 1) }
         }
         PageArrow(next = true, enabled = current < count - 1) { onSelect(current + 1) }
     }

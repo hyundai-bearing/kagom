@@ -130,7 +130,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
                     landmarkViews(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet()),
                     gearP, c::equip, mapFocus, { mapFocus = null },
                 )
-                NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, examples) { next, landmarkId ->
+                NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, c::saveOutfit, examples) { next, landmarkId ->
                     mapFocus = landmarkId.takeIf { next == NavTab.MAP }
                     tab = next
                 }

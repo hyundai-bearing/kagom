@@ -88,6 +88,23 @@ object KagomColor {
         val gain = Color(0xFF6FDCC4)
     }
 
+    /** 옷장 라벤더 스튜디오 (Figma 2027:10015). */
+    object Closet {
+        val studio = Color(0xFFF7F5FC)
+        val halo = Color(0xFFE8E0F7)
+        val shadow = Color(0x217A6999)
+        val selected = Color(0xFF7658B2)
+        val equipped = Color(0xFFEDE7F9)
+        val equippedText = Color(0xFF5D3E98)
+        val owned = Color(0xFFEAF1F4)
+        val ownedText = Color(0xFF426172)
+        val locked = Color(0xFFE5E5EB)
+        val lockedText = Color(0xFF52525F)
+        val slotBorder = Color(0xFFE0E0E5)
+        val slotEmpty = Color(0xFFEDEDF0)
+        val slotSave = Color(0xFF614D85)
+    }
+
     object Accent {
         val positive = Color(0xFF2F6F4E)
         val tier = Color(0xFFF3E6C8)
