@@ -129,7 +129,7 @@
 - 치장의 잠긴 랜드마크 보상에서 [지도에서 보기]를 누르면 그 랜드마크의 시·군 지도로 바로 들어가 구획을 고르고 상세를 띄운다 (`MapScreen(focusLandmarkId)`).
 - 핀 이름표는 핀 오른쪽에 두고, 공간이 부족하면 핀 아래에 둔다. Full에서는 방문 상태와 보상 이름을 이름표에 함께 표시한다.
 - 방문 상태는 미방문 / 해금 중 / 방문 완료다. 해금 중은 방문은 했지만 보상 팝업(POP-03)이 정차를 기다리는 동안이고, 보상은 팝업을 닫아야 받으므로 목록에 "획득"이라고 쓰지 않는다 (Full 목록: "해금 중 · 정차하면 … 획득"). Figma 목록 핀에는 해금 중이 없어 지도 핀(`LandmarkPin` Unlocking)과 같은 색·점으로 그렸다 (가정).
-- 강릉의 1읍·7면과 시내 13개 동을 9개 구획으로 표시한다. 선택한 구획의 핀은 기존 랜드마크 위경도를 지도 경계와 같은 방식으로 투영한다. 정차 중에는 핀이나 목록에서 보상 상세를 열 수 있다. 미방문 보상은 이름과 잠긴 마크를 표시한다. 랜드마크가 없는 구획은 준비 중으로 표시한다.
+- 강릉의 1읍·7면과 시내 13개 동을 9개 구획으로 표시한다. 선택한 구획의 핀은 기존 랜드마크 위경도를 지도 경계와 같은 방식으로 투영한다. 정차 중에는 핀이나 목록에서 보상 상세를 열 수 있다. 주행 중에는 상세 대신 "기어 P에서 핀 상세를 볼 수 있어요"를 알린다 (Full: 지도 왼쪽 아래 안내 글이 그 말로 바뀐다, Split: 핀을 누르면 뜬다). 미방문 보상은 이름과 잠긴 마크를 표시한다. 랜드마크가 없는 구획은 준비 중으로 표시한다.
 - 전국·시·군 경계는 기존 `assets/regions/korea_map.txt`를 사용한다. 원본 © OpenStreetMap contributors (ODbL). 생성 순서는 `fetch_korea.py` → `fetch_coast.py` → `build_korea.py`다.
 - 강릉 경계는 [통계청 통계지리정보서비스(SGIS)](https://sgis.kostat.go.kr)의 공공누리 제1유형 경계를 가공한 [vuski/admdongkor 2026-10-01 데이터](https://github.com/vuski/admdongkor/tree/d5d5a821c8de6cc337d47eeca604d7af76271c9b/ver20261001)를 사용한다. 가공 데이터는 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)이다. `python tools/regions/build_gangneung.py HangJeongDong_ver20261001.geojson`으로 강릉 경계를 추출하고 단순화해 `gangneung_districts.txt`를 다시 만든다.
 

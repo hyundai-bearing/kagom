@@ -263,6 +263,8 @@ fun MapScreen(
             split = split,
             showDistrictAttribution = unit != null && regions.isNotEmpty(),
             hint = when {
+                // 주행 중에는 핀 상세가 막혀 있다. 핀을 누르면 뜨는 정차 안내와 같은 말로 맞춘다 (반대되는 안내가 나란히 보였다)
+                unit != null && !gearP -> "기어 P에서 핀 상세를 볼 수 있어요. 구획을 누르면 핀이 바뀌어요."
                 unit != null -> "핀을 누르면 상세를 볼 수 있어요. 구획을 누르면 핀이 바뀌어요."
                 province != null -> "시·군을 누르면 구획 지도로 들어가요."
                 else -> "시·도를 누르면 그 지역으로 들어가요."
@@ -818,7 +820,8 @@ private fun RegionMap(
                     width = minOf(if (split) maxWidth - 16.dp else 520.dp, maxWidth),
                     itemId = reward.id,
                 )
-            } else {
+            } else if (split) {
+                // Full은 왼쪽 아래 안내가 주행 중에 같은 말을 하고 있어 따로 띄우지 않는다 (둘이 겹쳐 보였다)
                 Text("기어 P에서 핀 상세를 볼 수 있어요",
                     detailPosition
                         .background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
