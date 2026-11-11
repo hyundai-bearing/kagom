@@ -67,6 +67,11 @@ object KagomType {
     val ClosetPopupBadge = style(28, 34, true)
     val ClosetItemName = style(30, 36, true)
     val ClosetSmallText = style(28, 34, false)
+    val ClosetStatusText = style(21, 26, false)
+    val ClosetSlotText = style(22, 28, false)
+    val ClosetSlotButtonText = style(20, 24, false)
+    val ClosetSlotNumber = style(40, 48, false).copy(fontWeight = FontWeight.Medium)
+    val ClosetSlotNumberCompact = style(24, 30, false).copy(fontWeight = FontWeight.Medium)
     val ClosetSmallStrong = style(28, 34, true)
     // Figma POP-04 levelUpTitle / levelNumber 전용. 이미 Pleos Headline보다 커서 Figma 값 그대로 둔다
     val LevelTitle = style(64, 70, true)

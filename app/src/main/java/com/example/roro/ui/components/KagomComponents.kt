@@ -93,9 +93,9 @@ fun StatusBadge(
 
 /** 작은 칩 ("달성", "NEW", 출처 칩 등) */
 @Composable
-fun Chip(text: String, bg: Color, fg: Color, modifier: Modifier = Modifier, height: Dp = 28.dp, style: TextStyle = KagomType.Caption14Strong) {
+fun Chip(text: String, bg: Color, fg: Color, modifier: Modifier = Modifier, height: Dp = 28.dp, style: TextStyle = KagomType.Caption14Strong, horizontalPadding: Dp = 10.dp) {
     Box(
-        modifier.height(height).background(bg, RoundedCornerShape(KagomRadius.full)).padding(horizontal = 10.dp),
+        modifier.height(height).background(bg, RoundedCornerShape(KagomRadius.full)).padding(horizontal = horizontalPadding),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = style, color = fg, maxLines = 1) }
 }
