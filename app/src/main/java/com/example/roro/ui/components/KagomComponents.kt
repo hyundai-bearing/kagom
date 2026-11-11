@@ -70,7 +70,13 @@ import java.time.format.DateTimeFormatter
 
 /** statusBadge (Severity=Observe|Recommend|Urgent|Ok · Label). 높이 40 */
 @Composable
-fun StatusBadge(severity: Severity, label: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun StatusBadge(
+    severity: Severity,
+    label: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = KagomType.Caption14Strong,
+    onClick: (() -> Unit)? = null,
+) {
     val shape = RoundedCornerShape(KagomRadius.full)
     Box(
         modifier
@@ -81,7 +87,7 @@ fun StatusBadge(severity: Severity, label: String, modifier: Modifier = Modifier
             .padding(horizontal = KagomSpace.s16),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = KagomType.Caption14Strong, color = KagomColor.Severity.fg(severity), maxLines = 1)
+        Text(label, style = style, color = KagomColor.Severity.fg(severity), maxLines = 1)
     }
 }
 
@@ -381,7 +387,7 @@ fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifi
         Box(
             Modifier.size(64.dp).background(if (p.achieved) KagomColor.Surface.mintSoft else KagomColor.Surface.subtle, RoundedCornerShape(KagomRadius.r16)),
             contentAlignment = Alignment.Center,
-        ) { QuestIconGlyph(p.quest.icon, Modifier.size(36.dp)) }
+        ) { QuestIconGlyph(p.quest.icon, Modifier.size(40.dp)) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(KagomSpace.s4)) {
             Text(p.quest.name, style = KagomType.Heading24, color = KagomColor.Text.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(p.quest.title, style = KagomType.Body16, color = KagomColor.Text.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -546,8 +552,8 @@ fun LandmarkDetailPopup(name: String, reward: String, mark: String, visited: Boo
         horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 가이드 v1.2: 미방문이어도 이름·보상·아이템 이미지를 보여 주고 자물쇠 배지로만 구분한다
-        ItemThumb(mark, 96.dp, locked = false, markStyle = KagomType.Title28, lockBadge = !visited, itemId = itemId)
+        // 미방문 핀은 Figma 152:4670처럼 보상 이름과 잠긴 마크를 보여 준다.
+        ItemThumb(mark, 96.dp, locked = false, markStyle = KagomType.Title28, lockBadge = !visited, itemId = itemId.takeIf { visited })
         Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
             Text(name, style = KagomType.Heading22, color = KagomColor.Text.primary)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {

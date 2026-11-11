@@ -40,8 +40,10 @@ import com.example.roro.core.PendingPopup
 import com.example.roro.core.Progress
 import com.example.roro.ui.components.BottomTabBar
 import com.example.roro.ui.components.IviToast
+import com.example.roro.ui.components.KagomCharacter
 import com.example.roro.ui.components.NavRail
 import com.example.roro.ui.components.NavTab
+import com.example.roro.ui.components.wornLayers
 import com.example.roro.ui.screens.CarryOverScreen
 import com.example.roro.ui.screens.ClosetScreen
 import com.example.roro.ui.screens.DriveLockScreen
@@ -126,10 +128,18 @@ fun KagomApp(c: KagomController) = KagomTheme {
             } else when (target) {
                 NavTab.HOME -> HomeScreen(profile, data, status, gearP) { if (gearP) sheetOpen = true }
                 NavTab.QUESTS -> QuestsScreen(Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt)
-                NavTab.MAP -> MapScreen(
-                    landmarkViews(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet()),
-                    gearP, c::equip, mapFocus, { mapFocus = null },
-                )
+                NavTab.MAP -> {
+                    val location by c.locationSource.current.collectAsState(initial = null)
+                    MapScreen(
+                        landmarkViews(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet()),
+                        gearP, c::equip, location, mapFocus, { mapFocus = null },
+                    ) { modifier ->
+                        KagomCharacter(
+                            profile.skin, status.expression, modifier,
+                            worn = wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom),
+                        )
+                    }
+                }
                 NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, examples) { next, landmarkId ->
                     mapFocus = landmarkId.takeIf { next == NavTab.MAP }
                     tab = next
