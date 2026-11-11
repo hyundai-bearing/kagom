@@ -79,6 +79,8 @@ MOTIONS = {
     "wave": 42,     # 왼팔을 돌려 올려 손 흔들기 + 고개 갸웃
     "cheer": 30,    # 움츠렸다가 두 팔 만세 + 깡충 + 착지
     "stomp": 36,    # 발 동동: 왼발·오른발을 번갈아 여섯 번 구른다
+    "bow": 34,      # 꾸벅 인사: 허리를 숙였다 일어선다
+    "spin": 32,     # 빙글 돌기: 제자리에서 한 바퀴
 }
 
 # 스킨: 텍스처, 금속성, 거칠기, 귀 안쪽, 귀 테두리 (spec 3장 + 이전 BearSkin.kt)
@@ -1211,7 +1213,38 @@ def pose_stomp(f, n):
     return {}
 
 
-POSES = {"wave": pose_wave, "cheer": pose_cheer, "stomp": pose_stomp}
+def pose_bow(f, n):
+    """꾸벅 인사: 살짝 젖혔다가 허리를 숙이고(고개는 조금 늦게 더 숙인다) 잠깐 멈춘 뒤, 일어서며 조금 지나쳤다 돌아온다. 팔은 뒤로 빠진다"""
+    body(z=key(f, [(0, 0), (12, -0.015), (20, -0.015), (26, 0.004), (n - 3, 0)]))
+    turn("spine", x=key(f, [(0, 0), (3, -4), (12, 17), (15, 15), (20, 15), (27, -3), (n - 3, 0)]))
+    turn("head", x=key(f, [(0, 0), (3, -3), (13, 10), (20, 10), (26, -4), (n - 3, 0)]))
+    for side in "LR":
+        arm(side, up=key(f, [(0, 0), (12, 6), (20, 6), (n - 4, 0)]), fwd=key(f, [(0, 0), (12, -18), (20, -18), (28, 4), (n - 2, 0)]))
+    flop = key(f, [(0, 0), (10, -6), (14, 12), (18, 4), (24, -10), (28, 4), (n - 2, 0)])
+    ears(flop, flop)
+    return {}
+
+
+def pose_spin(f, n):
+    """빙글 돌기: 반대로 살짝 감았다가(움츠림) 까치발로 한 바퀴 돌고, 조금 지나쳤다 정면에 선다. 도는 동안 팔과 귀가 바깥으로 벌어진다"""
+    if f <= 5:
+        angle = key(f, [(0, 0), (5, -18)])
+    elif f <= 24:
+        angle = -18 + 390 * smooth((f - 5) / 19)
+    else:
+        angle = key(f, [(24, 372), (28, 360)])
+    body(z=key(f, [(0, 0), (5, -0.035), (9, 0.02), (20, 0.02), (24, -0.02), (28, 0)]))
+    turn("root", z=angle)
+    out = key(f, [(0, 0), (5, -6), (10, 55), (20, 55), (25, 10), (29, 0)])
+    for side in "LR":
+        arm(side, up=out)
+    turn("head", x=key(f, [(0, 0), (5, 6), (10, -4), (22, -4), (25, 6), (29, 0)]))
+    flop = key(f, [(0, 0), (5, -4), (11, 16), (20, 16), (25, -8), (28, 3), (30, 0)])
+    ears(flop, flop)
+    return {}
+
+
+POSES = {"wave": pose_wave, "cheer": pose_cheer, "stomp": pose_stomp, "bow": pose_bow, "spin": pose_spin}
 
 
 def pose_motion(act, nn, n):

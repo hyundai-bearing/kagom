@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.example.roro.ui.components.TouchAct
 import com.example.roro.core.Gear
 import com.example.roro.core.Examples
 import com.example.roro.core.Landmarks
@@ -58,6 +59,11 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
                 Btn("P", gear == Gear.P) { c.demoSetGear(Gear.P) }
                 Btn("D", gear == Gear.D) { c.demoSetGear(Gear.D) }
                 Btn("센서 값", o.gear == null) { c.demoSetGear(null) }
+            }
+            Group("캐릭터 동작 (홈, 기어 P + 대기 표정일 때)") {
+                TouchAct.entries.forEach { act ->
+                    Btn(act.label, false) { c.demoAct.value = act.key; onClose() }
+                }
             }
             Group("연료·배터리 %") {
                 listOf(72, 33, 28, 18, 12, 8, 4).forEach { p ->
