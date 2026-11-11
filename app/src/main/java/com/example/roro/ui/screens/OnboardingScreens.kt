@@ -347,7 +347,7 @@ fun NamingScreen(state: OnboardingState, skin: Skin, gearP: Boolean, onComplete:
                 when {
                     !gearP -> "주행 중에는 이름을 입력할 수 없어요."
                     focused -> "2~10자 · 한글/영문/숫자"
-                    else -> "기어 P에서만 키보드가 열립니다."
+                    else -> "기어 P에서만 키보드가 열려요."
                 },
                 style = KagomType.Caption14, color = KagomColor.Text.tertiary,
             )
