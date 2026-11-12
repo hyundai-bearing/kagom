@@ -47,6 +47,7 @@ import com.example.roro.ui.components.IviButtonType
 import com.example.roro.ui.components.KagomRenders
 import com.example.roro.ui.components.LockGlyph
 import com.example.roro.ui.theme.KagomColor
+import com.example.roro.ui.theme.KagomClosetPalette
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomType
 import java.time.Instant
@@ -93,10 +94,10 @@ internal fun ClosetItemPopup(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(item.name, style = if (split) KagomType.PleosTitleSmallStrong else KagomType.ClosetPopupTitle, color = KagomColor.Text.primary, modifier = Modifier.weight(1f, fill = false))
                     Row(Modifier.height(if (split) 42.dp else 48.dp)
-                        .background(if (locked) KagomColor.Closet.locked else KagomColor.Closet.owned, RoundedCornerShape(KagomRadius.r24))
+                        .background(if (locked) KagomColor.Closet.locked else KagomClosetPalette.of(profile.skin).ownedBackground, RoundedCornerShape(KagomRadius.r24))
                         .padding(horizontal = if (split) 14.dp else 20.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val statusText = if (locked) KagomColor.Closet.lockedText else KagomColor.Closet.ownedText
+                        val statusText = if (locked) KagomColor.Closet.lockedText else KagomClosetPalette.of(profile.skin).ownedText
                         if (locked) LockGlyph(Modifier.size(if (split) 16.dp else 20.dp), statusText)
                         Text(if (locked) "잠금" else "보유중", style = if (locked) KagomType.ClosetSmallText else KagomType.ClosetPopupBadge, color = statusText, maxLines = 1)
                     }

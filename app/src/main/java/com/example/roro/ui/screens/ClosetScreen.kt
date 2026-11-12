@@ -79,6 +79,8 @@ import com.example.roro.ui.components.Pagination
 import com.example.roro.ui.components.wornLayers
 import com.example.roro.ui.josa
 import com.example.roro.ui.theme.KagomColor
+import com.example.roro.ui.theme.ClosetPalette
+import com.example.roro.ui.theme.KagomClosetPalette
 import com.example.roro.ui.theme.KagomMotion
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomSpace
@@ -139,6 +141,7 @@ fun ClosetScreen(
     onNavigate: (NavTab, String?) -> Unit,
 ) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
+    val closetPalette = KagomClosetPalette.of(profile.skin)
     var draft by remember(data.equipped) { mutableStateOf(data.equipped) }
     var selectedSlot by remember { mutableStateOf(data.savedOutfits.indexOf(data.equipped).takeIf { it >= 0 }) }
     var tab by remember { mutableIntStateOf(0) }
@@ -198,10 +201,10 @@ fun ClosetScreen(
     // 시착: 저장 전 draft를 입혀 본다 (스킨 + 하의 + 상의 + 머리). 밀면 돌려 볼 수 있다.
     // 가이드 v1.2: 프리뷰 아래 장착 아이템 칩 줄은 없앴다
     val preview: @Composable (Modifier, Boolean) -> Unit = { m, compact ->
-        Box(m.clip(RoundedCornerShape(KagomRadius.r28)).background(KagomColor.Closet.studio), contentAlignment = Alignment.Center) {
+        Box(m.clip(RoundedCornerShape(KagomRadius.r28)).background(closetPalette.studio), contentAlignment = Alignment.Center) {
             // 원 양쪽의 여백이 같도록 슬롯 오른쪽 끝의 절반만큼 중심을 옮긴다.
             val shift = if (compact) 52.dp else 54.dp
-            Box(Modifier.offset(x = shift).size(if (compact) 300.dp else 540.dp).background(KagomColor.Closet.halo, CircleShape))
+            Box(Modifier.offset(x = shift).size(if (compact) 300.dp else 540.dp).background(closetPalette.halo, CircleShape))
             // 회전하는 렌더와 분리해 발밑 그림자의 크기와 위치를 고정한다.
             Canvas((if (compact) Modifier.align(Alignment.BottomCenter).offset(x = shift).padding(bottom = 42.dp)
                 else Modifier.align(Alignment.Center).offset(x = shift, y = 238.dp))
@@ -220,7 +223,7 @@ fun ClosetScreen(
             }
             KagomTurntable(profile.skin, wornLayers(draft.head, draft.top, draft.bottom),
                 if (compact) Modifier.offset(x = shift).size(234.dp, 366.dp) else Modifier.offset(x = shift).size(350.dp, 544.dp), enabled = gearP, showControls = false)
-            SavedOutfitSlots(data.savedOutfits.size, selectedSlot, gearP, compact,
+            SavedOutfitSlots(data.savedOutfits.size, selectedSlot, gearP, compact, closetPalette,
                 onSelect = { index ->
                     if (!gearP) { toast = "주차 중에 이용할 수 있어요" }
                     else if (index > data.savedOutfits.size) { toast = "빈 칸은 순서대로 저장해요" }
@@ -256,7 +259,7 @@ fun ClosetScreen(
                         row.forEach { item ->
                             key(item.id) {
                                 val s = stateOf(item)
-                                ClosetItemCard(item, s, selectedItemId == item.id, split, cardHeight, { onCell(item) }, Modifier.weight(1f))
+                                ClosetItemCard(item, s, selectedItemId == item.id, split, cardHeight, closetPalette, { onCell(item) }, Modifier.weight(1f))
                             }
                         }
                         repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
@@ -347,7 +350,7 @@ fun ClosetScreen(
 
 /** Figma 2027:10043: 실제 아이템 상태에 따라 썸네일과 상태만 바꾼다. */
 @Composable
-private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, compact: Boolean, cardHeight: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, compact: Boolean, cardHeight: Dp, palette: ClosetPalette, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(KagomRadius.r24)
     val highlighted = selected
     val context = LocalContext.current
@@ -355,7 +358,7 @@ private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, comp
     Column(
         modifier.height(cardHeight).clip(shape)
             .background(KagomColor.Surface.card)
-            .border(if (highlighted) 3.dp else 1.dp, if (highlighted) KagomColor.Closet.selected else KagomColor.Border.default, shape)
+            .border(if (highlighted) 3.dp else 1.dp, if (highlighted) palette.accent else KagomColor.Border.default, shape)
             .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = if (compact) 8.dp else 15.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -372,8 +375,8 @@ private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, comp
         }
         Spacer(Modifier.height(8.dp))
         val label = when (state) { CellState.Equipped -> "착용중"; CellState.Owned -> "보유중"; CellState.Locked -> "잠금" }
-        val color = when (state) { CellState.Equipped -> KagomColor.Closet.equipped; CellState.Owned -> KagomColor.Closet.owned; CellState.Locked -> KagomColor.Closet.locked }
-        val textColor = when (state) { CellState.Equipped -> KagomColor.Closet.equippedText; CellState.Owned -> KagomColor.Closet.ownedText; CellState.Locked -> KagomColor.Closet.lockedText }
+        val color = when (state) { CellState.Equipped -> palette.selectedBackground; CellState.Owned -> palette.ownedBackground; CellState.Locked -> KagomColor.Closet.locked }
+        val textColor = when (state) { CellState.Equipped -> palette.equippedText; CellState.Owned -> palette.ownedText; CellState.Locked -> KagomColor.Closet.lockedText }
         Box(Modifier.height(40.dp), contentAlignment = Alignment.TopCenter) {
             Chip(label, color, textColor, height = 34.dp,
                 style = KagomType.ClosetStatusText, horizontalPadding = 18.dp)
@@ -384,7 +387,7 @@ private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, comp
 
 /** 2071:7849: 빈 칸은 차례대로 고르고 저장 버튼으로 현재 시착을 기록한다. */
 @Composable
-private fun SavedOutfitSlots(count: Int, selected: Int?, enabled: Boolean, compact: Boolean, onSelect: (Int) -> Unit, onSave: () -> Unit, modifier: Modifier = Modifier) {
+private fun SavedOutfitSlots(count: Int, selected: Int?, enabled: Boolean, compact: Boolean, palette: ClosetPalette, onSelect: (Int) -> Unit, onSave: () -> Unit, modifier: Modifier = Modifier) {
     val size = if (compact) 64.dp else 96.dp
     val width = 96.dp
     val shape = RoundedCornerShape(KagomRadius.r24)
@@ -393,8 +396,8 @@ private fun SavedOutfitSlots(count: Int, selected: Int?, enabled: Boolean, compa
         repeat(3) { index ->
             val filled = index < count
             Box(Modifier.width(width).height(size).clip(shape)
-                .background(if (selected == index) KagomColor.Closet.slotSelected else if (filled) KagomColor.Surface.card else KagomColor.Closet.slotEmpty)
-                .border(if (selected == index) 2.dp else 1.dp, if (selected == index) KagomColor.Closet.selected else KagomColor.Closet.slotBorder, shape)
+                .background(if (selected == index) palette.selectedBackground else if (filled) KagomColor.Surface.card else KagomColor.Closet.slotEmpty)
+                .border(if (selected == index) 2.dp else 1.dp, if (selected == index) palette.accent else KagomColor.Closet.slotBorder, shape)
                 .clickable { onSelect(index) }
                 .semantics { contentDescription = if (filled) "저장 착장 ${index + 1}번" else "빈 착장 ${index + 1}번" }, contentAlignment = Alignment.Center) {
                 Text(if (filled) "${index + 1}" else "+", style = if (compact) KagomType.ClosetSlotNumberCompact else KagomType.ClosetSlotNumber,
@@ -404,7 +407,7 @@ private fun SavedOutfitSlots(count: Int, selected: Int?, enabled: Boolean, compa
         val canSave = enabled && (selected != null || count < 3)
         Box(Modifier.width(width).height(64.dp).clickable(enabled = canSave, onClick = onSave), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(KagomRadius.r16))
-                .background(if (canSave) KagomColor.Closet.slotSave else KagomColor.Surface.disabled), contentAlignment = Alignment.Center) {
+                .background(if (canSave) palette.button else KagomColor.Surface.disabled), contentAlignment = Alignment.Center) {
                 Text("저장하기", style = KagomType.ClosetSlotButtonText, color = if (canSave) KagomColor.Text.inverse else KagomColor.Text.disabled, maxLines = 1)
             }
         }
