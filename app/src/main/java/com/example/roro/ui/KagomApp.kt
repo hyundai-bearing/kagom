@@ -46,6 +46,7 @@ import com.example.roro.ui.components.NavTab
 import com.example.roro.ui.components.wornLayers
 import com.example.roro.ui.screens.CarryOverScreen
 import com.example.roro.ui.screens.ClosetScreen
+import com.example.roro.ui.screens.DetailAvatar
 import com.example.roro.ui.screens.DriveLockScreen
 import com.example.roro.ui.screens.DrivingToastView
 import com.example.roro.ui.screens.HomeScreen
@@ -129,17 +130,41 @@ fun KagomApp(c: KagomController) = KagomTheme {
                 OnboardingFlow(onboarding, gearP) { name, answers -> c.createProfile(name, answers) }
             } else when (target) {
                 NavTab.HOME -> HomeScreen(profile, data, status, gearP, demoAct, { c.demoAct.value = null }) { if (gearP) sheetOpen = true }
-                NavTab.QUESTS -> QuestsScreen(Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt)
+                NavTab.QUESTS -> QuestsScreen(
+                    Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt, gearP,
+                    DetailAvatar(profile.skin, status.expression, wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom)),
+                )
                 NavTab.MAP -> {
                     val location by c.locationSource.current.collectAsState(initial = null)
+                    val worn = wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom)
+                    val views = remember(data.visits, data.pending) {
+                        landmarkViews(data.visits, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet())
+                    }
                     MapScreen(
-                        landmarkViews(data.visitedPlaces, data.pending.filterIsInstance<PendingPopup.Landmark>().map { it.landmarkId }.toSet()),
-                        gearP, c::equip, location, mapFocus, { mapFocus = null },
+                        views = views,
+                        gearP = gearP,
+                        onEquip = c::equip,
+                        onNavigate = { landmark ->
+                            if (gearP) {
+                                val destination = "${landmark.lat},${landmark.lon}"
+                                val route = Uri.parse("google.navigation:q=$destination")
+                                val directions = Uri.parse("https://www.google.com/maps/dir/")
+                                    .buildUpon().appendQueryParameter("api", "1")
+                                    .appendQueryParameter("destination", destination)
+                                    .appendQueryParameter("travelmode", "driving").appendQueryParameter("dir_action", "navigate")
+                                    .build()
+                                val opened = listOf(route, directions).any { uri ->
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }.isSuccess
+                                }
+                                if (!opened) notice = Notice("길 안내를 열 수 없어요")
+                            }
+                        },
+                        location = location,
+                        detailAvatar = DetailAvatar(profile.skin, status.expression, worn),
+                        focusLandmarkId = mapFocus,
+                        onFocusShown = { mapFocus = null },
                     ) { modifier ->
-                        KagomCharacter(
-                            profile.skin, status.expression, modifier,
-                            worn = wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom),
-                        )
+                        KagomCharacter(profile.skin, status.expression, modifier, worn = worn)
                     }
                 }
                 NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, c::saveOutfit, examples) { next, landmarkId ->

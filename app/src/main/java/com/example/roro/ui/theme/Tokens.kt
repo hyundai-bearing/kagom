@@ -90,7 +90,7 @@ object KagomColor {
 
     /** 옷장 라벤더 스튜디오 (Figma 2027:10015). */
     object Closet {
-        val studio = Color(0xFFF7F5FC)
+        val studio = Color(0xFFF7F3FB)
         val halo = Color(0xFFE8E0F7)
         val shadow = Color(0x217A6999)
         val selected = Color(0xFF7658B2)
@@ -102,7 +102,10 @@ object KagomColor {
         val lockedText = Color(0xFF52525F)
         val slotBorder = Color(0xFFE0E0E5)
         val slotEmpty = Color(0xFFEDEDF0)
-        val slotSave = Color(0xFF614D85)
+        val slotSelected = Color(0xFFEDE7F9)
+        val slotNumber = Color(0xFF565465)
+        val slotPlus = Color(0xFF9494A0)
+        val slotSave = Color(0xFF8A73B4)
     }
 
     object Accent {
@@ -177,6 +180,35 @@ object KagomSize {
     val touchMin = 64.dp
     val navItem = 72.dp
     val navItemHeight = 58.dp
+}
+
+/** 옷장 전용 스킨 색상. 초록·보라 비교 시안을 바탕으로 나머지는 스킨에 맞게 정했다. */
+data class ClosetPalette(
+    val studio: Color, val halo: Color, val accent: Color, val button: Color,
+    val selectedBackground: Color, val equippedText: Color, val ownedBackground: Color, val ownedText: Color,
+)
+
+object KagomClosetPalette {
+    private fun palette(accent: Color, button: Color, base: Color, dark: Color) = ClosetPalette(
+        studio = lerp(Color.White, base, 0.08f),
+        halo = lerp(Color.White, base, 0.30f),
+        accent = accent, button = button,
+        selectedBackground = lerp(Color.White, base, 0.24f), equippedText = dark,
+        ownedBackground = lerp(Color.White, base, 0.17f), ownedText = dark,
+    )
+    private val palettes = mapOf(
+        "P01" to palette(Color(0xFF806341), Color(0xFF8A714F), Color(0xFFD3BC9C), Color(0xFF624C31)),
+        "P02" to palette(Color(0xFF0A665E), Color(0xFF408C7F), Color(0xFFA8DCC6), Color(0xFF0A665E)),
+        "P03" to ClosetPalette(KagomColor.Closet.studio, KagomColor.Closet.halo, KagomColor.Closet.selected,
+            KagomColor.Closet.slotSave, KagomColor.Closet.slotSelected, KagomColor.Closet.equippedText,
+            KagomColor.Closet.owned, KagomColor.Closet.ownedText),
+        "P04" to palette(Color(0xFF535B70), Color(0xFF596276), Color(0xFF9CA4B3), Color(0xFF414A5E)),
+        "P05" to palette(Color(0xFF586A7C), Color(0xFF6E8193), Color(0xFFC5D1DC), Color(0xFF46596D)),
+        "P06" to palette(Color(0xFF835339), Color(0xFF987052), Color(0xFFC49A70), Color(0xFF69402B)),
+        "P07" to palette(Color(0xFF147968), Color(0xFF438F82), Color(0xFF72DCC4), Color(0xFF0B6456)),
+        "P08" to palette(Color(0xFF985F62), Color(0xFFAB7776), Color(0xFFD49C8A), Color(0xFF794649)),
+    )
+    fun of(code: String?): ClosetPalette = palettes[code] ?: palettes.getValue("P03")
 }
 
 /**
