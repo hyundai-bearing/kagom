@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,6 +73,7 @@ import com.example.roro.data.Equipped
 import com.example.roro.data.Profile
 import com.example.roro.ui.components.CellState
 import com.example.roro.ui.components.AssetImage
+import com.example.roro.ui.components.BackgroundArt
 import com.example.roro.ui.components.Chip
 import com.example.roro.ui.components.ClosetTitlePlate
 import com.example.roro.ui.components.hasClosetTitlePlate
@@ -200,7 +202,7 @@ fun ClosetScreen(
         if (s != CellState.Locked && !Examples.isExample(item.id)) {
             draft = when {
                 s == CellState.Owned -> draft.with(item.category, item.id)
-                item.category == Category.TITLE -> draft
+                item.category.alwaysEquipped -> draft
                 else -> draft.with(item.category, null)
             }
         }
@@ -222,7 +224,9 @@ fun ClosetScreen(
             val shift = if (compact) 52.dp else 54.dp
             val hasPlate = hasClosetTitlePlate(draft.title)
             val characterY = if (compact && hasPlate) (-50).dp else 0.dp
-            Box(Modifier.offset(x = shift, y = characterY).size(if (compact) 300.dp else 540.dp).background(closetPalette.halo, CircleShape))
+            // 배경 탭에서는 고른 배경이 홈에서 어떻게 보일지 스튜디오 대신 깔아 보인다 (디자인에 없는 가정)
+            if (Category.entries[tab] == Category.BACKGROUND) BackgroundArt(draft.background, Modifier.fillMaxSize())
+            else Box(Modifier.offset(x = shift, y = characterY).size(if (compact) 300.dp else 540.dp).background(closetPalette.halo, CircleShape))
             // 회전하는 렌더와 분리해 발밑 그림자의 크기와 위치를 고정한다.
             Canvas((if (compact) Modifier.align(Alignment.BottomCenter).offset(x = shift, y = characterY).padding(bottom = 42.dp)
                 else Modifier.align(Alignment.Center).offset(x = shift, y = 238.dp))
@@ -401,6 +405,9 @@ private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, comp
         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             if (item.category == Category.TITLE && hasClosetTitlePlate(item.id)) {
                 ClosetTitlePlate(item.id, skin, Modifier.fillMaxWidth().padding(horizontal = 8.dp).offset(y = 20.dp), colorFilter = if (state == CellState.Locked) lockedCardFilter else null)
+            } else if (item.category == Category.BACKGROUND) {
+                BackgroundArt(item.id, Modifier.padding(top = if (compact) 12.dp else 20.dp).fillMaxHeight().aspectRatio(4f / 3f).clip(RoundedCornerShape(KagomRadius.r16)),
+                    colorFilter = if (state == CellState.Locked) lockedCardFilter else null)
             } else if (KagomRenders.exists(context, path)) AssetImage(path, Modifier.fillMaxWidth().heightIn(max = if (compact) 110.dp else 180.dp).fillMaxHeight().padding(top = if (compact) 12.dp else 20.dp).graphicsLayer {
                 scaleX = 1.5f; scaleY = 1.5f; translationY = (if (compact) 10.dp else 14.dp).toPx()
             }, colorFilter = if (state == CellState.Locked) lockedCardFilter else null)

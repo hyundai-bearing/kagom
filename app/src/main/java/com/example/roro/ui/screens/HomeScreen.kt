@@ -40,6 +40,7 @@ import com.example.roro.core.Tiers
 import com.example.roro.core.VehicleStatus
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
+import com.example.roro.ui.components.BackgroundArt
 import com.example.roro.ui.components.DriveLockBanner
 import com.example.roro.ui.components.HeaderProfile
 import com.example.roro.ui.components.KagomCharacter
@@ -108,41 +109,51 @@ fun HomeScreen(
         }
     }
 
+    // 장착한 배경 그림 (디자인에 없는 가정). 그림이 없는 ID면 전처럼 스킨 틴트만 보인다.
+    // 정지 그림이라 주행 중에도 그대로 둔다 (바꾸는 것은 옷장에서 기어 P일 때만)
+    val backdrop: @Composable () -> Unit = { BackgroundArt(data.equipped.background, Modifier.fillMaxSize()) }
+
     if (split) {
         // 헤더 / 캔버스 / 하단 배지 그룹 세로 스택. 배지 터치 → 바텀시트
-        Column(Modifier.fillMaxSize().background(palette.canvasTint)) {
-            header(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp))
-            if (!gearP) DriveLockBanner("정비 시트는 정차 후", "주행 중에는 배지 터치가 무시돼요.",
-                Modifier.padding(start = 20.dp, end = 20.dp, top = 74.dp))
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val titleId = data.equipped.title
-                if (hasClosetTitlePlate(titleId)) {
-                    character(Modifier.fillMaxHeight(0.75f).aspectRatio(450f / 660f).offset(y = (-32).dp))
-                    ClosetTitlePlate(titleId!!, profile.skin, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).width(300.dp))
-                } else character(Modifier.size(470.dp, 690.dp))
+        Box(Modifier.fillMaxSize().background(palette.canvasTint)) {
+            backdrop()
+            Column(Modifier.fillMaxSize()) {
+                header(Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp))
+                if (!gearP) DriveLockBanner("정비 시트는 정차 후", "주행 중에는 배지 터치가 무시돼요.",
+                    Modifier.padding(start = 20.dp, end = 20.dp, top = 74.dp))
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val titleId = data.equipped.title
+                    if (hasClosetTitlePlate(titleId)) {
+                        character(Modifier.fillMaxHeight(0.75f).aspectRatio(450f / 660f).offset(y = (-32).dp))
+                        ClosetTitlePlate(titleId!!, profile.skin, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).width(300.dp))
+                    } else character(Modifier.size(470.dp, 690.dp))
+                }
+                badges(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 20.dp))
             }
-            badges(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 20.dp))
         }
         return
     }
 
     Row(Modifier.fillMaxSize()) {
         // kagomMainCanvas (65%): 헤더·캐릭터·배지 세로 가운데
-        Column(
-            Modifier.weight(1f).fillMaxHeight().background(palette.canvasTint),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            header(Modifier)
-            // 가이드 v1.2: 캐릭터 아래 상태 글자가 없어졌다. 캐릭터 크기는 그대로 두고(660) 글자 자리만큼 위아래로 나눠 내린다
-            Spacer(Modifier.height(40.dp))
-            character(Modifier.size(450.dp, 660.dp))
-            if (hasClosetTitlePlate(data.equipped.title)) {
-                Spacer(Modifier.height(16.dp))
-                ClosetTitlePlate(data.equipped.title!!, profile.skin, Modifier.width(320.dp))
-                Spacer(Modifier.height(24.dp))
-            } else Spacer(Modifier.height(40.dp))
-            badges(Modifier.width(1000.dp))
+        Box(Modifier.weight(1f).fillMaxHeight().background(palette.canvasTint)) {
+            backdrop()
+            Column(
+                Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                header(Modifier)
+                // 가이드 v1.2: 캐릭터 아래 상태 글자가 없어졌다. 캐릭터 크기는 그대로 두고(660) 글자 자리만큼 위아래로 나눠 내린다
+                Spacer(Modifier.height(40.dp))
+                character(Modifier.size(450.dp, 660.dp))
+                if (hasClosetTitlePlate(data.equipped.title)) {
+                    Spacer(Modifier.height(16.dp))
+                    ClosetTitlePlate(data.equipped.title!!, profile.skin, Modifier.width(320.dp))
+                    Spacer(Modifier.height(24.dp))
+                } else Spacer(Modifier.height(40.dp))
+                badges(Modifier.width(1000.dp))
+            }
         }
         // vehicleStatusPanel (35%, 640 고정)
         Column(

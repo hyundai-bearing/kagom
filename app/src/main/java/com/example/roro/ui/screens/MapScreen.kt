@@ -3,6 +3,7 @@ package com.example.roro.ui.screens
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -11,10 +12,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,12 +42,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -49,7 +58,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -63,6 +74,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -81,6 +93,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.roro.R
@@ -108,11 +122,14 @@ import com.example.roro.ui.theme.KagomSpace
 import com.example.roro.ui.theme.KagomType
 import com.example.roro.ui.theme.LayoutMode
 import com.example.roro.ui.theme.LocalLayoutMode
+import com.example.roro.ui.theme.PleosKit
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val landmarkDateFormat = DateTimeFormatter.ofPattern("yyyy.MM.dd")
@@ -165,6 +182,8 @@ fun MapScreen(
     var unitId by rememberSaveable { mutableStateOf<String?>(null) }
     var districtId by rememberSaveable { mutableStateOf<String?>(null) }
     var pinId by rememberSaveable { mutableStateOf<String?>(null) }
+    /** Split: 지도 위로 끌어올리는 시트가 멈춘 자리 (Full에서는 쓰지 않는다) */
+    var sheetStop by rememberSaveable { mutableStateOf(SheetStop.PEEK) }
 
     fun goNationwide() {
         pinId = null
@@ -179,17 +198,26 @@ fun MapScreen(
         unitId = null
     }
 
+    /** 상세를 닫으면 Split 시트는 목록 높이로 내려간다 (보던 목록으로 돌아간다) */
     fun closeLandmarkDetail() {
         pinId = null
+        if (sheetStop == SheetStop.DETAIL) sheetStop = SheetStop.HALF
     }
 
     fun goMapBack() {
         if (unitId != null) goProvince() else goNationwide()
     }
 
-    BackHandler(enabled = provinceId != null || pinId != null) {
-        if (pinId != null) closeLandmarkDetail() else goMapBack()
+    // 뒤로 키: 상세 닫기 → (Split) 시트 접기 → 상위 지도
+    BackHandler(enabled = provinceId != null || pinId != null || (split && sheetStop != SheetStop.PEEK)) {
+        when {
+            pinId != null -> closeLandmarkDetail()
+            split && sheetStop != SheetStop.PEEK -> sheetStop = SheetStop.PEEK
+            else -> goMapBack()
+        }
     }
+    // 단계를 옮기거나 주행을 시작하면 시트를 접어 지도와 내 위치가 보이게 한다
+    LaunchedEffect(provinceId, unitId, gearP) { sheetStop = SheetStop.PEEK }
 
     val loaded = result?.getOrNull()
     LaunchedEffect(focusLandmarkId, loaded) {
@@ -231,6 +259,8 @@ fun MapScreen(
     val count = regions.flatMap { it.landmarks }
     val selectedPin = count.firstOrNull { it.landmark.id == pinId }
     val detail = selectedPin.takeIf { gearP }
+    // 상세가 열리면(핀·목록에서 고름, 치장에서 넘어옴, 다시 정차함) Split 시트를 상세 높이로 올린다
+    LaunchedEffect(detail?.landmark?.id) { if (detail != null) sheetStop = SheetStop.DETAIL }
 
     fun selectPin(id: String) {
         if (pinId == id) {
@@ -256,7 +286,8 @@ fun MapScreen(
         province != null -> "시·군을 누르면 구획 지도로 들어가요"
         else -> "시·도를 누르면 그 지역으로 들어가요"
     }
-    val mapContent: @Composable (Modifier) -> Unit = { modifier ->
+    // [top]·[bottom] = 지도 위에 얹힌 머리줄·접힌 시트의 높이, [sheetRise] = 시트가 접힌 자리보다 올라온 높이 px (Split만)
+    val mapContent: @Composable (Modifier, Dp, Dp, () -> Float) -> Unit = { modifier, top, bottom, sheetRise ->
         RegionMap(
             location = mapLocation,
             locationLabel = when {
@@ -287,6 +318,9 @@ fun MapScreen(
             onPin = ::selectPin,
             onDismissPin = ::closeLandmarkDetail,
             onBack = if (province != null) ::goMapBack else null,
+            insetTop = top,
+            insetBottom = bottom,
+            sheetRise = sheetRise,
             modifier = modifier,
         )
     }
@@ -309,42 +343,66 @@ fun MapScreen(
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(KagomColor.Surface.page)
-            .padding(
-                start = if (split) KagomSpace.s20 else KagomSpace.s36,
-                end = if (split) KagomSpace.s20 else KagomSpace.s36,
-                top = if (split) KagomSpace.s20 else KagomSpace.s28,
-                bottom = if (split) KagomSpace.s16 else KagomSpace.s28,
-            ),
-        verticalArrangement = Arrangement.spacedBy(if (split) KagomSpace.s12 else KagomSpace.s16),
-    ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(if (split) KagomSpace.s10 else KagomSpace.s16),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (province != null) {
-                Image(
-                    painterResource(if (split) R.drawable.map_back_split else R.drawable.map_back),
-                    contentDescription = "상위 지역 지도로 돌아가기",
-                    Modifier.size(if (split) 40.dp else 48.dp).clip(CircleShape)
-                        .clickable(role = Role.Button, onClick = ::goMapBack),
+    val title = unit?.name ?: province?.name ?: "전국"
+    val unlocked = String.format(Locale.KOREA, "해금 %,d / %,d", count.count { it.visited }, count.size)
+    if (split) {
+        // Split(세로 슬롯): 지도를 화면 전체에 깔고 머리줄과 목록·상세 시트를 그 위에 얹는다 (디자인에 없는 배치, 가정).
+        // 지도 아래에 목록을 쌓으면 Pleos 세로 슬롯(높이 약 920)에서 지도가 화면의 40%쯤만 차지해 구획과 핀이 뭉쳤다
+        BoxWithConstraints(Modifier.fillMaxSize().background(KagomColor.Surface.page)) {
+            val stops = with(LocalDensity.current) {
+                mapOf(
+                    SheetStop.PEEK to SHEET_PEEK.toPx(),
+                    SheetStop.HALF to maxOf(SHEET_PEEK, maxHeight * 0.48f).toPx(),
+                    SheetStop.DETAIL to maxOf(SHEET_PEEK, maxHeight * 0.62f).toPx(),
                 )
             }
-            val title = unit?.name ?: province?.name ?: "전국"
-            if (split && province != null) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Breadcrumb("전국", KagomType.Caption14, ::goNationwide)
-                        if (unit != null) {
-                            Text(" › ", style = KagomType.Caption14, color = KagomColor.Text.secondary)
-                            Breadcrumb(province.name, KagomType.Caption14, ::goProvince)
-                        }
-                    }
-                    Text(title, style = KagomType.Heading22, color = KagomColor.Text.primary)
+            val sheetHeight = remember { Animatable(stops.getValue(SheetStop.PEEK)) }
+            LaunchedEffect(sheetStop, stops) {
+                val target = stops.getValue(sheetStop)
+                // 주행 중에는 움직임 없이 바로 바꾼다
+                if (gearP) sheetHeight.animateTo(target, tween(KagomMotion.SHEET, easing = FastOutSlowInEasing)) else sheetHeight.snapTo(target)
+            }
+            mapContent(Modifier.fillMaxSize(), SPLIT_HEADER_INSET, SHEET_PEEK) { sheetHeight.value - stops.getValue(SheetStop.PEEK) }
+            SplitMapHeader(
+                title, province, unit, unlocked, ::goMapBack, ::goNationwide, ::goProvince,
+                Modifier.align(Alignment.TopCenter).padding(start = KagomSpace.s12, end = KagomSpace.s12, top = KagomSpace.s12),
+            )
+            MapSheet(
+                height = sheetHeight,
+                stops = stops,
+                stop = sheetStop,
+                onStop = { next ->
+                    // 상세를 끌어내리면 상세를 닫는다 (시트에는 목록이 남는다)
+                    if (next != SheetStop.DETAIL) pinId = null
+                    sheetStop = next
+                },
+                // 상세는 제 머리줄(이름·닫기)이 있다
+                title = when {
+                    detail != null -> null
+                    unit != null -> "${unit.name} 랜드마크"
+                    else -> panelTitle
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) { panel(it) }
+        }
+    } else {
+        Column(
+            Modifier.fillMaxSize().background(KagomColor.Surface.page)
+                .padding(horizontal = KagomSpace.s36, vertical = KagomSpace.s28),
+            verticalArrangement = Arrangement.spacedBy(KagomSpace.s16),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (province != null) {
+                    Image(
+                        painterResource(R.drawable.map_back),
+                        contentDescription = "상위 지역 지도로 돌아가기",
+                        Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = ::goMapBack),
+                    )
                 }
-            } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(KagomSpace.s8), verticalAlignment = Alignment.CenterVertically) {
                     if (province != null) {
                         Breadcrumb("전국", KagomType.Heading20, ::goNationwide)
@@ -354,37 +412,139 @@ fun MapScreen(
                             Image(painterResource(R.drawable.map_chevron), contentDescription = null)
                         }
                     }
-                    Text(title, style = if (split) KagomType.Heading22 else KagomType.Title28, color = KagomColor.Text.primary)
+                    Text(title, style = KagomType.Title28, color = KagomColor.Text.primary)
                 }
+                StatusBadge(Severity.OK, unlocked, style = KagomType.Body16Strong)
+                Spacer(Modifier.weight(1f))
+                MapLegend()
             }
-            if (split && province == null) Spacer(Modifier.weight(1f))
-            StatusBadge(
-                Severity.OK,
-                String.format(Locale.KOREA, "해금 %,d / %,d", count.count { it.visited }, count.size),
-                style = KagomType.Body16Strong,
-            )
-            if (!split) Spacer(Modifier.weight(1f))
-            if (!split) MapLegend()
-        }
-        if (split) {
-            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                val mapShare = when {
-                    detail != null -> 0.40f
-                    unit != null -> 0.44f
-                    else -> 0.52f
-                }
-                val mapHeight = minOf(420.dp, maxHeight * mapShare)
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
-                    mapContent(Modifier.fillMaxWidth().height(mapHeight))
-                    panel(Modifier.fillMaxWidth().weight(1f))
-                }
-            }
-        } else {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16)) {
-                mapContent(Modifier.weight(1f).fillMaxSize())
+                mapContent(Modifier.weight(1f).fillMaxSize(), 0.dp, 0.dp) { 0f }
                 panel(Modifier.width(if (unit != null) 480.dp else 400.dp).fillMaxSize())
             }
         }
+    }
+}
+
+/** Split 지도 시트가 멈추는 자리: 접힘(제목 한 줄) · 목록 · 상세 */
+private enum class SheetStop { PEEK, HALF, DETAIL }
+
+/** 접힌 시트의 높이 = 손잡이 32 + 제목 줄 56 + 아래 여백 8. 지도는 이만큼을 뺀 자리에 맞춘다 */
+private val SHEET_PEEK = 96.dp
+
+/** Split 머리줄이 가리는 높이 = 위 여백 12 + 머리줄 72 + 아래 틈 8 */
+private val SPLIT_HEADER_INSET = 92.dp
+
+/**
+ * Split 지도 위에 떠 있는 머리줄: 상위 지도로 가는 화살표 + 빵부스러기·지역 이름 + 해금 수.
+ * 높이를 고정해 둔다 (지도 시점이 머리줄 높이에 맞춰져 있어, 단계마다 높이가 달라지면 지도를 다시 그린다)
+ */
+@Composable
+private fun SplitMapHeader(
+    title: String,
+    province: MapRegion?,
+    unit: MapRegion?,
+    unlocked: String,
+    onBack: () -> Unit,
+    onNationwide: () -> Unit,
+    onProvince: () -> Unit,
+    modifier: Modifier,
+) {
+    val shape = RoundedCornerShape(KagomRadius.r20)
+    Row(
+        modifier.fillMaxWidth().height(72.dp)
+            .shadow(8.dp, shape, ambientColor = PleosKit.shadow, spotColor = PleosKit.shadow)
+            .background(KagomColor.Surface.card, shape)
+            // 머리줄을 누른 것이 아래 지도의 구획 선택으로 넘어가지 않게 한다
+            .pointerInput(Unit) { detectTapGestures { } }
+            .padding(horizontal = KagomSpace.s12),
+        horizontalArrangement = Arrangement.spacedBy(KagomSpace.s10),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (province != null) {
+            Image(
+                painterResource(R.drawable.map_back_split),
+                contentDescription = "상위 지역 지도로 돌아가기",
+                Modifier.size(40.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack),
+            )
+        }
+        Column(Modifier.weight(1f).padding(start = if (province == null) KagomSpace.s8 else 0.dp)) {
+            if (province != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Breadcrumb("전국", KagomType.Caption14, onNationwide)
+                    if (unit != null) {
+                        Text(" › ", style = KagomType.Caption14, color = KagomColor.Text.secondary)
+                        Breadcrumb(province.name, KagomType.Caption14, onProvince)
+                    }
+                }
+            }
+            Text(title, style = KagomType.Heading22, color = KagomColor.Text.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        StatusBadge(Severity.OK, unlocked, style = KagomType.Body16Strong)
+    }
+}
+
+/**
+ * Split 지도의 끌어올리는 시트 (디자인에 없는 것, 가정). 손잡이·제목 줄을 끌거나 누르면 [stops] 사이를 오간다.
+ * 목록은 시트 안에서 따로 스크롤된다 (지도 제스처와 섞이지 않게 시트는 손잡이·제목 줄에서만 끌린다).
+ * [height] = 지금 높이 px. 끄는 동안 지도의 가림 보정이 같은 값을 읽는다. [title] = null이면 제목 줄이 없다 (상세)
+ */
+@Composable
+private fun MapSheet(
+    height: Animatable<Float, AnimationVector1D>,
+    stops: Map<SheetStop, Float>,
+    stop: SheetStop,
+    onStop: (SheetStop) -> Unit,
+    title: String?,
+    modifier: Modifier,
+    content: @Composable (Modifier) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val shape = RoundedCornerShape(topStart = KagomRadius.r24, topEnd = KagomRadius.r24)
+    val expanded = stop != SheetStop.PEEK
+    val toggle = { onStop(if (expanded) SheetStop.PEEK else SheetStop.HALF) }
+    val drag = rememberDraggableState { delta ->
+        scope.launch { height.snapTo((height.value - delta).coerceIn(stops.getValue(SheetStop.PEEK), stops.getValue(SheetStop.DETAIL))) }
+    }
+    val grip = Modifier
+        .draggable(drag, Orientation.Vertical, onDragStopped = { velocity ->
+            // 놓은 자리에서 가까운 멈춤 자리로 간다. 빠르게 튕기면 그 방향의 자리까지 (0.15초만큼 더 간 자리로 본다, 가정)
+            val projected = height.value - velocity * 0.15f
+            val next = stops.minBy { abs(it.value - projected) }.key
+            if (next == stop) height.animateTo(stops.getValue(next), tween(KagomMotion.SHEET_OUT)) else onStop(next)
+        })
+        .clickable(role = Role.Button, onClickLabel = if (expanded) "목록 접기" else "목록 펼치기", onClick = toggle)
+    Column(
+        modifier.fillMaxWidth()
+            .layout { measurable, constraints ->
+                val px = height.value.roundToInt()
+                val placeable = measurable.measure(constraints.copy(minHeight = px, maxHeight = px))
+                layout(placeable.width, px) { placeable.place(0, 0) }
+            }
+            .shadow(16.dp, shape, ambientColor = PleosKit.shadow, spotColor = PleosKit.shadow)
+            .background(KagomColor.Surface.card, shape)
+            // 시트의 빈 곳을 누른 것이 아래 지도로 넘어가지 않게 한다
+            .pointerInput(Unit) { detectTapGestures { } },
+    ) {
+        Column(Modifier.fillMaxWidth().then(grip)) {
+            Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(48.dp, 5.dp).background(KagomColor.Border.default, CircleShape))
+            }
+            if (title != null) {
+                Row(
+                    Modifier.fillMaxWidth().height(56.dp).padding(horizontal = KagomSpace.s20),
+                    horizontalArrangement = Arrangement.spacedBy(KagomSpace.s8),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(title, Modifier.weight(1f), style = KagomType.Heading20, color = KagomColor.Text.primary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Image(painterResource(R.drawable.map_chevron), null, Modifier.size(20.dp).rotate(if (expanded) 90f else -90f))
+                }
+                // 접힌 시트에 목록의 첫 줄 머리가 비치지 않게 한다
+                Spacer(Modifier.height(KagomSpace.s8))
+            }
+        }
+        Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) { content(Modifier.fillMaxSize()) }
     }
 }
 
@@ -530,20 +690,39 @@ private fun RegionMap(
     onPin: (String) -> Unit,
     onDismissPin: () -> Unit,
     onBack: (() -> Unit)?,
+    /** 지도 위에 얹힌 것이 가리는 높이 (Split의 머리줄, 접힌 시트). 지도와 지도 위 글·버튼은 그 사이에 둔다 */
+    insetTop: Dp = 0.dp,
+    insetBottom: Dp = 0.dp,
+    /** 시트가 접힌 자리보다 더 올라온 높이 px. 그리는 단계에서 읽는다 (시트를 끄는 동안 지도를 다시 짜지 않게) */
+    sheetRise: () -> Float = { 0f },
     modifier: Modifier,
 ) {
     val paths = remember(regions) { regions.associate { it.region.id to it.region.outline() } }
     val outlinePath = remember(outline) { outline?.outline() }
     val measurer = rememberTextMeasurer(cacheSize = 128)
     val labelStyle = KagomType.Caption14.copy(color = KagomColor.Text.primary)
-    val shape = RoundedCornerShape(if (split) KagomRadius.r20 else KagomRadius.r24)
-    BoxWithConstraints(modifier.clip(shape).background(KagomColor.Map.sea)) {
+    // Split은 지도가 화면 끝까지 닿는다
+    val shape = RoundedCornerShape(if (split) 0.dp else KagomRadius.r24)
+    val density = LocalDensity.current
+    val topPx = with(density) { insetTop.toPx() }
+    val bottomPx = with(density) { insetBottom.toPx() }
+    // 시트가 올라와 고른 핀·구획을 가리면 지도 그림을 통째로 위로 민다 (다시 그리지 않는다).
+    // 고른 곳이 시트 위에 남은 자리의 가운데에 오는 만큼만, 시트가 올라온 높이를 넘지 않게
+    val focusY = remember { mutableFloatStateOf(Float.NaN) }
+    fun lift(height: Float): Float {
+        val rise = sheetRise()
+        val focus = focusY.floatValue
+        if (rise <= 0f || focus.isNaN()) return 0f
+        return (focus - (topPx + (height - topPx - bottomPx - rise) / 2)).coerceIn(0f, rise)
+    }
+    BoxWithConstraints(modifier.graphicsLayer { translationY = -lift(size.height) }.clip(shape).background(KagomColor.Map.sea)) {
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
         if (w <= 0f || h <= 0f) return@BoxWithConstraints
-        val density = LocalDensity.current
+        // 지도 위 글·버튼은 지도가 밀려도 제자리에 있고, 시트가 올라오면 시트 위에 얹혀 같이 올라간다
+        val ride: Density.() -> IntOffset = { IntOffset(0, (lift(h) - sheetRise()).roundToInt()) }
         val pad = with(density) { minOf((if (split) KagomSpace.s12 else KagomSpace.s28).toPx(), minOf(w, h) / 5f) }
-        val camera = remember(bounds, w, h, pad) { MapZoom.fit(bounds, w, h, pad) }
+        val camera = remember(bounds, w, h, pad, topPx, bottomPx) { MapZoom.fit(bounds, w, h, pad, topPx, bottomPx) }
         // 단계 이동: 떠나온 단계의 그림에서 새 단계의 그림으로 시점이 옮겨 가며 바뀐다 (주행 중에는 바로 바꾼다).
         // 방문 기록만 바뀌거나 화면 크기가 바뀐 것(범위가 같음)은 단계 이동이 아니다
         val scene = remember(regions, paths, outlinePath, camera, district?.region?.id) {
@@ -597,20 +776,28 @@ private fun RegionMap(
         val locationStatus = locationLabel.takeIf { onLocate == null }
         val north = if (split) null else painterResource(R.drawable.map_north)
         // 지도 위에 얹는 글·버튼의 자리 (아래에서 그리는 것과 같은 여백). 구획 이름표와 카곰이 여기를 피해야 서로 겹쳐서 못 읽는 일이 없다
-        val overlays = remember(attribution, locationStatus, locationLabel, hint, north, w, h, measurer) {
+        val overlays = remember(attribution, locationStatus, locationLabel, hint, north, w, h, measurer, split, topPx, bottomPx) {
             with(density) {
                 fun sizeOf(text: String, style: TextStyle) = measurer.measure(text, style).size
                 buildList {
                     val lines = listOfNotNull(locationStatus, attribution).map { sizeOf(it, KagomType.Caption14) }
-                    add(Rect(
+                    val credit = Rect(
                         w - lines.maxOf { it.width } - 2 * KagomSpace.s10.toPx(),
-                        h - lines.sumOf { it.height } - 2 * 6.dp.toPx(), w, h,
-                    ))
+                        h - bottomPx - lines.sumOf { it.height } - 2 * 6.dp.toPx(), w, h - bottomPx,
+                    )
+                    add(credit)
                     if (locationStatus == null) {
                         val text = sizeOf(locationLabel, KagomType.Body16Strong)
                         val edge = KagomSpace.s12.toPx()
-                        add(Rect(edge, edge, edge + text.width + 2 * KagomSpace.s16.toPx(), edge + maxOf(48.dp.toPx(), text.height.toFloat())))
+                        val width = text.width + 2 * KagomSpace.s16.toPx()
+                        val height = maxOf(48.dp.toPx(), text.height.toFloat())
+                        // Split: 왼쪽 위는 머리줄이 차지하고 핀·이름표가 몰린다 → 오른쪽 아래, 출처 글 위에 둔다
+                        add(if (split) Rect(w - edge - width, credit.top - height, w - edge, credit.top)
+                            else Rect(edge, edge, edge + width, edge + height))
                     }
+                    // 머리줄과 접힌 시트 밑으로는 이름표·카곰을 두지 않는다
+                    if (topPx > 0f) add(Rect(0f, 0f, w, topPx))
+                    if (bottomPx > 0f) add(Rect(0f, h - bottomPx, w, h))
                     if (north != null) {
                         val letter = sizeOf("N", KagomType.Caption14Strong)
                         val edge = KagomSpace.s20.toPx()
@@ -642,12 +829,6 @@ private fun RegionMap(
             )
             for (entry in ordered) {
                 val region = entry.region
-                if (split && sceneId == "nationwide" && entry.visited == 0 &&
-                    region.name !in setOf("서울특별시", "강원특별자치도", "부산광역시", "제주특별자치도")
-                ) continue
-                // Split 지도는 작아서(Pleos 세로 슬롯에서 높이 약 230) 20px 이름표를 다 달면 구획 모양이 덮인다.
-                // 시·군·구획 지도도 전국처럼 추려서, 랜드마크가 있는 곳과 고른 구획만 단다. 나머지 이름은 아래 목록에 있다
-                if (split && sceneId != "nationwide" && entry.landmarks.isEmpty() && region.id != district?.region?.id) continue
                 val p = point(region.labelLon, region.labelLat)
                 val caption = buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(region.name.shortRegionName()) }
@@ -670,6 +851,9 @@ private fun RegionMap(
             }
             placed
         }
+        val focus = selectedPin?.let { pinLocations[it.landmark.id]?.y }
+            ?: labels.firstOrNull { it.id == district?.region?.id }?.rect?.center?.y
+        SideEffect { focusY.floatValue = focus ?: Float.NaN }
         val tap by rememberUpdatedState<(Offset) -> Unit> { pos ->
             val id = labels.firstOrNull { it.rect.contains(pos) }?.id ?: regions.firstOrNull { entry ->
                 entry.region.contains(
@@ -777,7 +961,7 @@ private fun RegionMap(
                 val spots = listOf(near, near + pinRadius, near + 2 * pinRadius).flatMap { reach -> directions.map { it * reach } }
                 fun covered(shift: Offset): Float {
                     val box = Rect(at + shift, diameter / 2)
-                    if (box.left < 0f || box.top < 0f || box.right > w || box.bottom > h) return Float.MAX_VALUE
+                    if (box.left < 0f || box.top < topPx || box.right > w || box.bottom > h - bottomPx) return Float.MAX_VALUE
                     return blocked.filter { it.overlaps(box) }.map { it.intersect(box) }
                         .sumOf { (it.width * it.height).toDouble() }.toFloat()
                 }
@@ -793,7 +977,8 @@ private fun RegionMap(
                     } else {
                         IntOffset(
                             (projected.x + avatarShift.x - diameter / 2).coerceIn(0f, (w - diameter).coerceAtLeast(0f)).roundToInt(),
-                            (projected.y + avatarShift.y - diameter / 2).coerceIn(0f, (h - diameter).coerceAtLeast(0f)).roundToInt(),
+                            (projected.y + avatarShift.y - diameter / 2)
+                                .coerceIn(topPx, (h - bottomPx - diameter).coerceAtLeast(topPx)).roundToInt(),
                         )
                     }
                 }.clearAndSetSemantics { contentDescription = "내 위치의 카곰" }
@@ -811,9 +996,14 @@ private fun RegionMap(
                 }.size(KagomSpace.s8).background(KagomColor.Text.accent, CircleShape),
             )
         }
+        val creditHeight = with(density) { overlays.first().height.toDp() }
         if (onLocate != null) {
             Box(
-                Modifier.align(Alignment.TopStart).padding(KagomSpace.s12).heightIn(min = 48.dp)
+                // Split: 접힌 시트 바로 위. 시트가 올라오면 따라 올라가지 않고 그 뒤에 가려진다 (좁아진 지도에서 고른 핀을 덮지 않게)
+                (if (split) Modifier.align(Alignment.BottomEnd).offset { IntOffset(0, lift(h).roundToInt()) }
+                    .padding(end = KagomSpace.s12, bottom = insetBottom + creditHeight)
+                    else Modifier.align(Alignment.TopStart).padding(KagomSpace.s12))
+                    .heightIn(min = 48.dp)
                     .clip(CircleShape).background(KagomColor.Surface.card)
                     .clickable(role = Role.Button, onClick = onLocate).padding(horizontal = KagomSpace.s16),
                 contentAlignment = Alignment.Center,
@@ -831,7 +1021,10 @@ private fun RegionMap(
             }
         }
         Column(
-            Modifier.align(Alignment.BottomEnd).padding(horizontal = KagomSpace.s10, vertical = 6.dp),
+            Modifier.align(Alignment.BottomEnd).offset(ride).padding(bottom = insetBottom)
+                // Split: 지도가 화면 끝까지 차서 출처 글이 땅·이름표 위에 겹친다 → 바다색 바탕을 깐다
+                .then(if (split) Modifier.background(KagomColor.Map.sea.copy(alpha = 0.85f), RoundedCornerShape(topStart = KagomRadius.r12)) else Modifier)
+                .padding(horizontal = KagomSpace.s10, vertical = 6.dp),
             horizontalAlignment = Alignment.End,
         ) {
             if (locationStatus != null) Text(locationStatus, style = KagomType.Caption14, color = KagomColor.Text.secondary)
@@ -844,11 +1037,10 @@ private fun RegionMap(
             style = KagomType.Caption14, color = KagomColor.Text.inverse,
         )
         if (split && !gearP && !moving && selectedPin != null) {
-            val pinOnLowerHalf = pinLocations[selectedPin.landmark.id]?.y?.let { it >= h / 2 } ?: false
-            val position = if (pinOnLowerHalf) Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
-                else Modifier.align(Alignment.BottomCenter).padding(
-                    bottom = with(density) { overlays.first().height.toDp() } + KagomSpace.s4,
-                )
+            // 고른 핀을 가리지 않게 핀의 반대쪽에 띄운다: 머리줄 아래 또는 출처 글 위
+            val pinOnLowerHalf = pinLocations[selectedPin.landmark.id]?.y?.let { it >= (topPx + h - bottomPx) / 2 } ?: false
+            val position = if (pinOnLowerHalf) Modifier.align(Alignment.TopCenter).offset { IntOffset(0, lift(h).roundToInt()) }.padding(top = insetTop + 8.dp)
+                else Modifier.align(Alignment.BottomCenter).offset(ride).padding(bottom = insetBottom + creditHeight + KagomSpace.s4)
             Text("기어 P에서 핀 상세를 볼 수 있어요",
                 position.background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
                     .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -867,15 +1059,17 @@ private fun RegionPanel(
     onRegion: (String) -> Unit,
     modifier: Modifier,
 ) {
-    val shape = RoundedCornerShape(if (split) KagomRadius.r20 else KagomRadius.r24)
+    val shape = RoundedCornerShape(KagomRadius.r24)
     val sorted = remember(regions) {
         regions.sortedWith(compareByDescending<RegionProgress> { it.visited }.thenByDescending { it.landmarks.size }.thenBy { it.region.name })
     }
     LazyColumn(
-        modifier.clip(shape).background(KagomColor.Surface.card).padding(if (split) KagomSpace.s20 else KagomSpace.s24),
+        // Split: 시트 안에 들어간다. 카드 바탕과 제목은 시트가 그린다
+        if (split) modifier.padding(horizontal = KagomSpace.s20) else modifier.clip(shape).background(KagomColor.Surface.card).padding(KagomSpace.s24),
+        contentPadding = PaddingValues(bottom = if (split) KagomSpace.s16 else 0.dp),
         verticalArrangement = Arrangement.spacedBy(if (split) 2.dp else KagomSpace.s4),
     ) {
-        item {
+        if (!split) item {
             Text(title, style = KagomType.Heading20, color = KagomColor.Text.primary)
         }
         item { Text(hint, style = KagomType.Caption14, color = KagomColor.Text.secondary) }
@@ -917,13 +1111,15 @@ private fun LandmarkOverviewPanel(
     // 지도 위에서 아래 순으로 고정해서, 방문 상태와 선택이 바뀌어도 같은 자리에서 찾을 수 있게 한다.
     val groups = remember(registered) { registered.sortedByDescending { it.region.labelLat } }
     val unregistered = remember(empty) { empty.sortedBy { it.region.name } }
-    val shape = RoundedCornerShape(if (split) KagomRadius.r20 else KagomRadius.r24)
+    val shape = RoundedCornerShape(KagomRadius.r24)
     LazyColumn(
-        modifier.clip(shape).background(KagomColor.Surface.card).padding(if (split) KagomSpace.s20 else KagomSpace.s24),
+        // Split: 시트 안에 들어간다. 카드 바탕과 제목은 시트가 그린다
+        if (split) modifier.padding(horizontal = KagomSpace.s20) else modifier.clip(shape).background(KagomColor.Surface.card).padding(KagomSpace.s24),
         state = listState,
+        contentPadding = PaddingValues(bottom = if (split) KagomSpace.s16 else 0.dp),
         verticalArrangement = Arrangement.spacedBy(KagomSpace.s12),
     ) {
-        item {
+        if (!split) item {
             Text("$cityName 랜드마크", style = KagomType.Heading22, color = KagomColor.Text.primary)
         }
         if (groups.isEmpty()) {

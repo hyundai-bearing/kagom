@@ -140,12 +140,15 @@ object MapZoom {
     const val STEP = 3f
     const val MAX_LEVEL = 2
 
-    /** 0단계: [b]가 화면([w]×[h], 여백 [pad] px)에 꼭 들어가게 */
-    fun fit(b: GeoBounds, w: Float, h: Float, pad: Float): MapCamera {
+    /**
+     * 0단계: [b]가 화면([w]×[h], 여백 [pad] px)에 꼭 들어가게.
+     * [top]·[bottom] = 지도 위에 얹힌 것(Split의 머리줄, 접힌 시트)이 가리는 높이 px. 그만큼을 뺀 자리의 가운데에 맞춘다
+     */
+    fun fit(b: GeoBounds, w: Float, h: Float, pad: Float, top: Float = 0f, bottom: Float = 0f): MapCamera {
         val x0 = MapProjection.x(b.west); val x1 = MapProjection.x(b.east)
         val y0 = MapProjection.y(b.north); val y1 = MapProjection.y(b.south)
-        val s = min((w - 2 * pad) / (x1 - x0), (h - 2 * pad) / (y1 - y0))
-        return MapCamera((x0 + x1) / 2, (y0 + y1) / 2, s)
+        val s = min((w - 2 * pad) / (x1 - x0), (h - top - bottom - 2 * pad) / (y1 - y0))
+        return MapCamera((x0 + x1) / 2, (y0 + y1) / 2 + (bottom - top) / 2 / s, s)
     }
 
     /**
