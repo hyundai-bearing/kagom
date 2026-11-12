@@ -48,6 +48,7 @@ import com.example.roro.core.Quest
 import com.example.roro.core.Severity
 import com.example.roro.data.GeoPoint
 import com.example.roro.ui.components.Chip
+import com.example.roro.ui.components.CloseGlyph
 import com.example.roro.ui.components.ItemThumb
 import com.example.roro.ui.components.IviButton
 import com.example.roro.ui.components.IviButtonSize
@@ -222,21 +223,31 @@ internal fun LandmarkDetail(
             listOfNotNull("아직 가보지 않은 곳", landmark.areaName, km?.let { "직선거리 약 ${it.roundToInt()} km" }).joinToString(" · ")
         }
     }
-    val shape = RoundedCornerShape(if (split) KagomRadius.r20 else KagomRadius.r24)
+    val shape = RoundedCornerShape(KagomRadius.r24)
     Column(
-        modifier.clip(shape).background(KagomColor.Surface.card).padding(if (split) KagomSpace.s16 else KagomSpace.s24),
+        // Split: 지도 시트 안에 들어간다. 카드 바탕과 위 여백(손잡이)은 시트가 그린다
+        (if (split) modifier.padding(start = KagomSpace.s16, end = KagomSpace.s16, bottom = KagomSpace.s16)
+            else modifier.clip(shape).background(KagomColor.Surface.card).padding(KagomSpace.s24)),
         verticalArrangement = Arrangement.spacedBy(KagomSpace.s12),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Image(
-                painterResource(if (split) R.drawable.map_back_split else R.drawable.map_back),
+            if (!split) Image(
+                painterResource(R.drawable.map_back),
                 contentDescription = "랜드마크 목록으로 돌아가기",
                 Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack),
             )
             Text(title, Modifier.weight(1f), style = KagomType.Title28, color = KagomColor.Text.primary)
+            // Split: 지도 머리줄의 화살표(상위 지도)와 나란히 있으면 헷갈려서, 상세는 오른쪽의 닫기(×)로 닫는다
+            if (split) Box(
+                Modifier.size(48.dp).clip(CircleShape).background(KagomColor.Surface.subtle)
+                    .clickable(role = Role.Button, onClickLabel = "랜드마크 상세 닫기", onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                CloseGlyph(Modifier.size(20.dp), KagomColor.Text.primary)
+            }
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             val sceneSize = if (split) {
