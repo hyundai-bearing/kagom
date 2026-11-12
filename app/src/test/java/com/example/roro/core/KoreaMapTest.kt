@@ -53,6 +53,18 @@ class KoreaMapTest {
     }
 
     @Test
+    fun `위아래가 가려지면 남은 자리에 꼭 맞추고 그 가운데에 둔다`() {
+        val b = GeoBounds(126f, 36f, 127f, 37f)
+        // 높이 900에서 위 100(머리줄), 아래 200(접힌 시트)이 가려진다 → 보이는 자리는 100..700
+        val camera = MapZoom.fit(b, 2000f, 900f, 0f, top = 100f, bottom = 200f)
+        assertEquals(100f, camera.toScreenY(MapProjection.y(37f), 900f), 1e-2f)
+        assertEquals(700f, camera.toScreenY(MapProjection.y(36f), 900f), 1e-2f)
+        assertEquals(1000f, camera.toScreenX(MapProjection.x(126.5f), 2000f), 1e-2f)
+        // 가림이 없으면 전과 같다
+        assertEquals(MapZoom.fit(b, 2000f, 900f, 0f), MapZoom.fit(b, 2000f, 900f, 0f, top = 0f, bottom = 0f))
+    }
+
+    @Test
     fun `화면 좌표와 평면 좌표는 서로 되돌아온다`() {
         val cam = MapCamera(100f, -37f, 1234f)
         val x = cam.toPlaneX(321f, 800f); val y = cam.toPlaneY(123f, 600f)
