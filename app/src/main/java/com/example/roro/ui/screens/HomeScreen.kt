@@ -62,6 +62,9 @@ fun HomeScreen(
     data: AppData,
     status: VehicleStatus,
     gearP: Boolean,
+    /** 시연 패널에서 고른 캐릭터 동작 (TouchAct.key). 틀고 나면 [onDemoActShown] */
+    demoAct: String? = null,
+    onDemoActShown: () -> Unit = {},
     onOpenSheet: () -> Unit,
 ) {
     val palette = KagomSkinPalette.of(profile.skin)
@@ -76,6 +79,8 @@ fun HomeScreen(
             onTouch = if (gearP) ({}) else null,
             turnable = gearP && status.expression == Expression.IDLE,
             alive = gearP,
+            demoAct = demoAct,
+            onDemoActShown = onDemoActShown,
         )
     }
     val split = LocalLayoutMode.current == LayoutMode.SPLIT

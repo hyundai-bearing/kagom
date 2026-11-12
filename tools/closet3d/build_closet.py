@@ -19,11 +19,13 @@ base·item은 돌려보기 카메라의 (0단, HOME_YAW) 시점이라 홈에서 
   blender -b --factory-startup -P tools/closet3d/build_closet.py -- \
       --glb <절대경로>/tools/closet3d/source/pebble_bear.glb --skins <절대경로>/tools/closet3d/source/skins \
       --font <절대경로>/app/src/main/res/font/asta_sans.ttf \
-      --out <절대경로>/app/src/main/assets/kagom [--what all|base|items|thumbs|turn|motion|preview|motion_preview|clipcheck] \
+      --out <절대경로>/app/src/main/assets/kagom [--what all|base|items|thumbs|turn|motion|preview|motion_preview|live|clipcheck] \
       [--rows 0,1,2] [--codes P01,P02] [--acts wave,cheer,stomp] [--preview ITM-H-01,ITM-T-02,ITM-B-01]
 
   --what motion          터치 반응 동작(MOTIONS). 오래 걸리니 --acts·--codes로 나눠 동시에 돌리고, 멈추면 --skip-existing
-  --what motion_preview  동작을 곰+옷 진짜 3D로 몇 장씩 찍어 <out>/motion_preview/에 저장 (확인용, 앱에 넣지 않는다)
+  --what motion_preview  동작을 곰+옷 진짜 3D로 두 프레임에 한 장씩 찍어 <out>/motion_preview/에 저장 (확인용, 앱에 넣지 않는다)
+  --what live            열어 둔 Blender 안에서 돌릴 때 (렌더 없음): 장면을 만들고 동작을 타임라인에 키로 구워 재생해 볼 수 있게 한다.
+                         Blender의 파이썬에서 sys.argv를 위 인자로 채운 뒤 이 파일을 exec 한다 (MCP 애드온의 execute_code 등)
 
   --what clipcheck  옷이 몸을 뚫는지 점검: 아이템 정점이 몸 안에 들어간 양을 출력하고(CLIP ...),
                     진짜 3D(곰+옷 함께) / 앱식 합성 / 차이를 8방향으로 나란히 clip_<키>.png에 저장 (--rows로 고도 단 선택)
@@ -67,15 +69,18 @@ TURN_N = 48              # 7.5° 간격. 24(15°)에서 늘렸다: 예전 i번 �
 TURN_ELEV = [math.degrees(math.atan(0.16)), 25.0, 40.0]
 HOME_YAW = 2             # 홈·보상의 정지 화면 = 0단 2번 프레임 (곰 왼쪽으로 15°). 앱 KagomRenders.HOME_YAW와 같아야 한다
 
-# 터치 반응 (홈, 기어 P + 대기 표정): 이름 → (glb 동작, 없으면 이 스크립트가 만든 동작; 프레임 수 @24 fps).
+# 터치 반응 (홈, 기어 P + 대기 표정): 이름 → 프레임 수 @24 fps. 자세는 pose_wave·pose_cheer·pose_stomp가 뼈를 직접 움직여 만든다
+# (glb에 든 wave·happy 동작은 팔만 움직이고 움츠림·착지가 없어 쓰지 않는다).
 # 첫·끝 프레임은 기본 자세라 앱에서 기본 렌더와 이어진다. 이름은 앱 TouchAct와 같아야 한다
 # 동작 프레임 크기: 팔을 벌리거나 뛰어오르면 돌려보기 화면(480×754) 밖으로 나가서, 같은 카메라·같은 픽셀 크기로
 # 좌우 80 px, 위 76 px를 넓혀 찍는다 (곰 위치는 돌려보기 프레임과 같다. 앱 KagomRenders.MOTION_* 와 같아야 한다)
 MW, MH = 640, 830
 MOTIONS = {
-    "wave": ("wave", 38),     # 왼팔 들어 손 흔들기 + 고개 갸웃
-    "cheer": ("happy", 22),   # 두 팔 만세 + 깡충 + 귀 쫑긋
-    "stomp": (None, 28),      # 발 동동: 왼발·오른발 번갈아 들고 몸·고개·팔이 같이 흔들린다
+    "wave": 42,     # 왼팔을 돌려 올려 손 흔들기 + 고개 갸웃
+    "cheer": 30,    # 움츠렸다가 두 팔 만세 + 깡충 + 착지
+    "stomp": 36,    # 발 동동: 왼발·오른발을 번갈아 여섯 번 구른다
+    "bow": 34,      # 꾸벅 인사: 허리를 숙였다 일어선다
+    "spin": 32,     # 빙글 돌기: 제자리에서 한 바퀴
 }
 
 # 스킨: 텍스처, 금속성, 거칠기, 귀 안쪽, 귀 테두리 (spec 3장 + 이전 BearSkin.kt)
@@ -105,8 +110,18 @@ def lin(hexstr, a=1.0):
     return (ch(0), ch(2), ch(4), a)
 
 
+def node(tree, kind):
+    """노드를 종류로 찾는다. 이름("Principled BSDF")으로 찾으면 한국어 UI의 Blender에서는 새 노드 이름이 번역돼 있어 못 찾는다"""
+    return next(n for n in tree.nodes if n.type == kind)
+
+
 def setup():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+    if A.what == "live":
+        # 열어 둔 Blender 안에서 돌 때: 공장 초기화는 애드온(MCP 연결 포함)까지 내리므로 장면에 있는 것만 지운다
+        for o in list(bpy.data.objects):
+            bpy.data.objects.remove(o)
+    else:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     try:
@@ -144,7 +159,7 @@ def setup():
     w = bpy.data.worlds.new("w")
     sc.world = w
     w.use_nodes = True
-    bg = w.node_tree.nodes["Background"]
+    bg = node(w.node_tree, "BACKGROUND")
     bg.inputs[0].default_value = (0.95, 0.96, 0.98, 1)
     bg.inputs[1].default_value = 0.55
 
@@ -169,7 +184,7 @@ def setup():
 def mat(name, hexcol, rough=0.6, metal=0.0, coat=0.0, emit=0.0):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
-    p = m.node_tree.nodes["Principled BSDF"]
+    p = node(m.node_tree, "BSDF_PRINCIPLED")
     p.inputs["Base Color"].default_value = lin(hexcol)
     p.inputs["Roughness"].default_value = rough
     p.inputs["Metallic"].default_value = metal
@@ -185,7 +200,7 @@ def band_mat(name, base, bands, rough=0.55):
     """월드 Z 높이로 가로 줄무늬를 넣는 재질. bands = [(z0, z1, hex), ...]"""
     m = mat(name, base, rough)
     nt = m.node_tree
-    p = nt.nodes["Principled BSDF"]
+    p = node(nt, "BSDF_PRINCIPLED")
     geo = nt.nodes.new("ShaderNodeNewGeometry")
     sep = nt.nodes.new("ShaderNodeSeparateXYZ")
     ramp = nt.nodes.new("ShaderNodeValToRGB")
@@ -676,7 +691,7 @@ def build_expressions():
     oil2_m = mat("fx_oil2", "5A4232", 0.3, coat=0.6)
     z_m = mat("fx_z", "6F7DB8", 0.4)
     blush_m = mat("fx_blush", "FF6B6B", 0.6)
-    p = blush_m.node_tree.nodes["Principled BSDF"]
+    p = node(blush_m.node_tree, "BSDF_PRINCIPLED")
     p.inputs["Alpha"].default_value = 0.32
     tape_m = mat("fx_tape", "F2C59B", 0.55)
     pad_m = mat("fx_pad", "FFF3E4", 0.6)
@@ -805,12 +820,12 @@ def set_skin(code):
     for n in m.node_tree.nodes:
         if n.type == "TEX_IMAGE":
             n.image = bpy.data.images.load(os.path.join(A.skins, f"{tex}.png"), check_existing=True)
-    p = m.node_tree.nodes["Principled BSDF"]
+    p = node(m.node_tree, "BSDF_PRINCIPLED")
     p.inputs["Metallic"].default_value = metal
     p.inputs["Roughness"].default_value = rough
     p.inputs["Coat Weight"].default_value = 0.5 if code == "P07" else 0.0
-    bpy.data.materials["ear_inner"].node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = lin(ear_in)
-    bpy.data.materials["ear_back"].node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = lin(ear_back)
+    node(bpy.data.materials["ear_inner"].node_tree, "BSDF_PRINCIPLED").inputs["Base Color"].default_value = lin(ear_in)
+    node(bpy.data.materials["ear_back"].node_tree, "BSDF_PRINCIPLED").inputs["Base Color"].default_value = lin(ear_back)
 
 
 def show_only(objs_visible, bear_mode):
@@ -1052,10 +1067,15 @@ def world_rot(pb, axis, deg):
     return (r.inverted() @ Quaternion(Vector(axis), math.radians(deg)).to_matrix() @ r).to_quaternion()
 
 
+def detach_actions():
+    """glb에서 딸려 온 동작(idle·blink …)을 뼈대와 눈·입에서 떼어 낸다. 붙어 있으면 프레임을 옮길 때 직접 잡은 자세를 덮어쓴다"""
+    bpy.data.objects["bear_rig"].animation_data_clear()
+    for name in ("eyes", "mouth"):
+        bpy.data.objects[name].data.shape_keys.animation_data_clear()
+
+
 def pose_rest():
     rig = bpy.data.objects["bear_rig"]
-    if rig.animation_data:
-        rig.animation_data.action = None
     for pb in rig.pose.bones:
         pb.rotation_quaternion = (1, 0, 0, 0)
         pb.location = (0, 0, 0)
@@ -1069,42 +1089,171 @@ def smooth(t):
     return t * t * (3 - 2 * t)
 
 
+def key(f, keys):
+    """키 [(프레임, 값), ...] 사이를 천천히 출발해 천천히 멈추게 이은 값 (키 밖은 양 끝 값)"""
+    if f <= keys[0][0]:
+        return keys[0][1]
+    for (f0, v0), (f1, v1) in zip(keys, keys[1:]):
+        if f <= f1:
+            return v0 + (v1 - v0) * smooth((f - f0) / (f1 - f0))
+    return keys[-1][1]
+
+
+def turn(name, x=0.0, y=0.0, z=0.0):
+    """뼈를 월드 X → Y → Z 축 순서로 돌린다 (도). +X = 곰의 왼쪽, 정면 = -Y.
+    위를 향한 뼈(몸통·머리) 기준으로 x+ = 앞으로 숙임, y+ = 곰의 왼쪽으로 기울임"""
+    pb = bpy.data.objects["bear_rig"].pose.bones[name]
+    pb.rotation_quaternion = world_rot(pb, (0, 0, 1), z) @ world_rot(pb, (0, 1, 0), y) @ world_rot(pb, (1, 0, 0), x)
+
+
+def move(name, x=0.0, y=0.0, z=0.0):
+    """뼈를 월드 방향으로 옮긴다 (부모가 돌아가 있으면 부모 기준 방향)"""
+    pb = bpy.data.objects["bear_rig"].pose.bones[name]
+    pb.location = pb.bone.matrix_local.to_3x3().inverted() @ Vector((x, y, z))
+
+
+def arm(side, up=0.0, fwd=0.0):
+    """팔 (side: "L" | "R"). up = 옆으로 들어 올린 각(음수 = 몸에 붙임), fwd = 앞으로 내민 각. 팔은 뼈가 하나라 팔꿈치는 없다"""
+    turn("arm_" + side, x=-fwd, y=-up if side == "L" else up)
+
+
+def ears(left=0.0, right=0.0):
+    """귀가 바깥·아래로 눕는 각 (음수 = 쫑긋 세움)"""
+    turn("ear_L", y=left)
+    turn("ear_R", y=-right)
+
+
+def body(z=0.0, x=0.0, stretch=1.0):
+    """몸통 높이(z)·좌우(x) 이동과 위아래로 늘이기. 발은 바닥에 둔다: 몸이 내려앉거나 옆으로 실리면 다리를 그만큼 되돌린다
+    (다리가 root의 자식이라 그냥 두면 발이 바닥을 뚫거나 미끄러진다). 떠 있을 때(z > 0)는 다리가 몸을 따라간다.
+    돌려주는 값 = 다리에 더할 되돌림 (든 발은 여기에 더해서 옮긴다)"""
+    move("root", x=x, z=z)
+    pb = bpy.data.objects["bear_rig"].pose.bones["spine"]
+    pb.scale = (stretch ** -0.5, stretch, stretch ** -0.5)       # 부피가 같게 (뼈의 Y = 위)
+    back = (-x, 0.0, -min(z, 0.0))
+    for side in "LR":
+        move("leg_" + side, *back)
+    return back
+
+
+def pose_wave(f, n):
+    """손 흔들기: 살짝 움츠렸다가 왼팔을 앞으로 돌려 올리고(조금 지나쳤다 자리 잡기) 세 번 흔든 뒤 내린다.
+    몸은 반대쪽으로 기대고 고개는 손 쪽으로 갸웃, 귀는 고개보다 늦게 따라온다 (예전에는 팔만 차단기처럼 올라갔다)"""
+    def swing(t):       # 흔들기: 7프레임에 한 번, 세 번
+        return 22 * math.sin(2 * math.pi * (t - 12) / 7) * smooth((t - 12) / 2) * smooth((33 - t) / 2) if 12 < t < 33 else 0.0
+
+    def tilt(t):        # 고개 갸웃 (+ = 손 쪽)
+        return key(t, [(0, 0), (4, -1.5), (12, 9), (33, 9), (n - 1, 0)]) + 2.5 * swing(t - 2) / 22
+
+    body(z=key(f, [(0, 0), (3, -0.014), (9, 0.008), (13, 0), (33, 0), (36, -0.006), (n - 1, 0)]))
+    arm("L", up=key(f, [(0, 0), (2, -4), (9, 108), (12, 98), (33, 98), (39, -3), (n - 1, 0)]) + swing(f),
+        fwd=key(f, [(0, 0), (6, 26), (12, 12), (33, 12), (37, 18), (n - 1, 0)]))
+    arm("R", up=key(f, [(0, 0), (3, -3), (11, 8), (33, 8), (n - 1, 0)]))
+    turn("spine", y=key(f, [(0, 0), (3, 1.5), (11, -4), (33, -4), (n - 1, 0)]) - 1.5 * swing(f) / 22)
+    turn("head", x=key(f, [(0, 0), (3, 4), (10, -3), (15, 0)]), y=tilt(f))
+    lag = tilt(f - 2) - tilt(f)
+    turn("ear_L", y=0.8 * lag)
+    turn("ear_R", y=0.8 * lag)
+    return {}
+
+
+def pose_cheer(f, n):
+    """만세: 움츠렸다가(팔은 뒤로) 뛰어오르며 두 팔을 번쩍 들고, 내려앉으며 몸이 눌렸다 되돌아온다. 귀·팔은 몸보다 늦게 따라온다
+    (예전에는 팔을 옆으로만 벌려 T자로 보였고, 움츠림·착지 없이 떴다 내려왔다)"""
+    if f <= 6:
+        h = key(f, [(0, 0), (5, -0.05)])
+    elif f <= 7.5:
+        h = -0.05 * (1 - ((f - 6) / 1.5) ** 2)          # 점점 빨라지며 펴서 그 속도로 뜬다
+    elif f <= 16:
+        s = (f - 7.5) / 8.5
+        h = 0.12 * 4 * s * (1 - s)                        # 떠 있는 동안은 포물선
+    elif f <= 18.5:
+        h = -0.04 * (1 - (1 - (f - 16) / 2.5) ** 2)     # 닿는 속도에서 줄어들며 눌린다
+    else:
+        h = key(f, [(18.5, -0.04), (22.5, 0.008), (27, 0)])
+    air = smooth(max(h, 0.0) / 0.06)
+    body(z=h, stretch=key(f, [(0, 1), (5, 0.95), (8, 1.05), (12, 1.0), (15, 1.03), (18, 0.94), (22, 1.02), (26, 1)]))
+    for side, sign in (("L", 1), ("R", -1)):
+        pb = bpy.data.objects["bear_rig"].pose.bones["leg_" + side]
+        pb.rotation_quaternion = world_rot(pb, (0, 1, 0), -9 * sign * air) @ world_rot(pb, (1, 0, 0), -12 * air)
+        # 팔은 위로 곧게 들면 큰 머리 뒤에 숨는다 → 비스듬히 위·앞으로 들어 머리 옆으로 보이게
+        arm(side, up=key(f, [(0, 0), (5, -10), (6, -10), (10, 112), (13, 102), (16, 98), (19, 55), (24, -5), (28, 0)]),
+            fwd=key(f, [(0, 0), (5, -22), (9, 30), (16, 26), (20, 10), (24, 0)]))
+    turn("head", x=key(f, [(0, 0), (5, 9), (9, -11), (14, -6), (18, 9), (23, -2), (27, 0)]))
+    flop = key(f, [(0, 0), (5, 6), (8, 20), (12, -10), (16, -4), (18, 22), (21, -8), (24, 4), (27, 0)])
+    ears(flop, flop)
+    return {"mouth:open": 1.0 if 9 <= f <= 18 else 0.0}       # 벌린 입은 중간 값이 Y자로 보여서 한 프레임에 바꾼다
+
+
+def pose_stomp(f, n):
+    """발 동동: 신난 자세로 왼발·오른발을 번갈아 여섯 번 구른다. 발은 천천히 들었다가 탁 내리고, 닿을 때마다 몸이 살짝 내려앉는다.
+    몸은 디딘 발 쪽으로 실리고 팔은 엇갈려 흔든다 (예전에는 든 다리를 몸 안으로 당겨 올려 엉덩이가 뭉개졌고, 네 걸음이 똑같았다)"""
+    first, per, steps = 4, 4, 6
+    last = first + per * steps
+    amp = smooth(f / first) * smooth((n - 1 - f) / (n - 1 - last))     # 신난 자세로 들어가고 나오기
+    if first <= f < last:
+        k, u = divmod((f - first) / per, 1.0)
+        side = 1 if int(k) % 2 == 0 else -1          # 1 = 왼발(+X)을 든다
+        lift = smooth(u / 0.55) if u < 0.55 else 1 - ((u - 0.55) / 0.45) ** 2
+    else:
+        side, lift = 1, 0.0
+    since = (f - first) % per if first + per <= f < last else f - last     # 마지막으로 발이 닿은 뒤 지난 프레임
+    hit = max(0.0, 1 - since / 2.5) ** 2 if since >= 0 and f >= first + per else 0.0
+    back = body(z=-0.008 * amp + 0.008 * lift - 0.016 * hit, x=-0.02 * side * lift)
+    up = "leg_L" if side == 1 else "leg_R"
+    move(up, back[0] + 0.012 * side * lift, 0.0, back[2] + 0.045 * lift)
+    turn(up, x=-48 * lift)
+    turn("spine", y=-4 * side * lift)
+    turn("head", x=5 * lift - 3 * hit, y=3 * side * lift)
+    for name, sign in (("L", 1), ("R", -1)):
+        same = sign == side                          # 든 발 쪽 팔은 내리고 반대쪽 팔은 올린다
+        arm(name, up=22 * amp + (-12 if same else 10) * lift, fwd=30 * amp + (-14 if same else 10) * lift)
+    flop = 10 * lift + 14 * hit
+    ears(flop, flop)
+    return {}
+
+
+def pose_bow(f, n):
+    """꾸벅 인사: 살짝 젖혔다가 허리를 숙이고(고개는 조금 늦게 더 숙인다) 잠깐 멈춘 뒤, 일어서며 조금 지나쳤다 돌아온다. 팔은 뒤로 빠진다"""
+    body(z=key(f, [(0, 0), (12, -0.015), (20, -0.015), (26, 0.004), (n - 3, 0)]))
+    turn("spine", x=key(f, [(0, 0), (3, -4), (12, 17), (15, 15), (20, 15), (27, -3), (n - 3, 0)]))
+    turn("head", x=key(f, [(0, 0), (3, -3), (13, 10), (20, 10), (26, -4), (n - 3, 0)]))
+    for side in "LR":
+        arm(side, up=key(f, [(0, 0), (12, 6), (20, 6), (n - 4, 0)]), fwd=key(f, [(0, 0), (12, -18), (20, -18), (28, 4), (n - 2, 0)]))
+    flop = key(f, [(0, 0), (10, -6), (14, 12), (18, 4), (24, -10), (28, 4), (n - 2, 0)])
+    ears(flop, flop)
+    return {}
+
+
+def pose_spin(f, n):
+    """빙글 돌기: 반대로 살짝 감았다가(움츠림) 까치발로 한 바퀴 돌고, 조금 지나쳤다 정면에 선다. 도는 동안 팔과 귀가 바깥으로 벌어진다"""
+    if f <= 5:
+        angle = key(f, [(0, 0), (5, -18)])
+    elif f <= 24:
+        angle = -18 + 390 * smooth((f - 5) / 19)
+    else:
+        angle = key(f, [(24, 372), (28, 360)])
+    body(z=key(f, [(0, 0), (5, -0.035), (9, 0.02), (20, 0.02), (24, -0.02), (28, 0)]))
+    turn("root", z=angle)
+    out = key(f, [(0, 0), (5, -6), (10, 55), (20, 55), (25, 10), (29, 0)])
+    for side in "LR":
+        arm(side, up=out)
+    turn("head", x=key(f, [(0, 0), (5, 6), (10, -4), (22, -4), (25, 6), (29, 0)]))
+    flop = key(f, [(0, 0), (5, -4), (11, 16), (20, 16), (25, -8), (28, 3), (30, 0)])
+    ears(flop, flop)
+    return {}
+
+
+POSES = {"wave": pose_wave, "cheer": pose_cheer, "stomp": pose_stomp, "bow": pose_bow, "spin": pose_spin}
+
+
 def pose_motion(act, nn, n):
     """[act]의 nn번째 프레임 자세 (0번·끝 = 기본 자세). 표정은 대기 + 동작 중 웃는 눈"""
     pose_rest()
-    rig = bpy.data.objects["bear_rig"]
-    src, _ = MOTIONS[act]
-    t = nn / (n - 1)
-    env = smooth(t / 0.2) * smooth((1 - t) / 0.2)     # 처음·끝은 기본 자세로
-    if src:
-        action = bpy.data.actions[src]
-        rig.animation_data.action = action
-        if hasattr(rig.animation_data, "action_slot") and rig.animation_data.action_slot is None and len(action.slots):
-            rig.animation_data.action_slot = action.slots[0]
-        bpy.context.scene.frame_set(1 + nn)
-        keys = {"eyes:happy": env, "mouth:open": 0.5 * env if act == "cheer" else 0.0}
-    else:
-        # 발 동동: 네 걸음(왼·오·왼·오). 든 발은 앞으로 살짝 들리고, 몸은 디딘 발 쪽으로 기울고, 팔은 반대로 흔든다
-        pb = rig.pose.bones
-        k, u = divmod(t * 4, 1.0)
-        k = min(int(k), 3)
-        lift = math.sin(math.pi * u)
-        side = 1 if k % 2 == 0 else -1          # 1 = 왼발(+X) 들기
-        leg = pb["leg_L" if side == 1 else "leg_R"]
-        leg.location = (0, -0.07 * lift, 0)       # 뼈가 아래를 향하므로 -Y = 위로
-        leg.rotation_quaternion = world_rot(leg, (1, 0, 0), -28 * lift)
-        pb["root"].location = (0, 0.018 * lift, 0)
-        pb["spine"].rotation_quaternion = world_rot(pb["spine"], (0, 1, 0), -8 * side * lift)
-        pb["head"].rotation_quaternion = world_rot(pb["head"], (0, 1, 0), 7 * side * lift) @ world_rot(pb["head"], (1, 0, 0), 6 * lift)
-        swing = {"arm_L": -26 if side == -1 else 14, "arm_R": -26 if side == 1 else 14}
-        for name, a in swing.items():
-            pb[name].rotation_quaternion = world_rot(pb[name], (1, 0, 0), a * lift)
-        for name in ("ear_L", "ear_R"):
-            pb[name].rotation_quaternion = world_rot(pb[name], (0, 1, 0), -10 * side * lift)
-        keys = {"eyes:happy": env}
+    keys = POSES[act](nn, n)
+    keys["eyes:happy"] = smooth(nn / 5) * smooth((n - 1 - nn) / 5)
     set_expression(keys)
     bpy.context.view_layer.update()
-
 
 def motion_view(sc, rig):
     """돌려보기 (0단, HOME_YAW) 카메라 그대로, 화면만 MW×MH로 넓힌다 (위로 MH-TH, 좌우로 (MW-TW)/2).
@@ -1127,7 +1276,7 @@ def render_motion(sc, rig, items, codes, acts):
     sc.cycles.samples = A.turn_samples
     sc.render.image_settings.quality = 80
     for act in acts:
-        _, n = MOTIONS[act]
+        n = MOTIONS[act]
         out = os.path.join(A.out, "motion", act)
         os.makedirs(out, exist_ok=True)
         for nn in range(n):
@@ -1143,7 +1292,7 @@ def render_motion(sc, rig, items, codes, acts):
 
 
 def motion_preview(sc, rig, items, acts):
-    """확인용: 곰+옷을 진짜 3D로 함께 (앱 합성이 아님) 동작마다 7장. 0번 앞에 돌려보기 프레임(rest_turn)도 찍어 위치 비교"""
+    """확인용: 곰+옷을 진짜 3D로 함께 (앱 합성이 아님) 동작마다 두 프레임에 한 장. 0번 앞에 돌려보기 프레임(rest_turn)도 찍어 위치 비교"""
     out = os.path.join(A.out, "motion_preview")
     os.makedirs(out, exist_ok=True)
     rig.view(0, HOME_YAW, TW, TH)
@@ -1158,8 +1307,8 @@ def motion_preview(sc, rig, items, acts):
     bpy.ops.render.render(write_still=True)
     sel = [o for k in A.preview.split(",") for o in items.get(k, [])]
     for act in acts:
-        _, n = MOTIONS[act]
-        for nn in sorted({round(j * (n - 1) / 6) for j in range(7)}):
+        n = MOTIONS[act]
+        for nn in sorted(set(range(0, n, 2)) | {n - 1}):
             pose_motion(act, nn, n)
             show_only(sel, "normal")
             sc.render.filepath = os.path.join(out, f"{act}_{nn:02d}.png")
@@ -1167,6 +1316,40 @@ def motion_preview(sc, rig, items, acts):
             print("WROTE", sc.render.filepath)
     pose_rest()
     unmotion_view(rig)
+
+
+def bake_live(sc, rig, items, acts):
+    """열어 둔 Blender에서 동작을 돌려 보며 다듬을 때 (--what live): 동작을 차례로 타임라인에 키로 굽고(동작마다 마커)
+    카메라를 동작 화면에 맞춘다. 렌더는 하지 않는다. 스페이스로 재생해서 보고, 자세 함수를 고친 뒤 다시 구우면 된다"""
+    arm_obj = bpy.data.objects["bear_rig"]
+    shapes = [bpy.data.objects[o].data.shape_keys for o in ("eyes", "mouth")]
+    detach_actions()
+    for m in list(sc.timeline_markers):
+        sc.timeline_markers.remove(m)
+    start = 1
+    for act in acts:
+        n = MOTIONS[act]
+        sc.timeline_markers.new(act, frame=start)
+        for nn in range(n):
+            pose_motion(act, nn, n)
+            for pb in arm_obj.pose.bones:
+                for path in ("location", "rotation_quaternion", "scale"):
+                    pb.keyframe_insert(path, frame=start + nn)
+            for sk in shapes:
+                for kb in sk.key_blocks[1:]:
+                    kb.keyframe_insert("value", frame=start + nn)
+        start += n + 12      # 동작 사이는 기본 자세로 반 초
+    sc.frame_start, sc.frame_end = 1, start - 13
+    sc.render.fps = 24
+    motion_view(sc, rig)
+    set_skin("P03")
+    sel = [o for k in A.preview.split(",") for o in items.get(k, [])]
+    show_only(sel, "normal")
+    for o in sc.objects:     # 화면에서도 렌더에 나올 것만 보이게 (안 입은 옷·표정 소품·메달은 숨긴다)
+        if o.type in ("MESH", "CURVE", "FONT"):
+            o.hide_viewport = o.hide_render
+    sc.frame_set(1)
+    print("LIVE", {m.name: m.frame for m in sc.timeline_markers}, "frames", sc.frame_start, sc.frame_end)
 
 
 def main():
@@ -1194,13 +1377,16 @@ def main():
     codes = [c for c in A.codes.split(",") if c in SKINS] if A.codes else list(SKINS)
 
     what = A.what
-    if what in ("motion", "motion_preview"):
+    if what in ("motion", "motion_preview", "live"):
         # 옷을 뼈대에 붙이는 건 동작 렌더 때만 (다른 렌더는 기본 자세라 결과가 같지만 굳이 바꾸지 않는다)
         # 머리 아이템 = 머리에 고정, 상의 = 몸통만, 하의 = 몸통 + 다리 (팔은 옷 밖에 있으니 옷이 팔을 따라가지 않는다)
         follow = {"H": ({"head"}, "head"), "T": ({"root", "spine"}, "spine"), "B": ({"root", "spine", "leg_L", "leg_R"}, "spine")}
         items = {k: bind_to_rig(objs, *follow[k.split("-")[1]]) for k, objs in items.items()}
         acts = [a for a in A.acts.split(",") if a in MOTIONS] if A.acts else list(MOTIONS)
-        if what == "motion_preview":
+        detach_actions()
+        if what == "live":
+            bake_live(sc, rig, items, acts)
+        elif what == "motion_preview":
             motion_preview(sc, rig, items, acts)
         else:
             render_motion(sc, rig, items, codes, acts)

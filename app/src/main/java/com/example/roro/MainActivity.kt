@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.roro.ui.components.TouchAct
 import com.example.roro.core.Gear
 import com.example.roro.core.Examples
 import com.example.roro.core.OilLevel
@@ -35,6 +36,7 @@ import kotlinx.coroutines.cancel
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_examples true  # Figma 예시 데이터 켜기/끄기
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_new_vehicle true # 새 차에서 이전 카곰 기록 발견 (SCR-00 Carry-over)
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_popup reward  # reward/reveal/landmark:LM-GN-01/level/maintenance/maintenance-ev/maintenance-done/off (저장 안 함)
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_act wave      # 캐릭터 동작 한 번: wave/cheer/stomp/bow/spin (홈, 기어 P + 대기 표정)
  */
 class MainActivity : ComponentActivity() {
 
@@ -72,6 +74,7 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra("demo_popup")?.let { c.demoPopup.value = it.takeIf { name ->
             Examples.popups.any { it.key == name }
         } }
+        intent.getStringExtra("demo_act")?.let { c.demoAct.value = it.takeIf { key -> TouchAct.entries.any { a -> a.key == key } } }
         if (intent.getBooleanExtra("demo_reset", false)) c.demoResetAll()
         intent.getStringExtra("demo_gear")?.let { g -> c.demoSetGear(Gear.entries.firstOrNull { it.name == g.uppercase() }) }
         if (intent.hasExtra("demo_fuel")) intent.getIntExtra("demo_fuel", -1).takeIf { it in 0..100 }?.let { p ->

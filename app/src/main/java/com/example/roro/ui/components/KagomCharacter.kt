@@ -156,13 +156,17 @@ fun wornLayers(head: String?, top: String?, bottom: String?): List<String> = lis
  * 터치 반응 RAND_ACT_1~3: 곰 뼈대로 움직인 3D 동작을 프레임으로 렌더해 둔 것 (tools/closet3d/build_closet.py MOTIONS).
  * 옷도 뼈를 따라 움직이게 렌더해서 착용 레이어를 겹치면 맞는다. 첫·끝 프레임은 기본 자세라 기본 렌더와 이어진다.
  */
-enum class TouchAct(val key: String, val frames: Int) {
-    /** 손 흔들기: 왼팔을 들어 흔들고 고개를 갸웃 (1.6초) */
-    WAVE("wave", 38),
-    /** 만세: 두 팔을 들고 깡충, 귀 쫑긋 (0.9초) */
-    CHEER("cheer", 22),
-    /** 발 동동: 왼발·오른발을 번갈아 들고 몸·고개·팔이 같이 흔들린다 (1.2초) */
-    STOMP("stomp", 28),
+enum class TouchAct(val key: String, val frames: Int, val label: String) {
+    /** 손 흔들기: 살짝 움츠렸다가 왼팔을 돌려 올려 세 번 흔들고 고개를 갸웃 (1.75초) */
+    WAVE("wave", 42, "손 흔들기"),
+    /** 만세: 움츠렸다가 두 팔을 번쩍 들며 깡충 뛰고, 내려앉으며 몸이 눌렸다 돌아온다 (1.25초) */
+    CHEER("cheer", 30, "만세"),
+    /** 발 동동: 왼발·오른발을 번갈아 여섯 번 구르고 몸·고개·팔이 같이 흔들린다 (1.5초) */
+    STOMP("stomp", 36, "발 동동"),
+    /** 꾸벅 인사: 살짝 젖혔다가 허리를 숙이고 잠깐 멈춘 뒤 일어선다 (1.4초) */
+    BOW("bow", 34, "꾸벅 인사"),
+    /** 빙글 돌기: 반대로 살짝 감았다가 제자리에서 한 바퀴 돈다 (1.3초) */
+    SPIN("spin", 32, "빙글 돌기"),
 }
 
 /** 렌더에서 발끝 위치 (돌려보기 카메라 0단 기준, 곰 발바닥 ≈ 높이의 95%). 숨쉬기 기준점 */
@@ -326,6 +330,9 @@ fun KagomCharacter(
     turnable: Boolean = false,
     /** true면 가만히 있을 때도 숨쉬고(대기 표정이면 눈도 깜빡인다). 주행 중에는 끈다 (홈, 기어 P) */
     alive: Boolean = false,
+    /** 시연 패널에서 고른 동작 (TouchAct.key). 3D 동작을 틀 수 있을 때(기어 P + 대기 표정) 그 동작을 바로 한 번 틀고 [onDemoActShown]을 부른다 */
+    demoAct: String? = null,
+    onDemoActShown: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var motionJob by remember { mutableStateOf<Job?>(null) }
@@ -404,10 +411,10 @@ fun KagomCharacter(
     }
 
     /** 대기 표정: 바로 전과 다른 3D 동작을 고른다 (반응 중에 또 누르면 새 반응으로 바로 바꾼다). 이상 상태: 표정 몸짓 */
-    fun react() {
+    fun react(chosen: TouchAct? = null) {
         if (!canAct) { poke++; return }
-        val act = nextAct
-        val ready = head
+        val act = chosen ?: nextAct
+        val ready = head      // 미리 만든 앞부분은 같은 동작일 때만 쓰인다 (playMotion)
         nextAct = TouchAct.entries.filter { it != act }.random()
         motionJob?.cancel()
         motionJob = scope.launch {
@@ -421,6 +428,10 @@ fun KagomCharacter(
         }
     }
     val playing = motionFrame != null
+    LaunchedEffect(demoAct, canAct) {
+        val act = TouchAct.entries.firstOrNull { it.key == demoAct } ?: return@LaunchedEffect
+        if (canAct) { react(act); onDemoActShown() }
+    }
 
     val names = worn.mapNotNull { Items.byId(it)?.name }
     Box(

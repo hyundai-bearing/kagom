@@ -84,6 +84,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
     val toast by c.toast.collectAsState()
     val examples by c.demoExamples.collectAsState()
     val popupPreview by c.demoPopup.collectAsState()
+    val demoAct by c.demoAct.collectAsState()
     val gearP = gear.isPark
 
     var tab by rememberSaveable { mutableStateOf(NavTab.HOME) }
@@ -107,6 +108,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
     // 새 차에서 이전 기록을 찾았으면(SCR-00 Carry-over) 고를 때까지 온보딩처럼 다른 탭으로 못 간다
     val carryOver = profile != null && data.newVehicle
     val select: (NavTab) -> Unit = { if (profile != null && !carryOver) tab = it }
+    LaunchedEffect(demoAct) { if (demoAct != null) select(NavTab.HOME) }      // 시연에서 고른 동작은 홈에서 튼다
 
     val screen: @Composable () -> Unit = {
         // 탭 전환·카곰 생성 직후: 앞 화면이 먼저 옅어지고 다음 화면이 나타난다. 주행 중에는 바로 바꾼다
@@ -126,7 +128,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
             } else if (profile == null || target == null) {
                 OnboardingFlow(onboarding, gearP) { name, answers -> c.createProfile(name, answers) }
             } else when (target) {
-                NavTab.HOME -> HomeScreen(profile, data, status, gearP) { if (gearP) sheetOpen = true }
+                NavTab.HOME -> HomeScreen(profile, data, status, gearP, demoAct, { c.demoAct.value = null }) { if (gearP) sheetOpen = true }
                 NavTab.QUESTS -> QuestsScreen(Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt)
                 NavTab.MAP -> {
                     val location by c.locationSource.current.collectAsState(initial = null)

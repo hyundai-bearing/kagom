@@ -95,6 +95,8 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
     val demoExamples = MutableStateFlow(false)
     /** POP-02~05 시연은 저장소를 건드리지 않는 별도 프리뷰로 연다. */
     val demoPopup = MutableStateFlow<String?>(null)
+    /** 시연 패널 '캐릭터 동작': 고른 터치 반응(TouchAct.key)을 홈에서 한 번 튼다. 틀고 나면 홈이 null로 되돌린다 */
+    val demoAct = MutableStateFlow<String?>(null)
     private var toastJob: Job? = null
 
     private fun showToast(t: DrivingToast) {
