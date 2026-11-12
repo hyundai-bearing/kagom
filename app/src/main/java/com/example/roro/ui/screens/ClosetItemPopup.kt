@@ -122,7 +122,7 @@ private val lockedItemFilter = ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
     0f, 0f, 0f, 1f, 0f,
 )))
 
-private fun popupDescription(item: Item, locked: Boolean, data: AppData): String {
+internal fun popupDescription(item: Item, locked: Boolean, data: AppData): String {
     if (Examples.isExample(item.id)) return "시연용 예시 아이템이에요."
     if (locked) return item.condition.ifBlank { item.guide }
     val landmark = item.sourceId?.let { Landmarks.byId(it) }
