@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -47,6 +49,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -66,7 +69,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -89,9 +94,10 @@ import com.example.roro.core.MapProjection
 import com.example.roro.core.MapRegion
 import com.example.roro.core.MapZoom
 import com.example.roro.core.Severity
+import com.example.roro.core.Visit
 import com.example.roro.data.GeoPoint
 import com.example.roro.data.KoreaMapAsset
-import com.example.roro.ui.components.LandmarkDetailPopup
+import com.example.roro.ui.components.CheckGlyph
 import com.example.roro.ui.components.LandmarkPin
 import com.example.roro.ui.components.PinState
 import com.example.roro.ui.components.StatusBadge
@@ -102,13 +108,18 @@ import com.example.roro.ui.theme.KagomSpace
 import com.example.roro.ui.theme.KagomType
 import com.example.roro.ui.theme.LayoutMode
 import com.example.roro.ui.theme.LocalLayoutMode
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class LandmarkView(val landmark: Landmark, val pin: PinState) {
+private val landmarkDateFormat = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+
+data class LandmarkView(val landmark: Landmark, val pin: PinState, val firstVisitDay: Long?) {
     val visited: Boolean get() = pin != PinState.Locked
+    val firstVisitDate: String? get() = firstVisitDay?.let { LocalDate.ofEpochDay(it).format(landmarkDateFormat) }
 }
 
 /** 목록과 핀 이름표의 상태 글. 해금 중 = 방문은 했지만 보상 팝업(POP-03)이 정차를 기다리는 동안이라 보상은 아직 못 받았다 */
@@ -135,7 +146,9 @@ fun MapScreen(
     views: List<LandmarkView>,
     gearP: Boolean,
     onEquip: (String) -> Unit,
+    onNavigate: (Landmark) -> Unit,
     location: GeoPoint?,
+    detailAvatar: DetailAvatar,
     focusLandmarkId: String? = null,
     onFocusShown: () -> Unit = {},
     avatar: @Composable (Modifier) -> Unit,
@@ -166,15 +179,17 @@ fun MapScreen(
         unitId = null
     }
 
-    fun goBack() {
-        when {
-            pinId != null -> pinId = null
-            unitId != null -> goProvince()
-            else -> goNationwide()
-        }
+    fun closeLandmarkDetail() {
+        pinId = null
     }
 
-    BackHandler(enabled = provinceId != null || pinId != null, onBack = ::goBack)
+    fun goMapBack() {
+        if (unitId != null) goProvince() else goNationwide()
+    }
+
+    BackHandler(enabled = provinceId != null || pinId != null) {
+        if (pinId != null) closeLandmarkDetail() else goMapBack()
+    }
 
     val loaded = result?.getOrNull()
     LaunchedEffect(focusLandmarkId, loaded) {
@@ -211,35 +226,32 @@ fun MapScreen(
     val province = loaded.province(provinceId)
     val unit = loaded.unit(unitId)
     val regions = remember(loaded, province, unit, views) { mapRegions(loaded, province, unit, views) }
-    val district = unit?.let {
-        regions.firstOrNull { it.region.id == districtId } ?: regions.firstOrNull { it.landmarks.isNotEmpty() }
-    }
-    val activeLandmarks = district?.landmarks.orEmpty()
-    val selectedPin = activeLandmarks.firstOrNull { it.landmark.id == pinId }
+    val district = unit?.let { regions.firstOrNull { it.region.id == districtId } }
+    val districtListState = key(unit?.id) { rememberLazyListState() }
     val count = regions.flatMap { it.landmarks }
+    val selectedPin = count.firstOrNull { it.landmark.id == pinId }
+    val detail = selectedPin.takeIf { gearP }
+
+    fun selectPin(id: String) {
+        if (pinId == id) {
+            closeLandmarkDetail()
+        } else {
+            districtId = regions.firstOrNull { entry -> entry.landmarks.any { it.landmark.id == id } }?.region?.id
+            pinId = id
+        }
+    }
 
     fun chooseRegion(id: String) {
         pinId = null
         when {
-            unit != null -> districtId = id
+            unit != null -> districtId = id.takeUnless { it == districtId }
             province != null -> unitId = id
             else -> provinceId = id
         }
     }
 
-    val panelTitle = when {
-        district != null -> "${district.region.name} 랜드마크"
-        unit != null -> "${unit.name} 랜드마크"
-        province != null -> "${province.name.shortRegionName()} 시·군별 해금 현황"
-        else -> "시·도별 해금 현황"
-    }
+    val panelTitle = province?.let { "${it.name.shortRegionName()} 시·군별 해금 현황" } ?: "시·도별 해금 현황"
     val panelHint = when {
-        district != null && activeLandmarks.isNotEmpty() -> {
-            val preview = "랜드마크 ${activeLandmarks.size}개 · 미방문이어도 이름과 보상을 미리 볼 수 있어요"
-            if (split) preview else "선택한 구획의 $preview. 방문하면 안개가 걷히고 보상을 받아요"
-        }
-        unit != null && (district != null || regions.isEmpty()) -> "이 구획의 랜드마크는 준비 중이에요."
-        unit != null -> "구획을 누르면 해당 랜드마크를 볼 수 있어요."
         !split -> "구획을 누르면 다음 단계로 들어가요 · 숫자는 해금 / 전체 랜드마크"
         province != null -> "시·군을 누르면 구획 지도로 들어가요"
         else -> "시·도를 누르면 그 지역으로 들어가요"
@@ -259,28 +271,42 @@ fun MapScreen(
             regions = regions,
             outline = unit?.takeIf { regions.isEmpty() },
             district = district,
+            visiblePins = if (unit != null) count else emptyList(),
             selectedPin = selectedPin,
             split = split,
             showDistrictAttribution = unit != null && regions.isNotEmpty(),
             hint = when {
                 // 주행 중에는 핀 상세가 막혀 있다. 핀을 누르면 뜨는 정차 안내와 같은 말로 맞춘다 (반대되는 안내가 나란히 보였다)
-                unit != null && !gearP -> "기어 P에서 핀 상세를 볼 수 있어요. 구획을 누르면 핀이 바뀌어요."
-                unit != null -> "핀을 누르면 상세를 볼 수 있어요. 구획을 누르면 핀이 바뀌어요."
+                unit != null && !gearP -> "기어 P에서 핀 상세를 볼 수 있어요."
+                unit != null -> "핀을 누르면 랜드마크 상세를 볼 수 있어요."
                 province != null -> "시·군을 누르면 구획 지도로 들어가요."
                 else -> "시·도를 누르면 그 지역으로 들어가요."
             },
             gearP = gearP,
             onRegion = ::chooseRegion,
-            onPin = { pinId = if (pinId == it) null else it },
-            onDismissPin = { pinId = null },
-            onBack = if (province != null) ::goBack else null,
-            onEquip = onEquip,
+            onPin = ::selectPin,
+            onDismissPin = ::closeLandmarkDetail,
+            onBack = if (province != null) ::goMapBack else null,
             modifier = modifier,
         )
     }
     val panel: @Composable (Modifier) -> Unit = { modifier ->
-        RegionPanel(panelTitle, panelHint, regions, district, selectedPin, split, ::chooseRegion,
-            onPin = { pinId = if (pinId == it) null else it }, modifier = modifier)
+        if (detail != null) {
+            key(detail.landmark.id) {
+                LandmarkDetail(detail, mapLocation, detailAvatar, split,
+                    onBack = ::closeLandmarkDetail,
+                    onNavigate = { onNavigate(detail.landmark) },
+                    onEquip = { onEquip(detail.landmark.rewardItemId) },
+                    modifier = modifier)
+            }
+        } else if (unit != null) {
+            LandmarkOverviewPanel(
+                unit.name, regions, district?.region?.id, selectedPin?.landmark?.id, split,
+                districtListState, ::chooseRegion, ::selectPin, modifier,
+            )
+        } else {
+            RegionPanel(panelTitle, panelHint, regions, split, ::chooseRegion, modifier)
+        }
     }
 
     Column(
@@ -301,9 +327,9 @@ fun MapScreen(
             if (province != null) {
                 Image(
                     painterResource(if (split) R.drawable.map_back_split else R.drawable.map_back),
-                    contentDescription = "이전 지도",
+                    contentDescription = "상위 지역 지도로 돌아가기",
                     Modifier.size(if (split) 40.dp else 48.dp).clip(CircleShape)
-                        .clickable(role = Role.Button, onClick = ::goBack),
+                        .clickable(role = Role.Button, onClick = ::goMapBack),
                 )
             }
             val title = unit?.name ?: province?.name ?: "전국"
@@ -342,7 +368,12 @@ fun MapScreen(
         }
         if (split) {
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                val mapHeight = minOf(420.dp, maxHeight * 0.52f)
+                val mapShare = when {
+                    detail != null -> 0.40f
+                    unit != null -> 0.44f
+                    else -> 0.52f
+                }
+                val mapHeight = minOf(420.dp, maxHeight * mapShare)
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
                     mapContent(Modifier.fillMaxWidth().height(mapHeight))
                     panel(Modifier.fillMaxWidth().weight(1f))
@@ -351,7 +382,7 @@ fun MapScreen(
         } else {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16)) {
                 mapContent(Modifier.weight(1f).fillMaxSize())
-                panel(Modifier.width(400.dp).fillMaxSize())
+                panel(Modifier.width(if (unit != null) 480.dp else 400.dp).fillMaxSize())
             }
         }
     }
@@ -489,6 +520,7 @@ private fun RegionMap(
     regions: List<RegionProgress>,
     outline: MapRegion?,
     district: RegionProgress?,
+    visiblePins: List<LandmarkView>,
     selectedPin: LandmarkView?,
     split: Boolean,
     showDistrictAttribution: Boolean,
@@ -498,7 +530,6 @@ private fun RegionMap(
     onPin: (String) -> Unit,
     onDismissPin: () -> Unit,
     onBack: (() -> Unit)?,
-    onEquip: (String) -> Unit,
     modifier: Modifier,
 ) {
     val paths = remember(regions) { regions.associate { it.region.id to it.region.outline() } }
@@ -536,12 +567,12 @@ private fun RegionMap(
             camera.toScreenX(MapProjection.x(lon), w),
             camera.toScreenY(MapProjection.y(lat), h),
         )
-        val pinLocations = district?.landmarks.orEmpty().associate { v ->
+        val pinLocations = visiblePins.associate { v ->
             v.landmark.id to point(v.landmark.lon.toFloat(), v.landmark.lat.toFloat())
         }
-        val pinLabels = remember(district, camera, w, h, measurer, split) {
+        val pinLabels = remember(visiblePins, camera, w, h, measurer, split) {
             with(density) {
-                district?.landmarks.orEmpty().map { v ->
+                visiblePins.map { v ->
                     val p = pinLocations.getValue(v.landmark.id)
                     val reward = Items.byId(v.landmark.rewardItemId)?.name
                     val details = listOfNotNull(v.pin.caption, reward?.let { if (v.pin == PinState.Unlocked) it else "보상 $it" })
@@ -702,13 +733,15 @@ private fun RegionMap(
             val v = label.view
             val p = pinLocations.getValue(v.landmark.id)
             val name = v.landmark.name
+            val labelShape = RoundedCornerShape(if (split) KagomRadius.full else KagomRadius.r12)
             LandmarkPin(v.pin, Modifier.offset {
                 IntOffset((p.x - 24.dp.toPx()).roundToInt(), (p.y - 24.dp.toPx()).roundToInt())
             }.semantics { contentDescription = name }) { onPin(v.landmark.id) }
             Column(
                 Modifier.offset { IntOffset(label.rect.left.roundToInt(), label.rect.top.roundToInt()) }
                     .widthIn(max = with(density) { label.rect.width.toDp() })
-                    .clip(RoundedCornerShape(if (split) KagomRadius.full else KagomRadius.r12)).background(KagomColor.Surface.card)
+                    .clip(labelShape).background(KagomColor.Surface.card)
+                    .then(if (v == selectedPin) Modifier.border(1.dp, KagomColor.Text.accent, labelShape) else Modifier)
                     .clickable(role = Role.Button) { onPin(v.landmark.id) }
                     .padding(horizontal = KagomSpace.s10, vertical = KagomSpace.s4),
             ) {
@@ -804,45 +837,23 @@ private fun RegionMap(
             if (locationStatus != null) Text(locationStatus, style = KagomType.Caption14, color = KagomColor.Text.secondary)
             Text(attribution, style = KagomType.Caption14, color = KagomColor.Text.secondary)
         }
-        val reward = Items.byId(selectedPin?.landmark?.rewardItemId)
-        // 위쪽 핀의 상세 카드는 지도 아래쪽에 뜬다. 그동안은 안내 글을 숨긴다 (카드가 안내 글의 끝을 덮었다)
-        val detailOverHint = gearP && !moving && reward != null &&
-            selectedPin?.let { pinLocations.getValue(it.landmark.id).y < h / 2 } == true
-        if (!split && !detailOverHint) Text(
+        if (!split) Text(
             hint, Modifier.align(Alignment.BottomStart).padding(KagomSpace.s24)
                 .background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
                 .padding(horizontal = KagomSpace.s16, vertical = KagomSpace.s10),
             style = KagomType.Caption14, color = KagomColor.Text.inverse,
         )
-        if (!moving && selectedPin != null && reward != null) {
-            val pinOnLowerHalf = pinLocations.getValue(selectedPin.landmark.id).y >= h / 2
-            val detailPosition = if (pinOnLowerHalf) {
-                Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
-            } else {
-                Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp)
-            }
-            if (gearP) {
-                LandmarkDetailPopup(
-                    selectedPin.landmark.name, reward.name, reward.mark, selectedPin.visited,
-                    modifier = detailPosition
-                        .clickable(enabled = selectedPin.pin == PinState.Unlocked, onClickLabel = "보상 장착") {
-                            onEquip(reward.id)
-                            onDismissPin()
-                        },
-                    width = minOf(if (split) maxWidth - 16.dp else 520.dp, maxWidth),
-                    itemId = reward.id,
+        if (split && !gearP && !moving && selectedPin != null) {
+            val pinOnLowerHalf = pinLocations[selectedPin.landmark.id]?.y?.let { it >= h / 2 } ?: false
+            val position = if (pinOnLowerHalf) Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+                else Modifier.align(Alignment.BottomCenter).padding(
+                    bottom = with(density) { overlays.first().height.toDp() } + KagomSpace.s4,
                 )
-            } else if (split) {
-                // Full은 왼쪽 아래 안내가 주행 중에 같은 말을 하고 있어 따로 띄우지 않는다 (둘이 겹쳐 보였다).
-                // 아래쪽에 뜰 때는 오른쪽 아래 위치 안내·출처 글(overlays의 첫 칸) 위로 올린다 (그 글과 겹쳤다)
-                val noticePosition = if (pinOnLowerHalf) detailPosition else Modifier.align(Alignment.BottomCenter)
-                    .padding(bottom = with(density) { overlays.first().height.toDp() } + KagomSpace.s4)
-                Text("기어 P에서 핀 상세를 볼 수 있어요",
-                    noticePosition
-                        .background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    style = KagomType.Caption14Strong, color = KagomColor.Text.inverse)
-            }
+            Text("기어 P에서 핀 상세를 볼 수 있어요",
+                position.background(KagomColor.Surface.inverse, RoundedCornerShape(KagomRadius.full))
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                style = KagomType.Caption14Strong, color = KagomColor.Text.inverse,
+            )
         }
     }
 }
@@ -852,17 +863,13 @@ private fun RegionPanel(
     title: String,
     hint: String,
     regions: List<RegionProgress>,
-    district: RegionProgress?,
-    selectedPin: LandmarkView?,
     split: Boolean,
     onRegion: (String) -> Unit,
-    onPin: (String) -> Unit,
     modifier: Modifier,
 ) {
     val shape = RoundedCornerShape(if (split) KagomRadius.r20 else KagomRadius.r24)
-    val others = remember(regions, district) {
-        regions.filter { it.region.id != district?.region?.id }
-            .sortedWith(compareByDescending<RegionProgress> { it.visited }.thenByDescending { it.landmarks.size }.thenBy { it.region.name })
+    val sorted = remember(regions) {
+        regions.sortedWith(compareByDescending<RegionProgress> { it.visited }.thenByDescending { it.landmarks.size }.thenBy { it.region.name })
     }
     LazyColumn(
         modifier.clip(shape).background(KagomColor.Surface.card).padding(if (split) KagomSpace.s20 else KagomSpace.s24),
@@ -873,29 +880,7 @@ private fun RegionPanel(
         }
         item { Text(hint, style = KagomType.Caption14, color = KagomColor.Text.secondary) }
         item { Spacer(Modifier.height(if (split) 6.dp else KagomSpace.s8)) }
-        if (district != null && district.landmarks.isNotEmpty()) {
-            item {
-                Column(
-                    Modifier.fillMaxWidth()
-                        .background(KagomColor.Severity.bg(Severity.OK), RoundedCornerShape(if (split) KagomRadius.r14 else KagomRadius.r16))
-                        .padding(horizontal = if (split) 14.dp else KagomSpace.s16, vertical = if (split) KagomSpace.s12 else KagomSpace.s16),
-                    verticalArrangement = Arrangement.spacedBy(if (split) 6.dp else KagomSpace.s8),
-                ) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(district.region.name, style = KagomType.Body18, color = KagomColor.Text.primary)
-                        Text("${district.count} 해금", style = KagomType.Body16Strong, color = KagomColor.Accent.positive)
-                    }
-                    district.landmarks.forEach { v -> LandmarkRow(v, v == selectedPin, split) { onPin(v.landmark.id) } }
-                }
-            }
-        }
-        if (district != null && others.isNotEmpty()) {
-            item {
-                if (split) Spacer(Modifier.height(KagomSpace.s8))
-                else Text("다른 구획", Modifier.padding(top = KagomSpace.s16), style = KagomType.Caption14Strong, color = KagomColor.Text.primary)
-            }
-        }
-        items(others, key = { it.region.id }) { entry ->
+        items(sorted, key = { it.region.id }) { entry ->
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(KagomRadius.r16))
                     .clickable(role = Role.Button) { onRegion(entry.region.id) },
@@ -903,9 +888,8 @@ private fun RegionPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val started = entry.visited > 0
-                val complete = district != null && started && entry.visited == entry.landmarks.size
                 Box(Modifier.size(KagomSpace.s10).background(if (started) KagomColor.Map.landUnlocked else KagomColor.Map.landLocked, CircleShape))
-                Text(if (complete) "${entry.region.name} · 모두 해금" else entry.region.name, Modifier.weight(1f),
+                Text(entry.region.name, Modifier.weight(1f),
                     style = if (started) KagomType.Body16Strong else KagomType.Body16,
                     color = if (started) KagomColor.Text.primary else KagomColor.Text.secondary)
                 Text(entry.count, style = KagomType.Body16Strong,
@@ -916,17 +900,107 @@ private fun RegionPanel(
 }
 
 @Composable
-private fun LandmarkRow(view: LandmarkView, selected: Boolean, split: Boolean, onClick: () -> Unit) {
-    val reward = Items.byId(view.landmark.rewardItemId)
-    val shape = RoundedCornerShape(KagomRadius.r16)
+private fun LandmarkOverviewPanel(
+    cityName: String,
+    regions: List<RegionProgress>,
+    districtId: String?,
+    pinId: String?,
+    split: Boolean,
+    listState: LazyListState,
+    onRegion: (String) -> Unit,
+    onPin: (String) -> Unit,
+    modifier: Modifier,
+) {
+    val (registered, empty) = remember(regions) {
+        regions.partition { it.landmarks.isNotEmpty() }
+    }
+    // 지도 위에서 아래 순으로 고정해서, 방문 상태와 선택이 바뀌어도 같은 자리에서 찾을 수 있게 한다.
+    val groups = remember(registered) { registered.sortedByDescending { it.region.labelLat } }
+    val unregistered = remember(empty) { empty.sortedBy { it.region.name } }
+    val shape = RoundedCornerShape(if (split) KagomRadius.r20 else KagomRadius.r24)
+    LazyColumn(
+        modifier.clip(shape).background(KagomColor.Surface.card).padding(if (split) KagomSpace.s20 else KagomSpace.s24),
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(KagomSpace.s12),
+    ) {
+        item {
+            Text("$cityName 랜드마크", style = KagomType.Heading22, color = KagomColor.Text.primary)
+        }
+        if (groups.isEmpty()) {
+            item {
+                Text("등록된 랜드마크가 없어요.", style = KagomType.Body16, color = KagomColor.Text.secondary)
+            }
+        }
+        groups.forEach { entry ->
+            val expanded = entry.region.id == districtId
+            item(key = entry.region.id) {
+                DistrictChoice(entry, expanded) { onRegion(entry.region.id) }
+            }
+            if (expanded) {
+                items(entry.landmarks, key = { it.landmark.id }) { view ->
+                    LandmarkRow(view, view.landmark.id == pinId) { onPin(view.landmark.id) }
+                }
+            }
+        }
+        if (unregistered.isNotEmpty()) {
+            item {
+                Text("랜드마크 미등록 구획", Modifier.padding(top = KagomSpace.s8),
+                    style = KagomType.Caption14Strong, color = KagomColor.Text.secondary)
+            }
+            items(unregistered, key = { it.region.id }) { entry ->
+                DistrictChoice(entry, entry.region.id == districtId) { onRegion(entry.region.id) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DistrictChoice(entry: RegionProgress, highlighted: Boolean, onClick: () -> Unit) {
+    val expandable = entry.landmarks.isNotEmpty()
+    val shape = RoundedCornerShape(KagomRadius.r12)
+    val actionLabel = when {
+        !expandable -> "지도에서 구획 선택"
+        highlighted -> "랜드마크 목록 접기"
+        else -> "랜드마크 목록 펼치기"
+    }
     Row(
-        Modifier.fillMaxWidth().clip(shape)
-            .background(if (selected) KagomColor.Surface.card else Color.Transparent)
-            .clickable(role = Role.Button, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(if (split) KagomSpace.s10 else KagomSpace.s12),
+        Modifier.fillMaxWidth().heightIn(min = if (expandable) 60.dp else 48.dp).clip(shape)
+            .background(if (highlighted) KagomColor.Surface.mintSoft else KagomColor.Surface.subtle)
+            .border(1.dp, if (highlighted) KagomColor.Text.accent else KagomColor.Border.default, shape)
+            .semantics {
+                selected = highlighted
+                if (expandable) stateDescription = if (highlighted) "펼쳐짐" else "접힘"
+            }
+            .clickable(role = Role.Button, onClickLabel = actionLabel, onClick = onClick)
+            .padding(horizontal = KagomSpace.s16),
+        horizontalArrangement = Arrangement.spacedBy(KagomSpace.s8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val icon = Modifier.size(if (split) 33.6.dp else 36.dp)
+        Text(entry.region.name, Modifier.weight(1f), style = KagomType.Body16Strong,
+            color = if (highlighted) KagomColor.Text.accent else KagomColor.Text.primary)
+        if (expandable) {
+            Text("방문 ${entry.count}", style = KagomType.Caption14Strong, color = KagomColor.Text.secondary)
+            Image(painterResource(R.drawable.map_chevron), null, Modifier.size(20.dp).rotate(if (highlighted) -90f else 90f))
+        } else if (highlighted) {
+            CheckGlyph(Modifier.size(20.dp), KagomColor.Text.accent)
+        }
+    }
+}
+
+@Composable
+private fun LandmarkRow(view: LandmarkView, highlighted: Boolean, onClick: () -> Unit) {
+    val reward = Items.byId(view.landmark.rewardItemId)
+    val shape = RoundedCornerShape(KagomRadius.r12)
+    Row(
+        Modifier.fillMaxWidth().padding(start = KagomSpace.s20).clip(shape)
+            .background(KagomColor.Surface.card)
+            .border(1.dp, if (highlighted) KagomColor.Text.accent else KagomColor.Border.default, shape)
+            .clickable(role = Role.Button, onClickLabel = "랜드마크 상세 보기", onClick = onClick)
+            .padding(horizontal = KagomSpace.s12, vertical = KagomSpace.s10),
+        horizontalArrangement = Arrangement.spacedBy(KagomSpace.s12),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val icon = Modifier.size(36.dp)
         if (view.pin == PinState.Unlocking) {
             // Figma 목록 핀에는 해금 중이 없어서 지도 핀(landmarkPin State=Unlocking)과 같은 색·점으로 그린다
             Box(icon.background(KagomColor.Progress.fill, CircleShape), contentAlignment = Alignment.Center) {
@@ -941,20 +1015,20 @@ private fun LandmarkRow(view: LandmarkView, selected: Boolean, split: Boolean, o
                 icon,
             )
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (split) 0.dp else 2.dp)) {
-            Text(view.landmark.name, style = KagomType.Body16Strong,
-                color = if (view.visited) KagomColor.Text.primary else KagomColor.Text.secondary)
-            val rewardLabel = reward?.name?.let {
-                when {
-                    split -> it
-                    view.pin == PinState.Unlocked -> "$it 획득"
-                    // 해금 중인 보상은 보상 팝업에서 받는다. 팝업은 기어 P에서만 뜬다
-                    view.pin == PinState.Unlocking -> "정차하면 $it 획득"
-                    else -> it
-                }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(KagomSpace.s4)) {
+            Text(view.landmark.name, style = KagomType.Body18Strong, color = KagomColor.Text.primary)
+            val status = when (view.pin) {
+                PinState.Unlocked -> listOfNotNull(view.pin.caption, view.firstVisitDate?.let { "첫 방문 $it" }).joinToString(" · ")
+                PinState.Unlocking -> "해금 중 · 정차하면 보상 지급"
+                PinState.Locked -> view.pin.caption
             }
-            Text(listOfNotNull(view.pin.caption, rewardLabel).joinToString(" · "), style = KagomType.Caption14, color = KagomColor.Text.secondary)
+            Text(status, style = KagomType.Caption14Strong,
+                color = if (view.pin == PinState.Unlocked) KagomColor.Accent.positive else KagomColor.Text.secondary)
+            if (reward != null) {
+                Text("보상 · ${reward.name}", style = KagomType.Caption14, color = KagomColor.Text.secondary)
+            }
         }
+        Image(painterResource(R.drawable.map_chevron), null, Modifier.size(20.dp))
     }
 }
 
@@ -968,10 +1042,15 @@ private fun String.shortRegionName() = when (this) {
     else -> removeSuffix("특별자치도").removeSuffix("특별자치시").removeSuffix("특별시").removeSuffix("광역시")
 }
 
-fun landmarkViews(visited: Set<String>, unlockPending: Set<String>): List<LandmarkView> = Landmarks.all.map { lm ->
-    LandmarkView(lm, when {
-        lm.id !in visited -> PinState.Locked
-        lm.id in unlockPending -> PinState.Unlocking
-        else -> PinState.Unlocked
-    })
+fun landmarkViews(visits: List<Visit>, unlockPending: Set<String>): List<LandmarkView> {
+    val firstVisitDays = visits.groupBy { it.landmarkId }.mapValues { (_, records) -> records.minOf { it.day } }
+    return Landmarks.all.map { lm ->
+        val day = firstVisitDays[lm.id]
+        val state = when {
+            day == null -> PinState.Locked
+            lm.id in unlockPending -> PinState.Unlocking
+            else -> PinState.Unlocked
+        }
+        LandmarkView(lm, state, day)
+    }
 }
