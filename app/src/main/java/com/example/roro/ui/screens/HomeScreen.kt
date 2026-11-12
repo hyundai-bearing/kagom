@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +43,8 @@ import com.example.roro.data.Profile
 import com.example.roro.ui.components.DriveLockBanner
 import com.example.roro.ui.components.HeaderProfile
 import com.example.roro.ui.components.KagomCharacter
+import com.example.roro.ui.components.ClosetTitlePlate
+import com.example.roro.ui.components.hasClosetTitlePlate
 import com.example.roro.ui.components.QuickMaintenanceCard
 import com.example.roro.ui.components.StatusBadge
 import com.example.roro.ui.components.VehicleStatusRow
@@ -111,7 +115,11 @@ fun HomeScreen(
             if (!gearP) DriveLockBanner("정비 시트는 정차 후", "주행 중에는 배지 터치가 무시돼요.",
                 Modifier.padding(start = 20.dp, end = 20.dp, top = 74.dp))
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                character(Modifier.size(470.dp, 690.dp))
+                val titleId = data.equipped.title
+                if (hasClosetTitlePlate(titleId)) {
+                    character(Modifier.fillMaxHeight(0.75f).aspectRatio(450f / 660f).offset(y = (-32).dp))
+                    ClosetTitlePlate(titleId!!, profile.skin, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).width(300.dp))
+                } else character(Modifier.size(470.dp, 690.dp))
             }
             badges(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 20.dp))
         }
@@ -129,7 +137,11 @@ fun HomeScreen(
             // 가이드 v1.2: 캐릭터 아래 상태 글자가 없어졌다. 캐릭터 크기는 그대로 두고(660) 글자 자리만큼 위아래로 나눠 내린다
             Spacer(Modifier.height(40.dp))
             character(Modifier.size(450.dp, 660.dp))
-            Spacer(Modifier.height(40.dp))
+            if (hasClosetTitlePlate(data.equipped.title)) {
+                Spacer(Modifier.height(16.dp))
+                ClosetTitlePlate(data.equipped.title!!, profile.skin, Modifier.width(320.dp))
+                Spacer(Modifier.height(24.dp))
+            } else Spacer(Modifier.height(40.dp))
             badges(Modifier.width(1000.dp))
         }
         // vehicleStatusPanel (35%, 640 고정)

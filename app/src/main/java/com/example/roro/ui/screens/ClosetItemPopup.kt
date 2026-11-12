@@ -35,12 +35,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.roro.R
 import com.example.roro.core.Examples
+import com.example.roro.core.Category
 import com.example.roro.core.Expression
 import com.example.roro.core.Item
 import com.example.roro.core.Landmarks
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
 import com.example.roro.ui.components.AssetImage
+import com.example.roro.ui.components.ClosetTitlePlate
+import com.example.roro.ui.components.hasClosetTitlePlate
 import com.example.roro.ui.components.IviButton
 import com.example.roro.ui.components.IviButtonSize
 import com.example.roro.ui.components.IviButtonType
@@ -94,8 +97,11 @@ internal fun ClosetItemPopup(
                     contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
                 val context = LocalContext.current
                 val thumb = KagomRenders.thumbPath(item.id)
-                Box(Modifier.offset(x = unit * 305, y = unit * 48).size(unit * 400, unit * 235), contentAlignment = Alignment.Center) {
-                    if (KagomRenders.exists(context, thumb)) AssetImage(thumb, Modifier.fillMaxSize(), colorFilter = if (locked) lockedItemFilter else null)
+                val isTitlePlate = item.category == Category.TITLE && hasClosetTitlePlate(item.id)
+                Box(Modifier.offset(x = unit * (if (isTitlePlate) 289 else 305), y = unit * 48).size(unit * 400, unit * 235), contentAlignment = Alignment.Center) {
+                    if (isTitlePlate) {
+                        ClosetTitlePlate(item.id, profile.skin, Modifier.fillMaxWidth(0.8f), colorFilter = if (locked) lockedItemFilter else null)
+                    } else if (KagomRenders.exists(context, thumb)) AssetImage(thumb, Modifier.fillMaxSize(), colorFilter = if (locked) lockedItemFilter else null)
                     else Text(item.mark, style = KagomType.PleosTitleSmallStrong, color = KagomColor.Text.primary)
                     if (locked) LockGlyph(Modifier.size(unit * 44), KagomColor.Text.inverse)
                 }

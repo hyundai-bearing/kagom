@@ -45,7 +45,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -72,6 +72,8 @@ import com.example.roro.data.Profile
 import com.example.roro.ui.components.CellState
 import com.example.roro.ui.components.AssetImage
 import com.example.roro.ui.components.Chip
+import com.example.roro.ui.components.ClosetTitlePlate
+import com.example.roro.ui.components.hasClosetTitlePlate
 import com.example.roro.ui.components.KagomRenders
 import com.example.roro.ui.components.GhostSegmentedTabs
 import com.example.roro.ui.components.IviButton
@@ -210,9 +212,11 @@ fun ClosetScreen(
         Box(m.clip(RoundedCornerShape(KagomRadius.r28)).background(closetPalette.studio), contentAlignment = Alignment.Center) {
             // 원 양쪽의 여백이 같도록 슬롯 오른쪽 끝의 절반만큼 중심을 옮긴다.
             val shift = if (compact) 52.dp else 54.dp
-            Box(Modifier.offset(x = shift).size(if (compact) 300.dp else 540.dp).background(closetPalette.halo, CircleShape))
+            val hasPlate = hasClosetTitlePlate(draft.title)
+            val characterY = if (compact && hasPlate) (-50).dp else 0.dp
+            Box(Modifier.offset(x = shift, y = characterY).size(if (compact) 300.dp else 540.dp).background(closetPalette.halo, CircleShape))
             // 회전하는 렌더와 분리해 발밑 그림자의 크기와 위치를 고정한다.
-            Canvas((if (compact) Modifier.align(Alignment.BottomCenter).offset(x = shift).padding(bottom = 42.dp)
+            Canvas((if (compact) Modifier.align(Alignment.BottomCenter).offset(x = shift, y = characterY).padding(bottom = 42.dp)
                 else Modifier.align(Alignment.Center).offset(x = shift, y = 238.dp))
                 .size(if (compact) 140.dp else 240.dp, if (compact) 24.dp else 40.dp)) {
                 val radius = size.width / 2f
@@ -229,12 +233,17 @@ fun ClosetScreen(
             }
             KagomCharacter(
                 profile.skin, expression,
-                if (compact) Modifier.offset(x = shift).size(234.dp, 366.dp) else Modifier.offset(x = shift).size(350.dp, 544.dp),
+                if (compact) Modifier.offset(x = shift, y = characterY).size(234.dp, 366.dp) else Modifier.offset(x = shift).size(350.dp, 544.dp),
                 worn = wornLayers(draft.head, draft.top, draft.bottom),
                 onTouch = if (gearP) ({}) else null,
                 turnable = gearP && expression == Expression.IDLE,
                 alive = gearP,
             )
+            draft.title?.takeIf { hasPlate }?.let { titleId ->
+                ClosetTitlePlate(titleId, profile.skin,
+                    if (compact) Modifier.align(Alignment.BottomCenter).offset(x = shift).padding(bottom = 12.dp).width(220.dp)
+                    else Modifier.align(Alignment.Center).offset(x = shift, y = 340.dp).width(320.dp))
+            }
             SavedOutfitSlots(data.savedOutfits.size, selectedSlot, gearP, compact, closetPalette,
                 onSelect = { index ->
                     if (!gearP) { toast = "주차 중에 이용할 수 있어요" }
@@ -270,7 +279,7 @@ fun ClosetScreen(
                         row.forEach { item ->
                             key(item.id) {
                                 val s = stateOf(item)
-                                ClosetItemCard(item, s, selected?.id == item.id, split, cardHeight, closetPalette, { onCell(item) }, Modifier.weight(1f))
+                                ClosetItemCard(item, s, selected?.id == item.id, split, cardHeight, closetPalette, profile.skin, { onCell(item) }, Modifier.weight(1f))
                             }
                         }
                         repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
@@ -328,7 +337,7 @@ fun ClosetScreen(
                 Column(Modifier.fillMaxSize().verticalScroll(splitScroll).heightIn(min = maxHeight).padding(20.dp)) {
                     Text("옷장", style = KagomType.Title28, color = KagomColor.Text.primary)
                     Spacer(Modifier.height(KagomSpace.s16))
-                    preview(Modifier.fillMaxWidth().height(360.dp), true)
+                    preview(Modifier.fillMaxWidth().height(if (hasClosetTitlePlate(draft.title)) 420.dp else 360.dp), true)
                     Spacer(Modifier.height(KagomSpace.s16))
                     Text(hint, style = KagomType.ClosetSmallText, color = KagomColor.Text.tertiary)
                     Spacer(Modifier.height(KagomSpace.s12))
@@ -395,7 +404,7 @@ fun ClosetScreen(
 
 /** Figma 2027:10043: 실제 아이템 상태에 따라 썸네일과 상태만 바꾼다. */
 @Composable
-private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, compact: Boolean, cardHeight: Dp, palette: ClosetPalette, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, compact: Boolean, cardHeight: Dp, palette: ClosetPalette, skin: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(KagomRadius.r24)
     val highlighted = selected
     val context = LocalContext.current
@@ -407,11 +416,13 @@ private fun ClosetItemCard(item: Item, state: CellState, selected: Boolean, comp
             .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = if (compact) 8.dp else 15.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxWidth().weight(1f).clipToBounds(), contentAlignment = Alignment.Center) {
-            if (KagomRenders.exists(context, path)) AssetImage(path, Modifier.fillMaxSize().padding(top = if (compact) 12.dp else 20.dp).graphicsLayer {
-                scaleX = 1.5f; scaleY = 1.5f; translationY = (if (compact) 4.dp else 8.dp).toPx()
+        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            if (item.category == Category.TITLE && hasClosetTitlePlate(item.id)) {
+                ClosetTitlePlate(item.id, skin, Modifier.fillMaxWidth().padding(horizontal = 8.dp).offset(y = 8.dp))
+            } else if (KagomRenders.exists(context, path)) AssetImage(path, Modifier.fillMaxSize().padding(top = if (compact) 12.dp else 20.dp).graphicsLayer {
+                scaleX = 1.5f; scaleY = 1.5f; translationY = (if (compact) 10.dp else 14.dp).toPx()
             })
-            else Text(item.mark, Modifier.offset(y = if (compact) 6.dp else 12.dp), style = KagomType.Heading24, color = KagomColor.Text.tertiary)
+            else Text(item.mark, Modifier.offset(y = if (compact) 12.dp else 18.dp), style = KagomType.Heading24, color = KagomColor.Text.tertiary)
         }
         Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
         // 긴 이름은 위로 늘리고 이름과 상태의 아래쪽 기준은 유지한다.
