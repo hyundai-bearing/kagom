@@ -118,6 +118,9 @@ object Items {
             "기본 제공", "카곰을 만들면 기본으로 받는 배경이에요.", ""),
         Item("BG-02", "노을 언덕", Category.BACKGROUND, "노", Source.DEFAULT, null,
             "기본 제공", "카곰을 만들면 기본으로 받는 배경이에요.", ""),
+        Item("BG-03", "동해 바다", Category.BACKGROUND, "바", Source.QUEST, "QST-06",
+            "누적 300 km 주행 시 획득", "누적 300 km를 달리면 도전과제 보상으로 받을 수 있어요.",
+            "바다가 보여요! 우리 집 배경으로 걸어 둘까요?"),
     )
 
     /**
@@ -175,6 +178,9 @@ object Quests {
             "랜드마크 10회 달성!", "도전과제", "동해안 구석구석을 누볐어요"),
         Quest("QST-05", "성실한 카곰 집사", QuestIcon.WRENCH, "정기 점검 1회 완료", false, QuestKind.CHECKUP, 1, "회", "TTL-02", 200,
             "정기 점검 완료!", "정비", "차를 꼼꼼하게 챙겼어요"),
+        // 홈 배경을 보상으로 주는 과제. 디자인·스펙에 없어 조건과 EXP를 정했다 (가정)
+        Quest("QST-06", "먼 길 동행", QuestIcon.GAUGE, "누적 300 km 주행", true, QuestKind.DISTANCE, 300, " km", "BG-03", 150,
+            "누적 300 km 달성!", "주행", "300 km를 함께 달렸어요"),
     )
 
     fun byId(id: String?) = all.firstOrNull { it.id == id }
@@ -227,7 +233,8 @@ object Landmarks {
 
 /**
  * 티어 기준 EXP. 스펙에 수치가 없어 디자인(티어 1 → 2 = 400 EXP)에 맞춘 가정값.
- * 전체 보상 EXP 합계(도전과제 900 + 랜드마크 450 = 1,350)로 티어 4까지 닿도록 잡았다.
+ * QST-06을 넣기 전의 전체 보상 EXP 합계(도전과제 900 + 랜드마크 450 = 1,350)로 티어 4까지 닿도록 잡았다.
+ * QST-06(150)이 더해져 지금 합계는 1,500이지만, 이미 오른 티어가 내려가지 않도록 기준은 그대로 둔다.
  */
 object Tiers {
     val thresholds = listOf(0, 400, 900, 1350)

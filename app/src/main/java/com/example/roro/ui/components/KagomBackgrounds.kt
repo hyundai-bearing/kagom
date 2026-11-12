@@ -17,6 +17,7 @@ object KagomBackgrounds {
     fun drawable(itemId: String?): Int? = when (itemId) {
         "BG-01" -> R.drawable.bg_meadow
         "BG-02" -> R.drawable.bg_sunset
+        "BG-03" -> R.drawable.bg_coast
         else -> null
     }
 }

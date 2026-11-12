@@ -69,15 +69,15 @@ class ProgressTest {
     }
 
     @Test fun questListShowsAchievedFirstNewestOnTop() {
-        // Figma 6:2085: 첫 드라이브(11.08) → 성실한 카곰 집사(11.07) → 진행 중 3개, 달성률 40%
+        // Figma 6:2085: 첫 드라이브(11.08) → 성실한 카곰 집사(11.07) → 진행 중. Figma는 5개(달성률 40%)이고 QST-06이 더해져 6개다
         val visits = listOf(Visit("LM-GN-01", 1), Visit("LM-GN-02", 2), Visit("LM-GN-01", 3), Visit("LM-GN-02", 4))
         val all = Progress.all(ProgressContext(64, visits, 1), setOf("QST-01", "QST-05"))
         val doneAt = mapOf("QST-05" to 1_000L, "QST-01" to 2_000L)
-        assertEquals(listOf("QST-01", "QST-05", "QST-02", "QST-03", "QST-04"), Progress.listed(all, doneAt, QuestFilter.ALL).map { it.quest.id })
+        assertEquals(listOf("QST-01", "QST-05", "QST-02", "QST-03", "QST-04", "QST-06"), Progress.listed(all, doneAt, QuestFilter.ALL).map { it.quest.id })
         assertEquals(listOf("QST-01", "QST-05"), Progress.listed(all, doneAt, QuestFilter.DONE).map { it.quest.id })
-        assertEquals(listOf("QST-02", "QST-03", "QST-04"), Progress.listed(all, doneAt, QuestFilter.TODO).map { it.quest.id })
-        assertEquals(40, Progress.achievedPercent(all))
-        assertEquals(listOf("64 / 100 km", "2 / 3곳", "4 / 10회"), Progress.listed(all, doneAt, QuestFilter.TODO).map { it.countText })
+        assertEquals(listOf("QST-02", "QST-03", "QST-04", "QST-06"), Progress.listed(all, doneAt, QuestFilter.TODO).map { it.quest.id })
+        assertEquals(33, Progress.achievedPercent(all))
+        assertEquals(listOf("64 / 100 km", "2 / 3곳", "4 / 10회", "64 / 300 km"), Progress.listed(all, doneAt, QuestFilter.TODO).map { it.countText })
         // 달성 시각을 모르는 예전 기록은 시각이 있는 것 아래
         assertEquals(listOf("QST-05", "QST-01"), Progress.listed(all, mapOf("QST-05" to 1_000L), QuestFilter.DONE).map { it.quest.id })
     }
@@ -114,5 +114,20 @@ class ProgressTest {
         assertEquals(Category.BACKGROUND, Items.byId(Items.DEFAULT_BACKGROUND)?.category)
         // 칭호·배경은 벗을 수 없다
         assertEquals(listOf(Category.TITLE, Category.BACKGROUND), Category.entries.filter { it.alwaysEquipped })
+    }
+
+    @Test fun backgroundQuestRewardsBackgroundAt300Km() {
+        val q = Quests.byId("QST-06")!!
+        assertFalse(Progress.questProgress(q, ProgressContext(299, emptyList(), 0), emptySet()).achieved)
+        val done = setOf("QST-01", "QST-02")
+        assertEquals(listOf("QST-06"), Progress.newlyAchieved(ProgressContext(300, emptyList(), 0), done).map { it.id })
+        val reward = Items.byId(q.rewardItemId)!!
+        assertEquals(Category.BACKGROUND, reward.category)
+        // 보상 배경은 기본 제공이 아니다 → 달성 전에는 잠겨 있다
+        assertFalse(reward.id in Items.defaults)
+    }
+
+    @Test fun everyQuestRewardIsAnItemThatPointsBackToItsQuest() {
+        Quests.all.forEach { q -> assertEquals(q.id, Items.byId(q.rewardItemId)?.sourceId) }
     }
 }
