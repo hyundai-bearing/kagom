@@ -69,7 +69,7 @@ import kotlin.random.Random
 
 data class DetailAvatar(val skin: String, val expression: Expression, val worn: List<String>)
 
-private val detailDate = DateTimeFormatter.ofPattern("yyyy.MM.dd")
+internal val detailDateFormat = DateTimeFormatter.ofPattern("yyyy.MM.dd")
 
 /** 같은 랜드마크는 상세를 다시 열어도 같은 풍경을 쓴다. 범주에 리소스를 추가하면 다음 선택에 반영된다. */
 private val sceneryVariants = mapOf(
@@ -85,7 +85,7 @@ internal fun QuestDetail(
     onBack: () -> Unit,
 ) {
     val firstDrive = quest.id == "QST-01"
-    val date = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(detailDate) }
+    val date = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(detailDateFormat) }
     var cheer by remember { mutableStateOf(false) }
     val record: @Composable (Modifier) -> Unit = { modifier ->
         Column(modifier, verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
@@ -208,6 +208,7 @@ internal fun LandmarkDetail(
     val reward = Items.byId(landmark.rewardItemId) ?: return
     val unlocked = view.pin == PinState.Unlocked
     val pending = view.pin == PinState.Unlocking
+    val showPhotos = unlocked && hasLandmarkPhotos(landmark.id)
     val landscape = remember(landmark.id, landmark.scenery) {
         val variants = sceneryVariants[landmark.scenery].orEmpty()
         if (variants.isEmpty()) null else variants.random(Random(landmark.id.hashCode()))
@@ -250,7 +251,9 @@ internal fun LandmarkDetail(
             }
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val sceneSize = if (split) {
+            val sceneSize = if (split && showPhotos) {
+                Modifier.height((maxHeight * 0.37f).coerceIn(112.dp, 210.dp))
+            } else if (split) {
                 Modifier.height((maxHeight - 78.dp).coerceIn(if (unlocked) 146.dp else 194.dp, 310.dp))
             } else Modifier.aspectRatio(1.25f)
             Column(
@@ -281,6 +284,7 @@ internal fun LandmarkDetail(
                         .padding(KagomSpace.s12),
                     style = KagomType.Body16Strong, color = KagomColor.Text.primary, textAlign = TextAlign.Center,
                 )
+                if (showPhotos) LandmarkPhotoSection(landmark.id, title, split)
             }
         }
         val actionSize = if (split) IviButtonSize.Medium else IviButtonSize.Large
