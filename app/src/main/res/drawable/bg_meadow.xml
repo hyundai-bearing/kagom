@@ -1,0 +1,15 @@
+<!-- 홈 배경 BG-01 맑은 들판. 1280×1080 = Full 홈 캔버스. 땅은 아래 1/3에 둔다 (곰 발이 땅에 닿게, 아래 기준으로 잘라 Split에도 쓴다) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1280dp" android:height="1080dp"
+    android:viewportWidth="1280" android:viewportHeight="1080">
+    <path android:fillColor="#CDEAF7" android:pathData="M0,0H1280V1080H0Z"/>
+    <path android:fillColor="#E1F3F8" android:pathData="M0,430Q320,380 640,420T1280,400V1080H0Z"/>
+    <path android:fillColor="#FFF3CF" android:pathData="M920,210a120,120 0,1 0,240 0a120,120 0,1 0,-240 0Z"/>
+    <path android:fillColor="#FFE39A" android:pathData="M966,210a74,74 0,1 0,148 0a74,74 0,1 0,-148 0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M130,270a46,46 0,0 1,70 -34a58,58 0,0 1,104 -8a48,48 0,0 1,78 42a32,32 0,0 1,-12 62h-232a32,32 0,0 1,-8 -62ZM640,150a34,34 0,0 1,52 -25a43,43 0,0 1,77 -6a36,36 0,0 1,58 31a24,24 0,0 1,-9 46h-172a24,24 0,0 1,-6 -46ZM930,470a30,30 0,0 1,46 -22a38,38 0,0 1,68 -5a31,31 0,0 1,51 27a21,21 0,0 1,-8 40h-152a21,21 0,0 1,-5 -40Z"/>
+    <path android:fillColor="#BFE5C4" android:pathData="M0,700Q210,610 430,680T860,650T1280,640V1080H0Z"/>
+    <path android:fillColor="#A3D8A8" android:pathData="M0,770Q260,690 560,760T1280,720V1080H0Z"/>
+    <path android:fillColor="#8CCB93" android:pathData="M0,860Q340,790 700,840T1280,820V1080H0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M111,930a9,9 0,1 0,18 0a9,9 0,1 0,-18 0ZM321,1010a9,9 0,1 0,18 0a9,9 0,1 0,-18 0ZM1071,940a9,9 0,1 0,18 0a9,9 0,1 0,-18 0Z"/>
+    <path android:fillColor="#FFE39A" android:pathData="M201,990a9,9 0,1 0,18 0a9,9 0,1 0,-18 0ZM951,1020a9,9 0,1 0,18 0a9,9 0,1 0,-18 0ZM1171,1000a9,9 0,1 0,18 0a9,9 0,1 0,-18 0Z"/>
+</vector>

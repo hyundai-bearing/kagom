@@ -84,6 +84,7 @@ data class Item(
 
 object Items {
     const val DEFAULT_TITLE = "TTL-00"
+    const val DEFAULT_BACKGROUND = "BG-01"
 
     val all = listOf(
         Item("ITM-H-01", "해돋이 머리띠", Category.HEAD, "H", Source.LANDMARK, "LM-GN-01",
@@ -112,7 +113,21 @@ object Items {
         Item("TTL-02", "성실한 카곰 집사", Category.TITLE, "T", Source.MAINTENANCE, "QST-05",
             "정기 점검 1회 완료 시 획득", "정비 시트에서 정기 점검을 한 번 완료하면 받을 수 있어요.",
             "꼼꼼하게 챙겨 줘서 고마워요!"),
+        // 홈 배경. 디자인에 없어 이름·그림을 정했다 (가정). 홈 글자색을 그대로 쓰도록 모두 밝은 톤이다
+        Item(DEFAULT_BACKGROUND, "맑은 들판", Category.BACKGROUND, "들", Source.DEFAULT, null,
+            "기본 제공", "카곰을 만들면 기본으로 받는 배경이에요.", ""),
+        Item("BG-02", "노을 언덕", Category.BACKGROUND, "노", Source.DEFAULT, null,
+            "기본 제공", "카곰을 만들면 기본으로 받는 배경이에요.", ""),
     )
+
+    /**
+     * 처음부터 갖고 있는 것. 저장된 보유 목록에 없어도 보유로 친다
+     * (기본 배경은 뒤에 추가돼서 예전 설치의 보유 목록에는 없다).
+     */
+    val defaults: Set<String> = all.filter { it.source == Source.DEFAULT }.map { it.id }.toSet()
+
+    /** 보상으로 얻은 것만 (획득 아이템 수에 기본 제공은 세지 않는다) */
+    fun earned(owned: Set<String>): Set<String> = owned - defaults
 
     fun byId(id: String?): Item? = all.firstOrNull { it.id == id }
     fun of(category: Category) = all.filter { it.category == category }
