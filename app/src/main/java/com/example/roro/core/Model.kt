@@ -85,12 +85,17 @@ data class StatusRow(
     val unavailable: Boolean = false,
 )
 
-/** 아이템 카테고리. tab 키 = Figma tab=head|top|bottom|title */
+/** 아이템 카테고리. tab 키 = Figma tab=head|top|bottom|title. background는 디자인에 없는 탭이다 (가정) */
 enum class Category(val tab: String, val label: String, val noun: String) {
     HEAD("head", "머리", "머리 장식"),
     TOP("top", "상의", "상의"),
     BOTTOM("bottom", "하의", "하의"),
     TITLE("title", "칭호", "칭호"),
+    BACKGROUND("background", "배경", "배경"),
+    ;
+
+    /** 칭호·배경은 늘 하나를 쓰고 있어야 한다 (벗을 수 없고 다른 것으로만 바꾼다) */
+    val alwaysEquipped: Boolean get() = this == TITLE || this == BACKGROUND
 }
 
 /** 아이템 출처 칩 */

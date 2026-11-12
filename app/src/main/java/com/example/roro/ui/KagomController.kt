@@ -196,7 +196,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         for (t in (from + 1)..to) {
             points += Tiers.POINTS_PER_TIER
             pending = Progress.enqueue(pending, PendingPopup.TierUp(t, Tiers.POINTS_PER_TIER, after,
-                (d.owned - Items.DEFAULT_TITLE).size, d.visitedPlaces.size))
+                Items.earned(d.owned).size, d.visitedPlaces.size))
         }
         return d.copy(exp = after, points = points, pending = pending)
     }
@@ -365,8 +365,9 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
     fun today(): Long = LocalDate.now().toEpochDay() + demoDayOffset.value
 }
 
-/** 갖고 있지 않은 아이템은 착용할 수 없다 */
+/** 갖고 있지 않은 아이템은 착용할 수 없다. 배경은 비워 둘 수 없어 기본 배경으로 돌린다 */
 private fun Equipped.sanitized(owned: Set<String>) = Equipped(
     head = head?.takeIf { it in owned }, top = top?.takeIf { it in owned },
     bottom = bottom?.takeIf { it in owned }, title = title?.takeIf { it in owned },
+    background = background?.takeIf { it in owned } ?: Items.DEFAULT_BACKGROUND,
 )

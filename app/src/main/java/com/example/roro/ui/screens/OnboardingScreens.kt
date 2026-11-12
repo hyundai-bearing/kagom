@@ -124,7 +124,7 @@ fun CarryOverScreen(profile: Profile, data: AppData, drivenKm: Int, onKeep: () -
     val km = "${StateEngine.fmt(drivenKm)} km"
     val stats = listOfNotNull(
         "${data.exp}" to "누적 EXP",
-        "${(data.owned - Items.DEFAULT_TITLE).size}" to "획득 아이템",
+        "${Items.earned(data.owned).size}" to "획득 아이템",
         "${data.visitedPlaces.size} / ${Landmarks.all.size}" to "방문 랜드마크",
         if (split) null else km to "함께 달린 거리",       // Split은 칸이 셋이고 거리는 요약 줄에 쓴다
     )

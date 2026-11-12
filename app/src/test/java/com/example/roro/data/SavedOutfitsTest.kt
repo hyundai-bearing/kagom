@@ -1,5 +1,7 @@
 package com.example.roro.data
 
+import com.example.roro.core.Category
+import com.example.roro.core.Items
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -23,5 +25,13 @@ class SavedOutfitsTest {
     fun savingSelectedSlotReplacesOnlyThatOutfit() {
         val outfits = listOf(first, second, third)
         assertEquals(listOf(first, third, third), saveOutfit(outfits, 1, third))
+    }
+
+    @Test
+    fun backgroundIsPartOfOutfitAndStartsWithDefault() {
+        assertEquals(Items.DEFAULT_BACKGROUND, Equipped().background)
+        val changed = first.with(Category.BACKGROUND, "BG-02")
+        assertEquals("BG-02", changed[Category.BACKGROUND])
+        assertEquals("ITM-H-01", changed.head)
     }
 }

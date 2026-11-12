@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.roro.R
+import com.example.roro.core.Category
 import com.example.roro.core.Examples
 import com.example.roro.core.Expression
 import com.example.roro.core.Item
@@ -41,6 +43,7 @@ import com.example.roro.core.Landmarks
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
 import com.example.roro.ui.components.AssetImage
+import com.example.roro.ui.components.BackgroundArt
 import com.example.roro.ui.components.IviButton
 import com.example.roro.ui.components.IviButtonSize
 import com.example.roro.ui.components.IviButtonType
@@ -83,7 +86,9 @@ internal fun ClosetItemPopup(
                 val context = LocalContext.current
                 val thumb = KagomRenders.thumbPath(item.id)
                 Box(Modifier.offset(x = unit * 305, y = unit * 48).size(unit * 400, unit * 235), contentAlignment = Alignment.Center) {
-                    if (KagomRenders.exists(context, thumb)) AssetImage(thumb, Modifier.fillMaxSize(), colorFilter = if (locked) lockedItemFilter else null)
+                    if (item.category == Category.BACKGROUND) BackgroundArt(item.id,
+                        Modifier.fillMaxHeight().aspectRatio(4f / 3f).clip(RoundedCornerShape(unit * 16)), if (locked) lockedItemFilter else null)
+                    else if (KagomRenders.exists(context, thumb)) AssetImage(thumb, Modifier.fillMaxSize(), colorFilter = if (locked) lockedItemFilter else null)
                     else Text(item.mark, style = KagomType.PleosTitleSmallStrong, color = KagomColor.Text.primary)
                     if (locked) LockGlyph(Modifier.size(unit * 44), KagomColor.Text.inverse)
                 }

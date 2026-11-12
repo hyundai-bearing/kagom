@@ -1,0 +1,15 @@
+<!-- 홈 배경 BG-03 동해 바다 (QST-06 보상). detail_coast의 구도를 홈 캔버스(1280×1080)에 맞게 다시 그렸다: 곰이 모래밭에 서도록 모래밭이 아래 1/3 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1280dp" android:height="1080dp"
+    android:viewportWidth="1280" android:viewportHeight="1080">
+    <path android:fillColor="#BDE3F5" android:pathData="M0,0H1280V1080H0Z"/>
+    <path android:fillColor="#DAEEF1" android:pathData="M0,440Q380,380 760,440T1280,430V1080H0Z"/>
+    <path android:fillColor="#F9DFA9" android:pathData="M730,600a170,170 0,1 0,340 0a170,170 0,1 0,-340 0Z"/>
+    <path android:fillColor="#FBBE64" android:pathData="M795,600a105,105 0,1 0,210 0a105,105 0,1 0,-210 0Z"/>
+    <path android:fillColor="#80C5E3" android:pathData="M0,600H1280V1080H0Z"/>
+    <path android:fillColor="#55A7D1" android:pathData="M0,660Q200,625 420,660T860,660T1280,648V1080H0Z"/>
+    <path android:fillColor="#E9F6F8" android:pathData="M800,632Q900,622 1000,632Q900,642 800,632ZM850,656Q905,649 960,656Q905,663 850,656ZM815,686Q925,677 1035,686Q925,695 815,686Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M200,360a46,46 0,0 1,70 -34a58,58 0,0 1,104 -8a48,48 0,0 1,78 42a32,32 0,0 1,-12 62h-232a32,32 0,0 1,-8 -62ZM600,140a34,34 0,0 1,52 -25a43,43 0,0 1,77 -6a36,36 0,0 1,58 31a24,24 0,0 1,-9 46h-172a24,24 0,0 1,-6 -46Z"/>
+    <path android:fillColor="#F8F8EF" android:pathData="M0,730Q210,670 400,710T780,715T1280,725V1080H0Z"/>
+    <path android:fillColor="#F2E2BE" android:pathData="M0,750Q210,690 400,730T780,735T1280,745V1080H0Z"/>
+</vector>
