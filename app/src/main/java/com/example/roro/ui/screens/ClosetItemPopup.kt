@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,8 +32,6 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.roro.R
 import com.example.roro.core.Examples
@@ -50,6 +47,7 @@ import com.example.roro.ui.components.IviButtonType
 import com.example.roro.ui.components.KagomRenders
 import com.example.roro.ui.components.LockGlyph
 import com.example.roro.ui.theme.KagomColor
+import com.example.roro.ui.theme.KagomClosetPalette
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomType
 import java.time.Instant
@@ -91,23 +89,17 @@ internal fun ClosetItemPopup(
                 }
                 AssetImage(KagomRenders.basePath(profile.skin, Expression.IDLE),
                     Modifier.offset(x = unit * 660, y = unit * 65).size(unit * 170, unit * 264))
-                Box(Modifier.align(Alignment.TopEnd).size(64.dp)
-                    .clickable(onClick = onDismiss).semantics { contentDescription = "닫기" }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(if (split) 32.dp else 44.dp).background(KagomColor.Surface.card.copy(alpha = 0.9f), CircleShape), contentAlignment = Alignment.Center) {
-                        Text("×", style = KagomType.Heading24, color = KagomColor.Text.primary)
-                    }
-                }
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = if (split) 24.dp else 46.dp, vertical = if (split) 20.dp else 32.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(item.name, style = if (split) KagomType.PleosTitleSmallStrong else KagomType.ClosetPopupTitle, color = KagomColor.Text.primary, modifier = Modifier.weight(1f, fill = false))
                     Row(Modifier.height(if (split) 42.dp else 48.dp)
-                        .background(if (locked) KagomColor.Closet.locked else KagomColor.Closet.owned, RoundedCornerShape(KagomRadius.r24))
+                        .background(if (locked) KagomColor.Closet.locked else KagomClosetPalette.of(profile.skin).ownedBackground, RoundedCornerShape(KagomRadius.r24))
                         .padding(horizontal = if (split) 14.dp else 20.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val statusText = if (locked) KagomColor.Closet.lockedText else KagomColor.Closet.ownedText
+                        val statusText = if (locked) KagomColor.Closet.lockedText else KagomClosetPalette.of(profile.skin).ownedText
                         if (locked) LockGlyph(Modifier.size(if (split) 16.dp else 20.dp), statusText)
-                        Text(if (locked) "잠금" else "보유중", style = KagomType.ClosetPopupBadge, color = statusText, maxLines = 1)
+                        Text(if (locked) "잠금" else "보유중", style = if (locked) KagomType.ClosetSmallText else KagomType.ClosetPopupBadge, color = statusText, maxLines = 1)
                     }
                 }
                 Spacer(Modifier.height(if (split) 8.dp else 20.dp))
