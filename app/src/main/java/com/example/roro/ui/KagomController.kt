@@ -67,7 +67,13 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
 
     private var energyLevel = 0
 
-    val status: StateFlow<VehicleStatus> = combine(signals.snapshot, store.data) { s, d -> evaluate(s, d) }
+    /**
+     * 시연 패널 '날짜': 오늘을 며칠 뒤로 볼지. 엔진오일 교체 시기(MNT-01)의 날짜 기준은 기다려야만 볼 수 있어서 둔다.
+     * 저장하지 않으므로 앱을 다시 켜면 실제 날짜로 돌아온다. status가 처음 계산될 때 읽으므로 status보다 먼저 둔다
+     */
+    val demoDayOffset = MutableStateFlow(0L)
+
+    val status: StateFlow<VehicleStatus> = combine(signals.snapshot, store.data, demoDayOffset) { s, d, _ -> evaluate(s, d) }
         .stateIn(scope, SharingStarted.Eagerly, evaluate(signals.snapshot.value, store.data.value))
 
     private fun evaluate(s: VehicleSnapshot, d: AppData): VehicleStatus {
@@ -332,18 +338,31 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
     /** 새 차로 옮겨 탄 상황 (SCR-00 Carry-over). 실제 감지 방법은 아직 정해지지 않아 시연 훅으로만 켠다 */
     fun demoNewVehicle(on: Boolean) = store.update { d -> if (d.profile == null) d else d.copy(newVehicle = on) }
 
+    /**
+     * 캐릭터 색(스킨)만 바꾼다. 색은 성향 테스트 결과로만 정해져서, 여덟 색을 보려면 매번 처음부터 다시 해야 했다.
+     * 응답도 그 스킨의 조합으로 맞춰 저장값이 서로 어긋나지 않게 한다
+     */
+    fun demoSetSkin(code: String) {
+        val skin = Skins.all.firstOrNull { it.code == code } ?: return
+        store.update { d -> d.profile?.let { d.copy(profile = it.copy(skin = skin.code, answers = skin.answers)) } ?: d }
+    }
+
+    fun demoAddDays(days: Long) = demoSetDayOffset(demoDayOffset.value + days)
+    /** 과거로는 돌리지 않는다 (저장된 날짜보다 앞서면 경과 일수가 0으로 잘려 볼 것이 없다) */
+    fun demoSetDayOffset(days: Long) { demoDayOffset.value = days.coerceAtLeast(0) }
+
     fun demoResetAll() {
         signals.clear()
         locationSource.override.value = null
         insideLandmark = null
         deferred.value = emptySet()
         energyLevel = 0
+        demoDayOffset.value = 0
         store.reset()
     }
 
-    companion object {
-        fun today(): Long = LocalDate.now().toEpochDay()
-    }
+    /** 오늘 (epoch day). 시연 패널에서 넘긴 날짜가 있으면 그만큼 뒤 */
+    fun today(): Long = LocalDate.now().toEpochDay() + demoDayOffset.value
 }
 
 /** 갖고 있지 않은 아이템은 착용할 수 없다 */

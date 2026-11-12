@@ -32,9 +32,11 @@ import com.example.roro.core.Gear
 import com.example.roro.core.Examples
 import com.example.roro.core.Landmarks
 import com.example.roro.core.OilLevel
+import com.example.roro.core.Skins
 import com.example.roro.ui.theme.KagomColor
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomType
+import java.time.LocalDate
 
 /**
  * 시연 패널 (디버그 빌드 전용). 차 없이 상태 엔진·보상·팝업 큐를 시연한다.
@@ -65,6 +67,12 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
                     Btn(act.label, false) { c.demoAct.value = act.key; onClose() }
                 }
             }
+            Group("캐릭터 색 (카곰을 만든 뒤, 저장됨)") {
+                val data by c.store.data.collectAsState()
+                Skins.all.forEach { skin ->
+                    Btn("${skin.code} ${skin.skinName}", data.profile?.skin == skin.code) { c.demoSetSkin(skin.code) }
+                }
+            }
             Group("연료·배터리 %") {
                 listOf(72, 33, 28, 18, 12, 8, 4).forEach { p ->
                     Btn("$p", o.fuelPercent == p) { c.signals.edit { it.copy(fuelPercent = p) } }
@@ -83,6 +91,15 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
             Group("경고") {
                 Btn("엔진 경고등", o.engineWarning == true) { c.signals.edit { it.copy(engineWarning = if (it.engineWarning == true) false else true) } }
                 Btn("워셔액 부족", o.washerLow == true) { c.signals.edit { it.copy(washerLow = if (it.washerLow == true) false else true) } }
+            }
+            val dayOffset by c.demoDayOffset.collectAsState()
+            val status by c.status.collectAsState()
+            Group(
+                "날짜 ${LocalDate.ofEpochDay(c.today())}${if (dayOffset > 0) " (+${dayOffset}일)" else ""}" +
+                    " · 엔진오일 교체 시기 (MNT-01): ${status.oilChange?.display ?: "해당 없음"}",
+            ) {
+                listOf(1L, 30L, 100L, 300L).forEach { days -> Btn("+${days}일", false) { c.demoAddDays(days) } }
+                Btn("날짜 초기화", dayOffset == 0L) { c.demoSetDayOffset(0) }
             }
             Group("주행거리 (도전과제·MNT)") {
                 Btn("+10 km", false) { c.demoAddKm(10f) }
