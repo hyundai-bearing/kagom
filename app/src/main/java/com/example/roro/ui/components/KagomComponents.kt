@@ -369,19 +369,27 @@ fun QuestionCard(key: String, choice: String, tag: String, selected: Boolean, en
 enum class QuestCardSize { Wide, Compact }
 
 private val QUEST_DATE = DateTimeFormatter.ofPattern("yyyy.MM.dd")
-private val QUEST_TIME = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
- * questCard (Figma 6:2102 / 7:2102, 11/10 개편): 아이콘 칸 + 이름·조건·EXP + 오른쪽에 달성 날짜·시각 또는 진행 숫자·바.
+ * questCard (Figma 6:2102 / 7:2102, 11/10 개편): 아이콘 칸 + 이름·조건·EXP + 오른쪽에 달성 날짜 또는 진행 숫자·바.
  * 보상 미리보기(? 또는 아이템)는 카드에서 빠졌다 (보상은 POP-02에서 공개).
  * [doneAt] = 달성 시각(ms). 이 기록이 생기기 전에 달성한 과제는 null → 날짜 없이 "달성"만.
  * 단발형이 진행 중일 때의 모습은 Figma에 없어서 누적형과 같이 숫자·바로 보여 준다.
  */
 @Composable
-fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifier, doneAt: Long? = null) {
+fun QuestCard(
+    p: QuestProgress,
+    size: QuestCardSize,
+    modifier: Modifier = Modifier,
+    doneAt: Long? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val shape = RoundedCornerShape(KagomRadius.r24)
     Row(
         modifier.fillMaxWidth().height(140.dp)
-            .background(KagomColor.Surface.card, RoundedCornerShape(KagomRadius.r24)).padding(horizontal = KagomSpace.s28),
+            .clip(shape).background(KagomColor.Surface.card)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(horizontal = KagomSpace.s28),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(KagomSpace.s20),
     ) {
@@ -396,10 +404,7 @@ fun QuestCard(p: QuestProgress, size: QuestCardSize, modifier: Modifier = Modifi
         }
         if (p.achieved) {
             val at = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()) }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
-                Text(if (at != null) "${at.format(QUEST_DATE)} 달성" else "달성", style = KagomType.Body18Strong, color = KagomColor.Text.primary, maxLines = 1)
-                if (at != null) Text(at.format(QUEST_TIME), style = KagomType.Body16, color = KagomColor.Text.secondary)
-            }
+            Text(if (at != null) "${at.format(QUEST_DATE)} 달성" else "달성", style = KagomType.Body18Strong, color = KagomColor.Text.primary, maxLines = 1)
         } else {
             Column(
                 Modifier.width(if (size == QuestCardSize.Wide) 480.dp else 160.dp),
@@ -547,30 +552,6 @@ fun LandmarkPin(state: PinState, modifier: Modifier = Modifier, onClick: () -> U
 }
 
 /** landmarkDetailPopup (State=Visited|Locked · Name/Reward/Mark/Status). 440×174 */
-@Composable
-fun LandmarkDetailPopup(name: String, reward: String, mark: String, visited: Boolean, modifier: Modifier = Modifier, width: Dp = 440.dp, itemId: String? = null) {
-    val shape = RoundedCornerShape(KagomRadius.r24)
-    Row(
-        modifier.width(width).shadow(16.dp, shape, ambientColor = PleosKit.shadow, spotColor = PleosKit.shadow)
-            .background(KagomColor.Surface.card, shape).border(1.dp, KagomColor.Border.default, shape).padding(KagomSpace.s24),
-        horizontalArrangement = Arrangement.spacedBy(KagomSpace.s16),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // 미방문 핀은 Figma 152:4670처럼 보상 이름과 잠긴 마크를 보여 준다.
-        ItemThumb(mark, 96.dp, locked = false, markStyle = KagomType.Title28, lockBadge = !visited, itemId = itemId.takeIf { visited })
-        Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
-            Text(name, style = KagomType.Heading22, color = KagomColor.Text.primary)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("보상", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-                Text(reward, style = KagomType.Body16Strong, color = KagomColor.Text.primary)
-            }
-            if (visited) StatusBadge(Severity.OK, "방문 완료") else StatusBadge(Severity.RECOMMEND, "방문하면 획득")
-            Text(if (visited) "방문 완료 · 보상을 바로 장착할 수 있어요" else "방문하면 안개가 걷히고 보상을 바로 장착할 수 있어요",
-                style = KagomType.Caption14, color = KagomColor.Text.tertiary)
-        }
-    }
-}
-
 /** 잠긴 핀 툴팁 (SCR-05 tooltip): 왼쪽 꼬리가 달린 어두운 말풍선 */
 @Composable
 fun PinTooltip(title: String, body: String, modifier: Modifier = Modifier) {

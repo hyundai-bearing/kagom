@@ -333,6 +333,8 @@ fun KagomCharacter(
     /** 시연 패널에서 고른 동작 (TouchAct.key). 3D 동작을 틀 수 있을 때(기어 P + 대기 표정) 그 동작을 바로 한 번 틀고 [onDemoActShown]을 부른다 */
     demoAct: String? = null,
     onDemoActShown: () -> Unit = {},
+    /** 상세 화면의 버튼과 캐릭터 탭이 같은 동작을 실행한다. */
+    preferredAct: TouchAct? = null,
 ) {
     val context = LocalContext.current
     var motionJob by remember { mutableStateOf<Job?>(null) }
@@ -402,20 +404,21 @@ fun KagomCharacter(
     val turning = !turn.atRest && frames.hasAny
 
     // 다음 반응은 미리 정해 두고, 3D 동작을 틀 수 있는 동안(홈, 기어 P + 대기 표정) 앞부분을 합성해 둔다 → 탭하면 바로 움직인다
-    val canAct = onTouch != null && expression == Expression.IDLE
+    val canAct = onTouch != null && (expression == Expression.IDLE || preferredAct != null)
     var nextAct by remember { mutableStateOf(TouchAct.entries.random()) }
     var head by remember { mutableStateOf<MotionHead?>(null) }
-    LaunchedEffect(canAct, nextAct, skinCode, worn) {
+    val preloadAct = preferredAct ?: nextAct
+    LaunchedEffect(canAct, preloadAct, skinCode, worn) {
         head = null
-        if (canAct) head = preloadMotion(context.applicationContext, nextAct, skinCode, worn)
+        if (canAct) head = preloadMotion(context.applicationContext, preloadAct, skinCode, worn)
     }
 
     /** 대기 표정: 바로 전과 다른 3D 동작을 고른다 (반응 중에 또 누르면 새 반응으로 바로 바꾼다). 이상 상태: 표정 몸짓 */
     fun react(chosen: TouchAct? = null) {
         if (!canAct) { poke++; return }
-        val act = chosen ?: nextAct
+        val act = chosen ?: preloadAct
         val ready = head      // 미리 만든 앞부분은 같은 동작일 때만 쓰인다 (playMotion)
-        nextAct = TouchAct.entries.filter { it != act }.random()
+        if (preferredAct == null) nextAct = TouchAct.entries.filter { it != act }.random()
         motionJob?.cancel()
         motionJob = scope.launch {
             // 돌려 둔 채로 누르면 정면으로 빨리 돌려놓고 시작한다: 동작 프레임은 정면(HOME_YAW)뿐이라 돌아간 그림 위에 겹쳐 잔상처럼 보였다.
@@ -482,5 +485,5 @@ fun KagomCharacter(
         }
     }
     // 표정이 바뀌거나 터치 반응이 막히면(주행 시작) 하던 동작도 바로 멈춘다
-    LaunchedEffect(expression, onTouch != null) { motionJob?.cancel() }
+    LaunchedEffect(expression, onTouch != null, skinCode, worn) { motionJob?.cancel() }
 }
