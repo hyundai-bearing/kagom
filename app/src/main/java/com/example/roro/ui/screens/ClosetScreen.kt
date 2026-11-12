@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.example.roro.core.Category
 import com.example.roro.core.Examples
+import com.example.roro.core.Expression
 import com.example.roro.core.Item
 import com.example.roro.core.Items
 import com.example.roro.core.Landmarks
@@ -73,7 +74,7 @@ import com.example.roro.ui.components.IviButton
 import com.example.roro.ui.components.IviButtonSize
 import com.example.roro.ui.components.IviButtonType
 import com.example.roro.ui.components.IviToast
-import com.example.roro.ui.components.KagomTurntable
+import com.example.roro.ui.components.KagomCharacter
 import com.example.roro.ui.components.NavTab
 import com.example.roro.ui.components.Pagination
 import com.example.roro.ui.components.wornLayers
@@ -134,6 +135,7 @@ fun ClosetScreen(
     data: AppData,
     ctx: ProgressContext,
     gearP: Boolean,
+    expression: Expression,
     onSave: (Equipped) -> Unit,
     onSaveOutfit: (Int, Equipped) -> Unit,
     examples: Boolean = false,
@@ -221,8 +223,14 @@ fun ClosetScreen(
                     drawCircle(shadow, radius = radius, center = center)
                 }
             }
-            KagomTurntable(profile.skin, wornLayers(draft.head, draft.top, draft.bottom),
-                if (compact) Modifier.offset(x = shift).size(234.dp, 366.dp) else Modifier.offset(x = shift).size(350.dp, 544.dp), enabled = gearP, showControls = false)
+            KagomCharacter(
+                profile.skin, expression,
+                if (compact) Modifier.offset(x = shift).size(234.dp, 366.dp) else Modifier.offset(x = shift).size(350.dp, 544.dp),
+                worn = wornLayers(draft.head, draft.top, draft.bottom),
+                onTouch = if (gearP) ({}) else null,
+                turnable = gearP && expression == Expression.IDLE,
+                alive = gearP,
+            )
             SavedOutfitSlots(data.savedOutfits.size, selectedSlot, gearP, compact, closetPalette,
                 onSelect = { index ->
                     if (!gearP) { toast = "주차 중에 이용할 수 있어요" }

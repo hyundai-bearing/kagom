@@ -55,6 +55,18 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/** 사용자가 제공한 스킨별 무대. 알 수 없는 스킨은 기존 라벤더를 쓴다. */
+private fun closetStage(skin: String): Int = when (skin) {
+    "P01" -> R.drawable.closet_display_stage_cream
+    "P02" -> R.drawable.closet_display_stage_mint
+    "P04" -> R.drawable.closet_display_stage_charcoal
+    "P05" -> R.drawable.closet_display_stage_white
+    "P06" -> R.drawable.closet_display_stage_brown
+    "P07" -> R.drawable.closet_display_stage_turquoise
+    "P08" -> R.drawable.closet_display_stage_rose_gold
+    else -> R.drawable.closet_display_stage
+}
+
 /** Figma 2021:5094 / 2071:7596. 아이템과 카곰은 실제 데이터의 렌더를 쓴다. */
 @Composable
 internal fun ClosetItemPopup(
@@ -78,7 +90,7 @@ internal fun ClosetItemPopup(
         ) {
             BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1010f / 342f)) {
                 val unit = maxWidth / 1010f
-                Image(painterResource(R.drawable.closet_display_stage), contentDescription = null,
+                Image(painterResource(closetStage(profile.skin)), contentDescription = null,
                     contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
                 val context = LocalContext.current
                 val thumb = KagomRenders.thumbPath(item.id)
