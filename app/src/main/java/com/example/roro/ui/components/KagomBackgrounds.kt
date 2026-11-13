@@ -42,10 +42,14 @@ val LocalWeather = staticCompositionLocalOf<Weather?> { null }
  * [animated]: 홈과 옷장 미리보기에서 기어 P일 때만 켠다 (가이드 5.2). 카드·팝업·썸네일은 멈춘 그림이다.
  */
 @Composable
-fun BackgroundArt(itemId: String?, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null, animated: Boolean = false) {
+fun BackgroundArt(
+    itemId: String?, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null, animated: Boolean = false,
+    /** [BackgroundScene]의 horizontalBias. 옷장 미리보기는 해·등대가 있는 오른쪽을 남긴다 */
+    horizontalBias: Float = 0f,
+) {
     val scene = KagomBackgrounds.scene(itemId, LocalWeather.current) ?: return
     // 날씨나 고른 배경이 바뀔 때 그림이 툭 바뀌지 않게 겹쳐서 넘긴다 (주행 중에는 날씨가 바뀌지 않는다, KagomController.weather)
     Crossfade(scene, modifier, tween(if (animated) KagomMotion.PROGRESS else 0), label = "background") { kind ->
-        BackgroundScene(kind, animated, Modifier.fillMaxSize(), colorFilter)
+        BackgroundScene(kind, animated, Modifier.fillMaxSize(), colorFilter, horizontalBias)
     }
 }

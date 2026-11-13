@@ -258,6 +258,27 @@ fun HeaderProfile(
     }
 }
 
+/**
+ * 홈 머리 (2026-11-13 요청, 디자인에 없는 배치): 칭호는 곰 아래 번호판이 보여 주므로 빼고,
+ * 첫 줄에 이름과 레벨, 둘째 줄에 EXP를 넓게 둔다. [align]은 Full(가운데)·Split(왼쪽)에 맞춘다.
+ */
+@Composable
+fun HomeHeader(
+    name: String, tier: Int, exp: Int, nextExp: Int?, modifier: Modifier = Modifier,
+    align: Alignment.Horizontal = Alignment.CenterHorizontally,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(KagomSpace.s8), horizontalAlignment = align) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(name, style = KagomType.Title32, color = KagomColor.Text.primary, maxLines = 1)
+            TierEmblem(tier)
+        }
+        Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(if (nextExp != null) "EXP $exp / $nextExp" else "EXP $exp · MAX", style = KagomType.Caption14Strong, color = KagomColor.Text.secondary, maxLines = 1)
+            ProgressBar(if (nextExp != null) exp.toFloat() / nextExp else 1f, Modifier.fillMaxWidth(), height = 6.dp)
+        }
+    }
+}
+
 // ───────────── 홈 패널 ─────────────
 
 /** vehicleStatusRow (Label · Value · hasBadge). 59px + 하단 1px 구분선 */
