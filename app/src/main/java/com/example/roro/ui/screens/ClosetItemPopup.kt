@@ -43,6 +43,8 @@ import com.example.roro.core.Landmarks
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
 import com.example.roro.ui.components.AssetImage
+import com.example.roro.ui.components.ClosetTitlePlate
+import com.example.roro.ui.components.hasClosetTitlePlate
 import com.example.roro.ui.components.BackgroundArt
 import com.example.roro.ui.components.IviButton
 import com.example.roro.ui.components.IviButtonSize
@@ -57,6 +59,18 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+/** 사용자가 제공한 스킨별 무대. 알 수 없는 스킨은 기존 라벤더를 쓴다. */
+private fun closetStage(skin: String): Int = when (skin) {
+    "P01" -> R.drawable.closet_display_stage_cream
+    "P02" -> R.drawable.closet_display_stage_mint
+    "P04" -> R.drawable.closet_display_stage_charcoal
+    "P05" -> R.drawable.closet_display_stage_white
+    "P06" -> R.drawable.closet_display_stage_brown
+    "P07" -> R.drawable.closet_display_stage_turquoise
+    "P08" -> R.drawable.closet_display_stage_rose_gold
+    else -> R.drawable.closet_display_stage
+}
 
 /** Figma 2021:5094 / 2071:7596. 아이템과 카곰은 실제 데이터의 렌더를 쓴다. */
 @Composable
@@ -81,12 +95,15 @@ internal fun ClosetItemPopup(
         ) {
             BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1010f / 342f)) {
                 val unit = maxWidth / 1010f
-                Image(painterResource(R.drawable.closet_display_stage), contentDescription = null,
+                Image(painterResource(closetStage(profile.skin)), contentDescription = null,
                     contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
                 val context = LocalContext.current
                 val thumb = KagomRenders.thumbPath(item.id)
-                Box(Modifier.offset(x = unit * 305, y = unit * 48).size(unit * 400, unit * 235), contentAlignment = Alignment.Center) {
-                    if (item.category == Category.BACKGROUND) BackgroundArt(item.id,
+                val isTitlePlate = item.category == Category.TITLE && hasClosetTitlePlate(item.id)
+                Box(Modifier.offset(x = unit * (if (isTitlePlate) 289 else 305), y = unit * 48).size(unit * 400, unit * 235), contentAlignment = Alignment.Center) {
+                    if (isTitlePlate) {
+                        ClosetTitlePlate(item.id, profile.skin, Modifier.fillMaxWidth(0.8f), colorFilter = if (locked) lockedItemFilter else null)
+                    } else if (item.category == Category.BACKGROUND) BackgroundArt(item.id,
                         Modifier.fillMaxHeight().aspectRatio(4f / 3f).clip(RoundedCornerShape(unit * 16)), if (locked) lockedItemFilter else null)
                     else if (KagomRenders.exists(context, thumb)) AssetImage(thumb, Modifier.fillMaxSize(), colorFilter = if (locked) lockedItemFilter else null)
                     else Text(item.mark, style = KagomType.PleosTitleSmallStrong, color = KagomColor.Text.primary)
