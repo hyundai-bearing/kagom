@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.Severity as Sev
+import com.example.roro.core.Weather
 
 /**
  * Kagom 디자인 토큰 (Figma 변수 컬렉션 "Kagom Tokens" / "Kagom Primitives").
@@ -236,4 +237,109 @@ object KagomSkinPalette {
     )
 
     fun of(code: String?): SkinPalette = palettes[code] ?: palettes.getValue("P03")
+}
+
+/**
+ * 홈 배경 장면(ui/components/KagomBackgroundScene.kt)의 색. 디자인에 없어 정한 값이다 (가정, docs/IMPLEMENTATION.md).
+ * 홈 헤더 글자(Text.primary·secondary)가 하늘과 구름 위에서 그대로 읽히도록 [skyTop]과 [cloudShade]는 이보다 어둡게 두지 않는다.
+ */
+data class ScenePalette(
+    val skyTop: Color, val skyBottom: Color,
+    /** 해. 흐림에서는 구름 뒤의 옅은 원이고, 비·눈·천둥번개에는 없다 */
+    val sun: Color?, val sunGlow: Color?,
+    val cloudLight: Color, val cloudShade: Color,
+    /** 먼 산 두 겹 (아래로 갈수록 하늘색에 섞여 옅어진다). 바다에서는 먼 섬과 곶 */
+    val ridgeFar: Color, val ridgeNear: Color,
+    /** 언덕 세 겹과 그 아래쪽 그늘. 바다에서는 [hillFar] = 젖은 모래, [hillNear] = 모래밭 */
+    val hillFar: Color, val hillMid: Color, val hillNear: Color, val hillShade: Color,
+    val tree: Color, val treeLight: Color, val trunk: Color,
+    /** 빗줄기·눈송이·흰 꽃·물거품·갈매기 */
+    val particle: Color,
+    /** 노란 꽃·번개·등대 지붕 */
+    val accent: Color,
+    /** 물웅덩이 (비·천둥번개), 바닷가 얕은 물 */
+    val water: Color = skyBottom,
+    /** 하늘 가운데 색 (노을) */
+    val skyMid: Color? = null,
+    /** 바다: 수평선 쪽과 가까운 쪽 */
+    val sea: Color = hillFar, val seaDeep: Color = hillMid,
+    /** 해의 밝은 면, 물결, 번쩍임에 섞는 흰색 */
+    val white: Color = Color(0xFFFFFFFF),
+)
+
+object KagomScenePalette {
+    private val clear = ScenePalette(
+        skyTop = Color(0xFFA9DBF7), skyBottom = Color(0xFFE6F6FB),
+        sun = Color(0xFFFFD86B), sunGlow = Color(0xFFFFF1B8),
+        cloudLight = Color(0xFFFFFFFF), cloudShade = Color(0xFFE3F1FA),
+        ridgeFar = Color(0xFFB9DDE4), ridgeNear = Color(0xFFA5D3C9),
+        hillFar = Color(0xFFB8E3B4), hillMid = Color(0xFF9AD69A), hillNear = Color(0xFF7FC784), hillShade = Color(0xFF5FB06E),
+        tree = Color(0xFF5FB37A), treeLight = Color(0xFF86CC92), trunk = Color(0xFF9A7B5B),
+        particle = Color(0xFFFFFFFF), accent = Color(0xFFFFDF7E),
+    )
+    private val cloudy = ScenePalette(
+        skyTop = Color(0xFFC3D0DB), skyBottom = Color(0xFFE9EEF2),
+        sun = Color(0xFFF6F1DF), sunGlow = Color(0xFFF3F0E6),
+        cloudLight = Color(0xFFF7F9FB), cloudShade = Color(0xFFCBD5DE),
+        ridgeFar = Color(0xFFBFCFD3), ridgeNear = Color(0xFFAFC6C1),
+        hillFar = Color(0xFFB7D3B9), hillMid = Color(0xFFA0C5A5), hillNear = Color(0xFF89B692), hillShade = Color(0xFF6E9F7C),
+        tree = Color(0xFF6FA583), treeLight = Color(0xFF8DBB99), trunk = Color(0xFF8E7B67),
+        particle = Color(0xFFFFFFFF), accent = Color(0xFFE9E3C4),
+    )
+    private val rain = ScenePalette(
+        skyTop = Color(0xFFA8B9C9), skyBottom = Color(0xFFD8E1E8),
+        sun = null, sunGlow = null,
+        cloudLight = Color(0xFFD5DDE5), cloudShade = Color(0xFFA9B6C4),
+        ridgeFar = Color(0xFFB1C2C8), ridgeNear = Color(0xFF9FB8B4),
+        hillFar = Color(0xFFA6C6AD), hillMid = Color(0xFF8FB79A), hillNear = Color(0xFF78A786), hillShade = Color(0xFF5C8F70),
+        tree = Color(0xFF5F9777), treeLight = Color(0xFF7DAE8C), trunk = Color(0xFF7D6C5C),
+        particle = Color(0xFF7F9BB5), accent = Color(0xFFC7DAE6), water = Color(0xFFC7DAE6),
+    )
+    private val snow = ScenePalette(
+        skyTop = Color(0xFFBDD3E6), skyBottom = Color(0xFFEDF3F8),
+        sun = null, sunGlow = null,
+        cloudLight = Color(0xFFFFFFFF), cloudShade = Color(0xFFDCE6EF),
+        ridgeFar = Color(0xFFD5E1EC), ridgeNear = Color(0xFFC6D7E5),
+        hillFar = Color(0xFFF3F7FA), hillMid = Color(0xFFE9F0F6), hillNear = Color(0xFFFBFDFE), hillShade = Color(0xFFD3E0EB),
+        tree = Color(0xFF6E9C8C), treeLight = Color(0xFFFFFFFF), trunk = Color(0xFF8A7767),
+        particle = Color(0xFFFFFFFF), accent = Color(0xFFC4D5E3),
+    )
+    private val thunder = ScenePalette(
+        skyTop = Color(0xFFA2ABC2), skyBottom = Color(0xFFD0D4E0),
+        sun = null, sunGlow = null,
+        cloudLight = Color(0xFFC4C9D8), cloudShade = Color(0xFF9BA3B8),
+        ridgeFar = Color(0xFFA9B3C2), ridgeNear = Color(0xFF98A8B0),
+        hillFar = Color(0xFF98B5A3), hillMid = Color(0xFF83A690), hillNear = Color(0xFF6E977E), hillShade = Color(0xFF557F69),
+        tree = Color(0xFF56876E), treeLight = Color(0xFF729F84), trunk = Color(0xFF6F6156),
+        particle = Color(0xFF7C89A8), accent = Color(0xFFFFD95C), water = Color(0xFFBCC6D8),
+    )
+    /** BG-02 노을 언덕 */
+    val sunset = ScenePalette(
+        skyTop = Color(0xFFF7C2C4), skyBottom = Color(0xFFFFF2DA), skyMid = Color(0xFFFFD8B4),
+        sun = Color(0xFFFFB25C), sunGlow = Color(0xFFFFE2A6),
+        cloudLight = Color(0xFFFFF7F0), cloudShade = Color(0xFFFFCDBA),
+        ridgeFar = Color(0xFFE6B3A6), ridgeNear = Color(0xFFD7A48E),
+        hillFar = Color(0xFFCBD09C), hillMid = Color(0xFFB0C58E), hillNear = Color(0xFF93B884), hillShade = Color(0xFF6C9A6C),
+        tree = Color(0xFF7FA872), treeLight = Color(0xFFBCCB8C), trunk = Color(0xFF94725A),
+        particle = Color(0xFFFFFFFF), accent = Color(0xFFFFD98A),
+    )
+    /** BG-03 동해 바다 */
+    val coast = ScenePalette(
+        skyTop = Color(0xFFA6D8F5), skyBottom = Color(0xFFE6F6FA),
+        sun = Color(0xFFFFBE64), sunGlow = Color(0xFFFFE6AE),
+        cloudLight = Color(0xFFFFFFFF), cloudShade = Color(0xFFE3F1FA),
+        ridgeFar = Color(0xFF9CC7CE), ridgeNear = Color(0xFF7DB79C),
+        hillFar = Color(0xFFE3CFA0), hillMid = Color(0xFFEFDDB2), hillNear = Color(0xFFF8EACA), hillShade = Color(0xFFE7D2A2),
+        tree = Color(0xFF4F9373), treeLight = Color(0xFF7DB88F), trunk = Color(0xFF8F7257),
+        particle = Color(0xFFFFFFFF), accent = Color(0xFFE8705F), water = Color(0xFFA5E0EC),
+        sea = Color(0xFF8CCFE9), seaDeep = Color(0xFF52A8D4),
+    )
+
+    fun of(weather: Weather): ScenePalette = when (weather) {
+        Weather.CLEAR -> clear
+        Weather.CLOUDY -> cloudy
+        Weather.RAIN -> rain
+        Weather.SNOW -> snow
+        Weather.THUNDER -> thunder
+    }
 }

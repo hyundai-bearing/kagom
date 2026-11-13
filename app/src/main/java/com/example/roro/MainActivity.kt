@@ -7,9 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.roro.ui.components.TouchAct
+import com.example.roro.core.Category
 import com.example.roro.core.Gear
+import com.example.roro.core.Items
 import com.example.roro.core.Examples
 import com.example.roro.core.OilLevel
+import com.example.roro.core.Weather
 import com.example.roro.data.LocationSource
 import com.example.roro.ui.KagomApp
 import com.example.roro.ui.KagomController
@@ -39,6 +42,8 @@ import kotlinx.coroutines.cancel
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_act wave      # 캐릭터 동작 한 번: wave/cheer/stomp/bow/spin (홈, 기어 P + 대기 표정)
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_skin P04      # 캐릭터 색 P01~P08 (카곰을 만든 뒤, 저장됨)
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ei demo_days 300      # 오늘을 N일 뒤로 (엔진오일 교체 시기 MNT-01). 0 = 실제 날짜 (저장 안 함)
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_background BG-03 # 홈에 깔아 볼 배경 BG-01~04 (잠긴 배경도), off = 장착한 배경 (저장 안 함)
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_weather rain  # 배경 '오늘 날씨'(BG-04)의 날씨: clear/cloudy/rain/snow/thunder, off = 실제 날씨 (저장 안 함, 기어 P에서 반영)
  */
 class MainActivity : ComponentActivity() {
 
@@ -91,7 +96,20 @@ class MainActivity : ComponentActivity() {
         if (intent.hasExtra("demo_examples")) c.demoExamples.value = intent.getBooleanExtra("demo_examples", false)
         if (intent.hasExtra("demo_new_vehicle")) c.demoNewVehicle(intent.getBooleanExtra("demo_new_vehicle", false))
         intent.getStringExtra("demo_skin")?.let { c.demoSetSkin(it.uppercase()) }
+        intent.getStringExtra("demo_background")?.let { id -> c.demoBackground.value = id.uppercase().takeIf { Items.byId(it)?.category == Category.BACKGROUND } }
+        intent.getStringExtra("demo_weather")?.let { w -> c.demoWeather.value = Weather.entries.firstOrNull { it.name == w.uppercase() } }
         if (intent.hasExtra("demo_days")) c.demoSetDayOffset(intent.getIntExtra("demo_days", 0).toLong())
+    }
+
+    // MET Norway 이용 조건: 앱을 쓰지 않는 동안에는 날씨를 새로 받지 않는다
+    override fun onStart() {
+        super.onStart()
+        controller.weatherSource.active.value = true
+    }
+
+    override fun onStop() {
+        controller.weatherSource.active.value = false
+        super.onStop()
     }
 
     override fun onDestroy() {

@@ -1,0 +1,34 @@
+<!-- 랜드마크 상세 풍경: 대관령 옛길 (LandmarkScenery.FOREST). 디자인에 없어 detail_coast와 같은 크기·톤으로 직접 그렸다 (가정): 겹겹의 산과 전나무 사이로 난 옛길 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="640dp" android:height="420dp"
+    android:viewportWidth="640" android:viewportHeight="420">
+    <path android:fillColor="#CDE8F2" android:pathData="M0,0H640V420H0Z"/>
+    <path android:fillColor="#E0F0F2" android:pathData="M0,190Q190,160 380,190T640,184V420H0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M48,99C37,86 83,74 111,80C130,64 167,63 184,77C194,92 153,106 109,110C78,115 55,109 48,99ZM275,65C278,54 323,49 355,53C376,57 376,65 354,70C320,77 272,75 275,65Z"/>
+    <path android:fillColor="#A8CBD0" android:pathData="M0,225Q110,120 220,210Q330,100 450,215Q550,140 640,205V420H0Z"/>
+    <path android:fillColor="#7FB59F" android:pathData="M0,280Q160,190 330,270T640,250V420H0Z"/>
+    <path android:fillColor="#9CCB8E" android:pathData="M0,330Q200,300 400,325T640,315V420H0Z"/>
+    <path android:fillColor="#F2E2BE" android:pathData="M262,420Q372,376 312,344Q268,318 326,296L346,299Q300,320 348,344Q420,380 384,420Z"/>
+    <path android:fillColor="#8F7257" android:pathData="M146.4,357.6H153.6V372H146.4Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M114,362.4L150,306L186,362.4Z"/>
+    <path android:fillColor="#6BAA86" android:pathData="M121.2,328.8L150,276L178.8,328.8Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M129.6,297.6L150,252L170.4,297.6Z"/>
+    <path android:fillColor="#8F7257" android:pathData="M486.6,362.6H493.4V376H486.6Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M456.4,367L490,314.4L523.6,367Z"/>
+    <path android:fillColor="#6BAA86" android:pathData="M463.1,335.7L490,286.4L516.9,335.7Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M471,306.6L490,264L509,306.6Z"/>
+    <path android:fillColor="#86BD7F" android:pathData="M0,396Q160,374 330,392T640,384V420H0ZM262,420Q300,405 330,398L378,402Q392,410 384,420Z"/>
+    <path android:fillColor="#F2E2BE" android:pathData="M262,420Q318,398 336,394L372,398Q396,408 384,420Z"/>
+    <path android:fillColor="#8F7257" android:pathData="M64.3,385.2H75.7V408H64.3Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M13,392.8L70,303.5L127,392.8Z"/>
+    <path android:fillColor="#6BAA86" android:pathData="M24.4,339.6L70,256L115.6,339.6Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M37.7,290.2L70,218L102.3,290.2Z"/>
+    <path android:fillColor="#8F7257" android:pathData="M560,388H572V412H560Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M506,396L566,302L626,396Z"/>
+    <path android:fillColor="#6BAA86" android:pathData="M518,340L566,252L614,340Z"/>
+    <path android:fillColor="#4F9373" android:pathData="M532,288L566,212L600,288Z"/>
+    <path android:fillColor="#8F7257" android:pathData="M614.4,403.6H621.6V418H614.4Z"/>
+    <path android:fillColor="#5E9E7E" android:pathData="M582,408.4L618,352L654,408.4Z"/>
+    <path android:fillColor="#7DB88F" android:pathData="M589.2,374.8L618,322L646.8,374.8Z"/>
+    <path android:fillColor="#5E9E7E" android:pathData="M597.6,343.6L618,298L638.4,343.6Z"/>
+</vector>

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,12 +37,14 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.roro.core.Category
 import com.example.roro.core.Checkup
 import com.example.roro.core.PendingPopup
 import com.example.roro.core.Progress
 import com.example.roro.ui.components.BottomTabBar
 import com.example.roro.ui.components.IviToast
 import com.example.roro.ui.components.KagomCharacter
+import com.example.roro.ui.components.LocalWeather
 import com.example.roro.ui.components.NavRail
 import com.example.roro.ui.components.NavTab
 import com.example.roro.ui.components.wornLayers
@@ -77,6 +80,12 @@ private data class Notice(val text: String, val id: Long = System.nanoTime())
  */
 @Composable
 fun KagomApp(c: KagomController) = KagomTheme {
+    val weather by c.weather.collectAsState()
+    CompositionLocalProvider(LocalWeather provides weather) { KagomAppContent(c) }
+}
+
+@Composable
+private fun KagomAppContent(c: KagomController) {
     val mode = LocalLayoutMode.current
     val context = LocalContext.current
     val data by c.store.data.collectAsState()
@@ -87,6 +96,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
     val examples by c.demoExamples.collectAsState()
     val popupPreview by c.demoPopup.collectAsState()
     val demoAct by c.demoAct.collectAsState()
+    val demoBackground by c.demoBackground.collectAsState()
     val gearP = gear.isPark
 
     var tab by rememberSaveable { mutableStateOf(NavTab.HOME) }
@@ -130,11 +140,15 @@ fun KagomApp(c: KagomController) = KagomTheme {
             } else if (profile == null || target == null) {
                 OnboardingFlow(onboarding, gearP) { name, answers -> c.createProfile(name, answers) }
             } else when (target) {
-                NavTab.HOME -> HomeScreen(
-                    profile, data, status, gearP, demoAct, { c.demoAct.value = null },
-                    onOpenSheet = { sheetOpen = true },
-                    onBlockedSheet = { notice = Notice("정비 시트는 정차 후 이용할 수 있어요") },
-                )
+                NavTab.HOME -> {
+                    // 시연 패널의 배경 미리보기는 홈에만 깔고 저장된 장착은 건드리지 않는다
+                    val shown = demoBackground?.let { data.copy(equipped = data.equipped.with(Category.BACKGROUND, it)) } ?: data
+                    HomeScreen(
+                        profile, shown, status, gearP, demoAct, { c.demoAct.value = null },
+                        onOpenSheet = { sheetOpen = true },
+                        onBlockedSheet = { notice = Notice("정비 시트는 정차 후 이용할 수 있어요") },
+                    )
+                }
                 NavTab.QUESTS -> QuestsScreen(
                     Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt, gearP,
                     DetailAvatar(profile.skin, status.expression, wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom)),

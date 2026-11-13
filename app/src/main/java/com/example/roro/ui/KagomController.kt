@@ -17,6 +17,7 @@ import com.example.roro.core.StateEngine
 import com.example.roro.core.Tiers
 import com.example.roro.core.VehicleSnapshot
 import com.example.roro.core.VehicleStatus
+import com.example.roro.core.Weather
 import com.example.roro.data.AppData
 import com.example.roro.data.DrivingStateSource
 import com.example.roro.data.Equipped
@@ -28,6 +29,7 @@ import com.example.roro.data.MockVehicleSignalSource
 import com.example.roro.data.OverridableSignalSource
 import com.example.roro.data.PleosVehicleSignalSource
 import com.example.roro.data.Profile
+import com.example.roro.data.WeatherSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -64,6 +67,21 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
     val gear: StateFlow<Gear> = combine(signals.snapshot, drivingSource.driving) { s, driving ->
         s.gear ?: if (driving) Gear.D else Gear.P
     }.stateIn(scope, SharingStarted.Eagerly, Gear.P)
+
+    val weatherSource = WeatherSource()
+    /** 시연 패널 '날씨': 실제 날씨 대신 보여 줄 날씨. null = 실제 날씨. 저장하지 않는다 */
+    val demoWeather = MutableStateFlow<Weather?>(null)
+    /** 시연 패널 '배경 미리보기': 장착하지 않고 홈에 깔아 볼 배경 아이템 ID (잠긴 배경도 볼 수 있다). 저장하지 않는다 */
+    val demoBackground = MutableStateFlow<String?>(null)
+
+    /**
+     * 홈 배경 "오늘 날씨"(BG-04)가 그릴 날씨. null = 모름(위치·통신 없음) → 기본 그림.
+     * 주행 중에는 배경이 갑자기 바뀌어 눈길을 끌지 않도록 그대로 두고, 기어 P가 되면 바뀐 날씨를 반영한다 (가이드 5.2).
+     * 날씨를 모르는 채로 출발했으면(이미 기본 그림이 보인다) 주행 중에 날씨가 들어와도 다음 정차까지 기본 그림이다
+     */
+    val weather: StateFlow<Weather?> = combine(weatherSource.weather, demoWeather, gear) { real, demo, g -> (demo ?: real) to g.isPark }
+        .runningFold(null as Weather?) { shown, (next, parked) -> if (parked) next else shown }
+        .stateIn(scope, SharingStarted.Eagerly, null)
 
     private var energyLevel = 0
 
@@ -119,6 +137,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         signals.start()
         drivingSource.start()
         locationSource.start()
+        weatherSource.start(scope, locationSource.current)
 
         // 기어가 P를 벗어나면 "나중에" 목록을 비운다
         scope.launch {
@@ -137,6 +156,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         signals.stop()
         drivingSource.stop()
         locationSource.stop()
+        weatherSource.stop()
     }
 
     private fun onSignals(s: VehicleSnapshot) {
@@ -363,6 +383,8 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         deferred.value = emptySet()
         energyLevel = 0
         demoDayOffset.value = 0
+        demoWeather.value = null
+        demoBackground.value = null
         store.reset()
     }
 

@@ -100,7 +100,10 @@ class KoreaMapTest {
         val map = mapWithGangneungDistricts()
         val gangneung = map.districtsOf(Landmarks.GANGNEUNG)
         assertEquals(9, gangneung.size)
-        val expected = mapOf("LM-GN-01" to "강동면", "LM-GN-02" to "시내 13개 동", "LM-GN-03" to "주문진읍")
+        val expected = mapOf(
+            "LM-GN-01" to "강동면", "LM-GN-02" to "시내 13개 동", "LM-GN-03" to "주문진읍",
+            "LM-GN-04" to "왕산면", "LM-GN-05" to "성산면",
+        )
         for ((id, name) in expected) {
             val landmark = Landmarks.byId(id)!!
             val matches = gangneung.filter { it.contains(landmark.lon.toFloat(), landmark.lat.toFloat()) }
@@ -119,11 +122,11 @@ class KoreaMapTest {
     }
 
     @Test
-    fun `강릉 랜드마크를 모두 방문해도 세 구획만 해금된다`() {
+    fun `강릉 랜드마크를 모두 방문하면 그 다섯 구획만 해금된다`() {
         val map = mapWithGangneungDistricts()
         val ids = Landmarks.inUnit(Landmarks.GANGNEUNG).map { it.id }.toSet()
         val areas = map.landmarkVisitAreas(Landmarks.all, ids)
-        assertEquals(setOf("주문진읍", "시내 13개 동", "강동면"), areas.map { it.region.name }.toSet())
+        assertEquals(setOf("주문진읍", "시내 13개 동", "강동면", "왕산면", "성산면"), areas.map { it.region.name }.toSet())
         assertTrue(areas.all { it.fullyVisited })
     }
 

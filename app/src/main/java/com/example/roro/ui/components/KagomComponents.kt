@@ -136,7 +136,7 @@ fun ItemThumb(
     ) {
         when {
             // 배경 아이템은 3D 썸네일 대신 그림 자체를 칸에 채운다
-            !locked && KagomBackgrounds.drawable(itemId) != null -> BackgroundArt(itemId, Modifier.fillMaxSize().clip(shape))
+            !locked && KagomBackgrounds.has(itemId) -> BackgroundArt(itemId, Modifier.fillMaxSize().clip(shape))
             thumb != null -> AssetImage(thumb, Modifier.fillMaxSize().padding(size * 0.06f))
             locked && mark == null -> LockGlyph(Modifier.size(size * 0.32f), KagomColor.Text.inverse)
             else -> Text(mark ?: "?", style = markStyle, color = if (locked) KagomColor.Text.inverse else KagomColor.Text.accent)
