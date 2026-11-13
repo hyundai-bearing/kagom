@@ -225,7 +225,7 @@ fun ClosetScreen(
             val hasPlate = hasClosetTitlePlate(draft.title)
             val characterY = if (compact && hasPlate) (-50).dp else 0.dp
             // 배경 탭에서는 고른 배경이 홈에서 어떻게 보일지 스튜디오 대신 깔아 보인다 (디자인에 없는 가정)
-            if (Category.entries[tab] == Category.BACKGROUND) BackgroundArt(draft.background, Modifier.fillMaxSize(), animated = gearP)
+            if (Category.entries[tab] == Category.BACKGROUND) BackgroundArt(draft.background, Modifier.fillMaxSize(), animated = gearP, horizontalBias = 1f)
             else Box(Modifier.offset(x = shift, y = characterY).size(if (compact) 300.dp else 540.dp).background(closetPalette.halo, CircleShape))
             // 회전하는 렌더와 분리해 발밑 그림자의 크기와 위치를 고정한다.
             Canvas((if (compact) Modifier.align(Alignment.BottomCenter).offset(x = shift, y = characterY).padding(bottom = 42.dp)

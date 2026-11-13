@@ -34,7 +34,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.example.roro.core.Expression
-import com.example.roro.core.Items
 import com.example.roro.core.Severity
 import com.example.roro.core.StatusId
 import com.example.roro.core.Tiers
@@ -42,7 +41,7 @@ import com.example.roro.core.VehicleStatus
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
 import com.example.roro.ui.components.BackgroundArt
-import com.example.roro.ui.components.HeaderProfile
+import com.example.roro.ui.components.HomeHeader
 import com.example.roro.ui.components.KagomCharacter
 import com.example.roro.ui.components.ClosetTitlePlate
 import com.example.roro.ui.components.hasClosetTitlePlate
@@ -75,9 +74,10 @@ fun HomeScreen(
     today: Long = java.time.LocalDate.now().toEpochDay(),
 ) {
     val palette = KagomSkinPalette.of(profile.skin)
-    val title = Items.byId(data.equipped.title)?.name
+    val split = LocalLayoutMode.current == LayoutMode.SPLIT
     val header: @Composable (Modifier) -> Unit = { m ->
-        HeaderProfile(profile.name, title, Tiers.tierFor(data.exp), data.exp, Tiers.nextThreshold(data.exp), m)
+        HomeHeader(profile.name, Tiers.tierFor(data.exp), data.exp, Tiers.nextThreshold(data.exp), m,
+            align = if (split) Alignment.Start else Alignment.CenterHorizontally)
     }
     val character: @Composable (Modifier) -> Unit = { m ->
         KagomCharacter(
@@ -90,7 +90,6 @@ fun HomeScreen(
             onDemoActShown = onDemoActShown,
         )
     }
-    val split = LocalLayoutMode.current == LayoutMode.SPLIT
     // 이 화면이 뜬 뒤에 새로 생긴 배지만 톡 튀어나온다 (처음부터 있던 배지와 주행 중에는 움직이지 않는다)
     val known = remember { status.badges.map { it.id }.toMutableSet() }
     known.retainAll(status.badges.map { it.id }.toSet())
@@ -125,9 +124,10 @@ fun HomeScreen(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val titleId = data.equipped.title
                     if (hasClosetTitlePlate(titleId)) {
-                        character(Modifier.fillMaxHeight(0.75f).aspectRatio(450f / 660f).offset(y = (-32).dp))
+                        // 2026-11-13 요청: 캐릭터를 조금 내린다 (전에는 -32)
+                        character(Modifier.fillMaxHeight(0.75f).aspectRatio(450f / 660f).offset(y = 8.dp))
                         ClosetTitlePlate(titleId!!, profile.skin, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp).width(300.dp))
-                    } else character(Modifier.size(360.dp, 560.dp))
+                    } else character(Modifier.size(360.dp, 560.dp).offset(y = 40.dp))
                 }
                 badges(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 20.dp))
             }
@@ -145,8 +145,8 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 header(Modifier)
-                // 가이드 v1.2: 캐릭터 아래 상태 글자가 없어졌다. 캐릭터 크기는 그대로 두고(660) 글자 자리만큼 위아래로 나눠 내린다
-                Spacer(Modifier.height(20.dp))
+                // 2026-11-13 요청: 캐릭터를 머리에서 조금 떨어뜨려 내린다 (전에는 20)
+                Spacer(Modifier.height(56.dp))
                 character(Modifier.size(360.dp, 560.dp))
                 if (hasClosetTitlePlate(data.equipped.title)) {
                     Spacer(Modifier.height(16.dp))

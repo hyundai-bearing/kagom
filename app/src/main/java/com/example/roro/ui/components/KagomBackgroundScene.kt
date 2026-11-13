@@ -60,7 +60,11 @@ enum class SceneKind {
  * [colorFilter]는 잠긴 배경을 탈색해 보일 때 쓴다.
  */
 @Composable
-fun BackgroundScene(kind: SceneKind, animated: Boolean, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null) {
+fun BackgroundScene(
+    kind: SceneKind, animated: Boolean, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null,
+    /** 칸이 장면보다 좁아 좌우가 잘릴 때 어느 쪽을 남길지: -1 = 왼쪽, 0 = 가운데, 1 = 오른쪽 */
+    horizontalBias: Float = 0f,
+) {
     val palette = when (kind) {
         SceneKind.CLEAR -> KagomScenePalette.of(Weather.CLEAR)
         SceneKind.CLOUDY -> KagomScenePalette.of(Weather.CLOUDY)
@@ -87,7 +91,7 @@ fun BackgroundScene(kind: SceneKind, animated: Boolean, modifier: Modifier = Mod
         val fit = max(size.width / SCENE_W, size.height / SCENE_H)
         val draw: DrawScope.() -> Unit = {
             withTransform({
-                translate((size.width - SCENE_W * fit) / 2f, size.height - SCENE_H * fit)
+                translate((size.width - SCENE_W * fit) * (horizontalBias + 1f) / 2f, size.height - SCENE_H * fit)
                 scale(fit, fit, Offset.Zero)
             }) {
                 if (model.kind == SceneKind.COAST) drawCoast(model, palette, time.floatValue)
