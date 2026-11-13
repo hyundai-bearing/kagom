@@ -97,6 +97,8 @@ private fun KagomAppContent(c: KagomController) {
     val popupPreview by c.demoPopup.collectAsState()
     val demoAct by c.demoAct.collectAsState()
     val demoBackground by c.demoBackground.collectAsState()
+    val dayOffset by c.demoDayOffset.collectAsState()
+    val today = java.time.LocalDate.now().toEpochDay() + dayOffset
     val gearP = gear.isPark
 
     var tab by rememberSaveable { mutableStateOf(NavTab.HOME) }
@@ -145,6 +147,7 @@ private fun KagomAppContent(c: KagomController) {
                     val shown = demoBackground?.let { data.copy(equipped = data.equipped.with(Category.BACKGROUND, it)) } ?: data
                     HomeScreen(
                         profile, shown, status, gearP, demoAct, { c.demoAct.value = null },
+                        today = today,
                         onOpenSheet = { sheetOpen = true },
                         onBlockedSheet = { notice = Notice("정비 시트는 정차 후 이용할 수 있어요") },
                     )
@@ -209,7 +212,7 @@ private fun KagomAppContent(c: KagomController) {
 
         if (profile != null) MaintenanceSheet(
             visible = sheetOpen,
-            status = status, data = data, gearP = gearP,
+            status = status, data = data, gearP = gearP, today = today,
             onClose = { sheetOpen = false },
             onRefilled = { c.refilledEngineOil(); notice = Notice("엔진오일 경고 배지를 숨겼어요") },
             onOilChanged = { c.oilChanged(); notice = Notice("오일 교체일을 오늘로 기록했어요") },
@@ -284,7 +287,7 @@ private fun KagomAppContent(c: KagomController) {
         }
         // 팝업 미리보기는 맨 위 레이어이고 뒤로 키도 자기가 받는다 (나중에 등록한 쪽이 먼저 받는다)
         if (c.debug && popupPreview != null) key(popupPreview) {
-            PopupPreview(popupPreview!!, gearP) { c.demoPopup.value = null }
+            PopupPreview(popupPreview!!, gearP, today = today) { c.demoPopup.value = null }
         }
     }
 }

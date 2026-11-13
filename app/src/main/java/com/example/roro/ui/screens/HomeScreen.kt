@@ -72,6 +72,7 @@ fun HomeScreen(
     onDemoActShown: () -> Unit = {},
     onOpenSheet: () -> Unit,
     onBlockedSheet: () -> Unit,
+    today: Long = java.time.LocalDate.now().toEpochDay(),
 ) {
     val palette = KagomSkinPalette.of(profile.skin)
     val title = Items.byId(data.equipped.title)?.name
@@ -169,8 +170,8 @@ fun HomeScreen(
                     .forEach { VehicleStatusRow(it) }
             }
             QuickMaintenanceCard(
-                oilRemaining = if (status.oilChange != null) oilCalendarDisplay(data.maintenance.oilChangedDay) else null,
-                oilRatio = oilCalendarRatio(data.maintenance.oilChangedDay),
+                oilRemaining = if (status.oilChange != null) oilCalendarDisplay(data.maintenance.oilChangedDay, today) else null,
+                oilRatio = oilCalendarRatio(data.maintenance.oilChangedDay, today),
                 inspection = status.checkup.display,
                 inspectionRatio = (1f - ((status.checkup.display.substringBefore(" km").replace(",", "").toFloatOrNull() ?: 0f) / 10_000f)).coerceIn(0f, 1f),
                 issues = status.badges.filter { it.id in setOf(StatusId.SEN_03, StatusId.SEN_04, StatusId.SEN_05) },

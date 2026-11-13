@@ -310,6 +310,9 @@ base·item은 이 카메라의 0단 2번 프레임(곰 왼쪽으로 15°, `HOME_
 - 상태 기반 액체 알림(2026-11-13 사용자 확정표): SDK의 항목별 capability 확인을 통과한 신호만 사용한다. 브레이크액 LOW는 점검 필요, CRITICALLY_LOW는 긴급이다. 엔진오일·미션오일 LOW/HIGH는 점검 필요, CRITICALLY_LOW는 긴급이다. NORMAL/ERROR/미수신/미지원은 이상 알림을 만들지 않는다. 빠른 정비와 캐릭터 아래 배지는 같은 상태 엔진 결과를 사용한다. 엔진오일 보충 기록이 있어도 센서 이상이 유지되면 알림을 숨기지 않는다. EV의 엔진오일 제외 및 기존 캐릭터 표정 규칙은 유지하며, 미션오일 HIGH는 LOW와 같은 STAIN으로 처리한다. 기존 ‘엔진 경고등’은 PowerDownWarningIndicator를 대용한 기존 가정이며 이번 세 항목 변경에서는 유지했다.
 
 - 정비소 내비게이션 동시 표시 검증(2026-11-12, Pleos Connect v2.1.0): `NEW_TASK | LAUNCH_ADJACENT`를 전달해도 내비게이션이 카곰 창을 덮고 카곰 태스크는 `visible=false`가 됐다. 카곰을 portrait로 전환한 후 실행해도 동일했다. 방향 고정 실험은 제거했다. [Pleos Window Policy](https://document.pleos.ai/en/docs/connect/guide/docs-design/getting-started/window)는 앱 간 호출 시 호출 대상이 원래 앱을 덮는 정책을 명시한다. 현재 정비소 버튼은 내비게이션 열기까지 지원하며 자동 좌우 동시 배치는 지원 확인이 필요하다. 시스템 창 바를 통한 사용자 배치는 별도다.
-- 단위 테스트 57개 (`StateEngineTest`, `ProgressTest`, `KoreaMapTest`, `SavedOutfitsTest`, `PaginationEntriesTest`, `WeatherTest`): 날씨 기호 묶기·보내는 좌표 줄이기, 심각도, 히스테리시스, 표정 우선순위, MNT-01/02 주기, 스킨 매핑, 이름 규칙, 팝업 큐 순서, 도전과제 목록 순서·달성률, 기본 제공 아이템 보유·배경 보상(QST-06), 차를 바꿔도 이어지는 주행 거리, 지오펜스, 지도 데이터(대표 지점·랜드마크가 자기 시 안인지, 강릉 랜드마크가 각자 맞는 구획 안인지).
+- 단위 테스트 62개 (`StateEngineTest`, `ProgressTest`, `KoreaMapTest`, `SavedOutfitsTest`, `PaginationEntriesTest`, `WeatherTest`, `OilCalendarTest`): 엔진오일 교체 안내의 시연 날짜 계산, 액체 알림 단계, 셀프 점검 기준 거리, 날씨 기호 묶기·보내는 좌표 줄이기, 심각도, 히스테리시스, 표정 우선순위, MNT-01/02 주기, 스킨 매핑, 이름 규칙, 팝업 큐 순서, 도전과제 목록 순서·달성률, 기본 제공 아이템 보유·배경 보상(QST-06), 차를 바꿔도 이어지는 주행 거리, 지오펜스, 지도 데이터(대표 지점·랜드마크가 자기 시 안인지, 강릉 랜드마크가 각자 맞는 구획 안인지).
 - Pleos Connect 에뮬레이터(Full)와 폰 에뮬레이터(세로 = Split)에서 Figma 프레임과 화면 대조.
 - 컴포넌트 코드 HEX 하드코딩 없음 (`Tokens.kt`에만 있음).
+
+### 엔진오일 날짜 시연 연동
+홈과 POP-05는 컨트롤러의 시뮬레이션 날짜를 전달받아 365일 잔여일, 오늘 표시, 교체 버튼 활성화를 계산한다. 팝업 미리보기도 같은 날짜를 사용하며 교체 버튼을 누른 시뮬레이션 날짜를 별도로 기억한다. 날짜 초기화 시 미래 교체 기록의 경과일은 0일로 제한한다. 기존 core MNT-01의 주행거리·가혹 조건 규칙은 유지한다.
