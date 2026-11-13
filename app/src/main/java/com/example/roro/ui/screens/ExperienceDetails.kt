@@ -74,6 +74,8 @@ internal val detailDateFormat = DateTimeFormatter.ofPattern("yyyy.MM.dd")
 /** 같은 랜드마크는 상세를 다시 열어도 같은 풍경을 쓴다. 범주에 리소스를 추가하면 다음 선택에 반영된다. */
 private val sceneryVariants = mapOf(
     LandmarkScenery.COAST to listOf(R.drawable.detail_coast),
+    LandmarkScenery.HIGHLAND to listOf(R.drawable.detail_highland),
+    LandmarkScenery.FOREST to listOf(R.drawable.detail_forest),
 )
 
 @Composable

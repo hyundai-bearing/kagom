@@ -475,16 +475,21 @@ fun LandmarkUnlockModal(p: PendingPopup.Landmark, profile: Profile, equipped: Eq
         }
         LandmarkPin(PinState.Unlocked, Modifier.offset(x = (470f * scale).dp, y = (150f * scale).dp).size((64f * scale).dp))
         Box(
-            // Split은 도장 글자를 줄이지 않아 폭이 넓다: 핀(470)에 닿지 않게 왼쪽으로 당긴다
-            Modifier.offset(x = ((if (split) 270f else 300f) * scale).dp, y = (200f * scale).dp)
-                // 도장: 크게 떠 있다가 쿵 찍힌다
-                .graphicsLayer { val t = stamp.value; scaleX = 1.9f - 0.9f * t; scaleY = 1.9f - 0.9f * t; alpha = t.coerceIn(0f, 1f) }
-                .rotate(-10f)
-                .border((2f * scale).dp, KagomColor.Accent.stamp, RoundedCornerShape(10.dp)).padding(horizontal = (12f * scale).dp, vertical = (6f * scale).dp),
+            // 이름이 길면("대관령 옛길 방문") 도장이 넓어져 핀(470, 150~214)을 덮는다.
+            // Full: 오른쪽 끝을 핀 앞에 맞춰 왼쪽으로 늘어나게 한다.
+            // Split: 글자를 줄이지 않아 곰과 핀 사이에 다 들어가지 않는다 → 핀 아래로 내려 오른쪽으로 늘어나게 한다
+            Modifier.offset(x = ((if (split) 270f else 150f) * scale).dp, y = ((if (split) 240f else 200f) * scale).dp).width((312f * scale).dp),
+            contentAlignment = if (split) Alignment.TopStart else Alignment.TopEnd,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                // 도장: 크게 떠 있다가 쿵 찍힌다
+                Modifier.graphicsLayer { val t = stamp.value; scaleX = 1.9f - 0.9f * t; scaleY = 1.9f - 0.9f * t; alpha = t.coerceIn(0f, 1f) }
+                    .rotate(-10f)
+                    .border((2f * scale).dp, KagomColor.Accent.stamp, RoundedCornerShape(10.dp)).padding(horizontal = (12f * scale).dp, vertical = (6f * scale).dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 // 도장 글자도 Split에서 Pleos 최소(20px) 아래로 줄이지 않는다
-                Text("${lm.name} 방문", style = if (split) KagomType.Caption14Strong else KagomType.Body18Strong, color = KagomColor.Accent.stamp)
+                Text("${lm.name} 방문", style = if (split) KagomType.Caption14Strong else KagomType.Body18Strong, color = KagomColor.Accent.stamp, maxLines = 1, softWrap = false)
                 Text(date, style = KagomType.Caption14Strong, color = KagomColor.Accent.stamp)
             }
         }
