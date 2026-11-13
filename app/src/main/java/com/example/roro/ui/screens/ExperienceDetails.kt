@@ -48,7 +48,6 @@ import com.example.roro.core.Quest
 import com.example.roro.core.Severity
 import com.example.roro.data.GeoPoint
 import com.example.roro.ui.components.Chip
-import com.example.roro.ui.components.LocalToday
 import com.example.roro.ui.components.TitlePlate
 import com.example.roro.ui.components.CloseGlyph
 import com.example.roro.ui.components.ItemThumb
@@ -102,7 +101,8 @@ internal fun QuestDetail(
                 contentAlignment = Alignment.Center,
             ) {
                 // 칭호 번호판과 같은 그림에 과제 이름과 달성일을 쓴다 (2026-11-13 요청)
-                val doneDay = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay() } ?: LocalToday.current
+                // 달성 시각이 없는 옛 기록은 날짜를 지어내지 않고 비운다 (옆 배지도 "달성"만 보인다)
+                val doneDay = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay() }
                 TitlePlate(if (firstDrive) "첫 10 km" else quest.name, doneDay, avatar.skin,
                     Modifier.widthIn(max = if (split) 468.dp else 740.dp).fillMaxWidth())
             }

@@ -80,16 +80,21 @@ private val PLATE_DATE = DateTimeFormatter.ofPattern("yyMMdd")
 /**
  * 번호판: 스킨 색 바탕 위에 날짜(yyMMdd)와 이름을 쓴다. 칭호 번호판(홈·옷장)과 달성한 도전과제 상세가 같이 쓴다.
  * 글자는 번호판 크기에 맞춰 같이 커지고 작아진다 (그림 px 기준 글자 크기 = KagomType.PlateDate·PlateName).
- * [colorFilter]는 잠긴 칭호를 탈색할 때 바탕과 글자에 같이 건다.
+ * [colorFilter]는 잠긴 칭호를 탈색할 때 바탕과 글자에 같이 건다. [epochDay]가 없으면(날짜를 모르는 옛 달성 기록) 날짜 줄을 비운다.
  */
 @Composable
-fun TitlePlate(name: String, epochDay: Long, skin: String, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null) {
+fun TitlePlate(name: String, epochDay: Long?, skin: String, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null) {
     val art = plateArt(skin)
     val bitmap = ImageBitmap.imageResource(art.res)
     val measurer = rememberTextMeasurer()
-    val date = remember(epochDay) { "—  " + LocalDate.ofEpochDay(epochDay).format(PLATE_DATE) + "  —" }
-    val dateLayout = remember(date, art.ink) { measurer.measure(date, KagomType.PlateDate.copy(color = art.ink), maxLines = 1, softWrap = false) }
-    val nameLayout = remember(name, art.ink) { measurer.measure(name, KagomType.PlateName.copy(color = art.ink), maxLines = 1, softWrap = false) }
+    // 측정한 글자는 화면 밀도에 묶여 있다 → 창 크기가 바뀌어 밀도가 바뀌면(KagomTheme) 새 measurer로 다시 잰다
+    val dateLayout = remember(epochDay, art.ink, measurer) {
+        epochDay?.let {
+            val date = "—  " + LocalDate.ofEpochDay(it).format(PLATE_DATE) + "  —"
+            measurer.measure(date, KagomType.PlateDate.copy(color = art.ink), maxLines = 1, softWrap = false)
+        }
+    }
+    val nameLayout = remember(name, art.ink, measurer) { measurer.measure(name, KagomType.PlateName.copy(color = art.ink), maxLines = 1, softWrap = false) }
     val layer = remember(colorFilter) { colorFilter?.let { Paint().apply { this.colorFilter = it } } }
     // 그림의 모서리 반지름은 번호판 높이의 약 15%다: 고정 dp로 깎으면 크게 그릴 때 둥근 모서리 바깥의 시트 바탕이 보인다
     Canvas(modifier.aspectRatio(art.width.toFloat() / art.height).clip(RoundedCornerShape(15))
@@ -97,7 +102,7 @@ fun TitlePlate(name: String, epochDay: Long, skin: String, modifier: Modifier = 
         val k = size.width / art.width
         val draw: DrawScope.() -> Unit = {
             drawImage(bitmap, dstSize = IntSize(size.width.toInt(), size.height.toInt()), filterQuality = FilterQuality.Medium)
-            plateText(dateLayout, KagomType.PlateDate, art.date, Float.MAX_VALUE, k)
+            dateLayout?.let { plateText(it, KagomType.PlateDate, art.date, Float.MAX_VALUE, k) }
             plateText(nameLayout, KagomType.PlateName, art.name, art.nameMaxWidth, k)
         }
         if (layer == null) draw() else drawIntoCanvas { canvas ->

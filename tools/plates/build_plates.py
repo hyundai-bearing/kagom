@@ -47,6 +47,8 @@ def blank(plate):
     dark_text = np.median(L) > 128
     diff = (base - L) if dark_text else (L - base)
     mask = diff > 28
+    if not mask.any():
+        raise SystemExit("글자를 찾지 못했다: 시트나 TEXT_* 범위를 확인한다")
     ys, xs = np.nonzero(mask)
     ink = np.median(region[mask], axis=0)
     # 날짜 줄과 이름 줄: 글자 화소가 있는 줄을 위아래 두 덩어리로 나눈다
@@ -104,4 +106,5 @@ def main():
                   f"-> {os.path.relpath(path, ROOT)} {os.path.getsize(path)}B")
 
 
-main()
+if __name__ == "__main__":
+    main()

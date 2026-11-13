@@ -42,7 +42,6 @@ import com.example.roro.core.Checkup
 import com.example.roro.core.PendingPopup
 import com.example.roro.core.Progress
 import com.example.roro.ui.components.BottomTabBar
-import java.time.LocalDate
 import com.example.roro.ui.components.IviToast
 import com.example.roro.ui.components.KagomCharacter
 import com.example.roro.ui.components.LocalToday
@@ -71,6 +70,7 @@ import com.example.roro.ui.theme.KagomTheme
 import com.example.roro.ui.theme.LayoutMode
 import com.example.roro.ui.theme.LocalLayoutMode
 import kotlinx.coroutines.delay
+import java.time.LocalDate
 
 /** 정차 중 사용자 동작의 결과 알림 (정비 시트 버튼). [id]가 달라야 같은 문구도 다시 뜬다 */
 private data class Notice(val text: String, val id: Long = System.nanoTime())
