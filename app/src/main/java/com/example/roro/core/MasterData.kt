@@ -84,7 +84,9 @@ data class Item(
 
 object Items {
     const val DEFAULT_TITLE = "TTL-00"
-    const val DEFAULT_BACKGROUND = "BG-01"
+    /** 지금 있는 곳의 날씨에 따라 그림이 바뀌는 배경 (core/Weather.kt). 새로 만든 카곰은 이것을 먼저 장착한다 */
+    const val WEATHER_BACKGROUND = "BG-04"
+    const val DEFAULT_BACKGROUND = WEATHER_BACKGROUND
 
     val all = listOf(
         Item("ITM-H-01", "해돋이 머리띠", Category.HEAD, "H", Source.LANDMARK, "LM-GN-01",
@@ -114,7 +116,10 @@ object Items {
             "정기 점검 1회 완료 시 획득", "정비 시트에서 정기 점검을 한 번 완료하면 받을 수 있어요.",
             "꼼꼼하게 챙겨 줘서 고마워요!"),
         // 홈 배경. 디자인에 없어 이름·그림을 정했다 (가정). 홈 글자색을 그대로 쓰도록 모두 밝은 톤이다
-        Item(DEFAULT_BACKGROUND, "맑은 들판", Category.BACKGROUND, "들", Source.DEFAULT, null,
+        // 날씨 자료의 출처(MET Norway, CC BY 4.0)는 아이템 설명에 늘 보여야 한다 (THIRD_PARTY_NOTICES.md)
+        Item(WEATHER_BACKGROUND, "오늘 날씨", Category.BACKGROUND, "날", Source.DEFAULT, null,
+            "기본 제공", "지금 있는 곳의 날씨에 맞춰 바뀌는 배경이에요. 날씨 자료: MET Norway", ""),
+        Item("BG-01", "맑은 들판", Category.BACKGROUND, "들", Source.DEFAULT, null,
             "기본 제공", "카곰을 만들면 기본으로 받는 배경이에요.", ""),
         Item("BG-02", "노을 언덕", Category.BACKGROUND, "노", Source.DEFAULT, null,
             "기본 제공", "카곰을 만들면 기본으로 받는 배경이에요.", ""),

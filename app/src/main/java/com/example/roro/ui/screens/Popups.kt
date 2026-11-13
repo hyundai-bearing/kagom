@@ -277,7 +277,7 @@ private fun ItemShowcase(mark: String, size: Dp, modifier: Modifier = Modifier, 
             contentAlignment = Alignment.Center,
         ) {
             // 배경 보상(QST-06)은 3D 썸네일이 없고 그림 자체를 카드에 채운다
-            if (KagomBackgrounds.drawable(itemId) != null) BackgroundArt(itemId,
+            if (KagomBackgrounds.has(itemId)) BackgroundArt(itemId,
                 Modifier.fillMaxSize().padding(size * 0.08f).clip(RoundedCornerShape(KagomRadius.r16)))
             else if (thumb != null) AssetImage(thumb, Modifier.fillMaxSize().padding(size * 0.08f))
             else Text(mark, style = KagomType.Display40, color = KagomColor.Text.accent)

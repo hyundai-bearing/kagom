@@ -6,6 +6,8 @@
     <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />   <!-- SEN-03~07 오일·브레이크액·미션오일·워셔액·엔진 경고 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />    <!-- 주행거리·기어 -->
     <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" /> <!-- 랜드마크 방문 판정 (위치는 저장하지 않음) -->
+    <!-- 홈 배경 "오늘 날씨": MET Norway 날씨 예보 (위치는 약 11 km 칸으로 줄여서만 보냄) -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="카곰"

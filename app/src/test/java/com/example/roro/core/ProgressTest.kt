@@ -108,8 +108,9 @@ class ProgressTest {
     }
 
     @Test fun defaultItemsAreOwnedButNotCountedAsEarned() {
-        // 기본 칭호·기본 배경 2종은 처음부터 보유이고, 획득 아이템 수에는 세지 않는다
-        assertEquals(setOf(Items.DEFAULT_TITLE, Items.DEFAULT_BACKGROUND, "BG-02"), Items.defaults)
+        // 기본 칭호·기본 배경 3종은 처음부터 보유이고, 획득 아이템 수에는 세지 않는다
+        assertEquals(setOf(Items.DEFAULT_TITLE, Items.WEATHER_BACKGROUND, "BG-01", "BG-02"), Items.defaults)
+        assertEquals(Items.WEATHER_BACKGROUND, Items.DEFAULT_BACKGROUND)
         assertEquals(setOf("ITM-B-01"), Items.earned(Items.defaults + "ITM-B-01"))
         assertEquals(Category.BACKGROUND, Items.byId(Items.DEFAULT_BACKGROUND)?.category)
         // 칭호·배경은 벗을 수 없다
