@@ -1016,6 +1016,9 @@ class Rig:
                 continue
             pts += [ev.matrix_world @ v.co for v in me.vertices]
             ev.to_mesh_clear()
+        # 조명이 yaw를 따라 돈다. 썸네일처럼 view()를 부르지 않는 렌더가 여기서 남긴 방향으로 찍히지 않게 원래대로 되돌린다
+        before = (self.yaw.rotation_euler.copy(), self.pitch.rotation_euler.copy(),
+                  self.sc.render.resolution_x, self.sc.render.resolution_y)
         worst = 0.0
         for row in range(len(TURN_ELEV)):
             for i in range(0, TURN_N, 2):
@@ -1023,6 +1026,8 @@ class Rig:
                 bpy.context.view_layer.update()
                 vs = [world_to_camera_view(self.sc, self.cam, p) for p in pts]
                 worst = max(worst, max(abs(v.x - 0.5) for v in vs) * 2, max(abs(v.y - 0.5) for v in vs) * 2)
+        self.yaw.rotation_euler, self.pitch.rotation_euler = before[0], before[1]
+        self.sc.render.resolution_x, self.sc.render.resolution_y = before[2], before[3]
         return worst
 
     def view(self, row, i, w, h):
