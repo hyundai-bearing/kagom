@@ -1,7 +1,7 @@
 """
 카곰 치장 아이템 3D 모델링 + 렌더 (Blender 5.x, Cycles)
 
-곰 모델(pebble_bear.glb)에 맞춰 치장 아이템 6종과 칭호 메달 3종을 절차적으로 만들고,
+곰 모델(pebble_bear.glb)에 맞춰 치장 아이템 8종과 칭호 메달 3종을 절차적으로 만들고,
 앱이 겹쳐 그릴 수 있게 같은 카메라로 렌더한다.
 
   base_<P0n>_<표정>.webp          스킨 × 표정 기본 캐릭터 (아이템 없음)        614×965
@@ -99,6 +99,10 @@ SKINS = {
 ARMS = [((0.205, -0.01, 0.48), (0.345, -0.032, 0.235)), ((-0.205, -0.01, 0.48), (-0.345, -0.032, 0.235))]
 TAIL = ((0.0, 0.204, 0.199), (0.0, 0.415, 0.282))
 BEAR_PARTS = ["bear_body", "ear_inner_L", "ear_inner_R", "eyes", "mouth", "nose"]
+# 카메라 거리를 정한 아이템 (Rig). 여기에 더하거나 빼면 모든 렌더를 다시 찍어야 한다
+RIG_ITEMS = ["ITM-H-01", "ITM-H-02", "ITM-T-01", "ITM-T-02", "ITM-B-01", "ITM-B-02"]
+# 썸네일을 찍는 방향 (기본은 앞에서). 배낭은 등에 있어 뒤에서 찍는다
+THUMB_DIR = {"ITM-T-03": (0.55, 1.0, 0.22)}
 
 
 # ───────────────────────── 장면 ─────────────────────────
@@ -413,6 +417,36 @@ def tube(name, pts, radius, material, cyclic=False):
     return o
 
 
+def ribbon(name, pts, width, thick, material):
+    """몸 표면을 따라가는 납작한 끈: 점마다 몸 법선과 진행 방향에 수직인 쪽으로 width만큼 벌린 띠 (관 모양 tube는 밧줄처럼 보인다)"""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    prev = None
+    # 면 법선은 목·겨드랑이처럼 접힌 곳에서 갑자기 뒤집혀 띠가 꼬인다 → 표면에서 점으로 향하는 방향을 쓰고 이웃끼리 고르게 한다
+    nors = [(p - BVH.find_nearest(p)[0]).normalized() for p in pts]
+    for _ in range(8):
+        nors = [nors[0]] + [(nors[j] * 2 + nors[j - 1] + nors[j + 1]).normalized() for j in range(1, len(nors) - 1)] + [nors[-1]]
+    for i, p in enumerate(pts):
+        t = (pts[min(len(pts) - 1, i + 1)] - pts[max(0, i - 1)]).normalized()
+        side = t.cross(nors[i]).normalized() * (width / 2)
+        cur = (bm.verts.new(p - side), bm.verts.new(p + side))
+        if prev:
+            bm.faces.new((prev[0], prev[1], cur[1], cur[0]))
+        prev = cur
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(me)
+    bm.free()
+    for poly in me.polygons:
+        poly.use_smooth = True
+    o = link(bpy.data.objects.new(name, me))
+    sol = o.modifiers.new("solid", "SOLIDIFY")
+    sol.thickness, sol.offset, sol.use_rim = thick, 0.0, True
+    bv = o.modifiers.new("bevel", "BEVEL")
+    bv.width, bv.segments = thick * 0.35, 2
+    o.data.materials.append(material)
+    return o
+
+
 def ellipsoid(name, loc, scale, material, rot=(0, 0, 0), segs=48):
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
@@ -597,6 +631,73 @@ def item_board_shorts():
         b = a + Vector((0.01 * sx, -0.012, -0.045))
         cpt = b + Vector((0.004 * sx, -0.004, -0.03))
         objs.append(tube(f"bs_cord{sx}", [a, b, cpt], 0.0045, white))
+    return objs
+
+
+def item_pinwheel_cap():
+    """ITM-H-03 바람개비 모자 (안반데기): 배추밭 빛 둥근 모자 + 흰 띠 + 꼭대기에 풍력발전기처럼 도는 바람개비 날개 세 장"""
+    green = mat("pw_cap", "6FBF73", 0.5, coat=0.2)
+    cream = mat("pw_band", "F6F2E4", 0.5)
+    white = mat("pw_mast", "FFFFFF", 0.35, coat=0.4)
+    # 흰 날개는 하늘·구름·눈 배경에서 안 보여서 바람개비 색으로 칠한다
+    blades = [mat(f"pw_blade{i}", c, 0.4, coat=0.3) for i, c in enumerate(("FF7A6B", "FFD45C", "6EC6F0"))]
+    top, _ = ray_in_plane((0, -0.02, 0.74), (0, 0, 1), 0.0)
+    loc = top + Vector((0, -0.01, 0.004))
+    objs = [ellipsoid("pw_dome", loc, (0.114, 0.103, 0.06), green),
+            ellipsoid("pw_band", loc + Vector((0, 0, -0.012)), (0.123, 0.112, 0.022), cream)]
+    mast_top = loc + Vector((0, 0, 0.082))
+    objs.append(tube("pw_mast", [loc + Vector((0, 0, 0.05)), loc + Vector((0, 0, 0.066)), mast_top], 0.008, white))
+    # 날개는 기둥 앞에서 정면(-Y)을 본다 (풍력발전기처럼 XZ 평면에 120° 간격). 키가 머리띠 햇살(ITM-H-01)을 넘지 않게 짧게 둔다
+    hub = mast_top + Vector((0, -0.016, 0))
+    objs.append(ellipsoid("pw_hub", hub, (0.017, 0.017, 0.017), white))
+    for i in range(3):
+        a = math.radians(108 + i * 120)
+        d = Vector((math.cos(a), 0, math.sin(a)))
+        objs.append(ellipsoid(f"pw_blade{i}", hub + d * 0.04, (0.018, 0.006, 0.035), blades[i],
+                              rot=Vector((0, 0, 1)).rotation_difference(d).to_euler()))
+    return objs
+
+
+def item_trail_backpack():
+    """ITM-T-03 옛길 배낭 (대관령 옛길): 등에 멘 배낭 + 덮개 + 앞주머니 + 위에 만 돗자리, 앞에서는 어깨끈과 가슴끈이 보인다"""
+    body_m = mat("bp_body", "4E8C63", 0.7)
+    flap_m = mat("bp_flap", "3F7453", 0.65)
+    tan = mat("bp_strap", "E0A84B", 0.6)
+    roll_m = mat("bp_roll", "E5735C", 0.75)
+    buckle_m = mat("bp_buckle", "F6F2E4", 0.35, metal=0.3)
+    back, n = ray_in_plane((0, 0, 0.35), (0, 1, 0), 0.0)      # 등 가운데
+    up = (Vector((0, 0, 1)) - n * n.z).normalized()            # 등판을 따라 위쪽
+    loc = back + n * 0.042
+    # 상자를 쌓으면 궤짝처럼 보여서 둥근 덩어리로 만든다 (비율 = 폭, 등판을 따라 위아래, 등에서 바깥쪽)
+    bag = ellipsoid("bp_bag", loc, (0.132, 0.118, 0.064), body_m)
+    # 덮개: 조금 큰 덩어리를 위쪽에 겹쳐서 배낭 위 1/3을 감싸게 한다
+    flap = ellipsoid("bp_flap", loc + up * 0.046, (0.137, 0.08, 0.068), flap_m)
+    pocket = ellipsoid("bp_pocket", loc + n * 0.046 - up * 0.052, (0.074, 0.046, 0.03), flap_m)
+    clasp = rounded_box("bp_clasp", (0.04, 0.034, 0.014), buckle_m, 0.006)
+    clasp.location = loc + n * 0.062 + up * 0.0
+    for o in (bag, flap, pocket, clasp):
+        facing(o, n)
+    objs = [bag, flap, pocket, clasp]
+    # 돗자리: 덮개 위에 가로로 얹고 끈 두 줄로 묶는다
+    rc = loc + up * 0.15 + n * 0.004
+    objs.append(tube("bp_roll", [rc + Vector((-0.135, 0, 0)), rc, rc + Vector((0.135, 0, 0))], 0.034, roll_m))
+    for sx in (1, -1):
+        objs.append(ellipsoid(f"bp_tie{sx}", rc + Vector((0.07 * sx, 0, 0)), (0.008, 0.038, 0.038), tan))
+    # 어깨끈: 배낭 위 모서리에서 어깨를 넘어 가슴 옆으로. 팔 밑으로는 돌리지 않는다 (팔과 겹친다)
+    for sx in (1, -1):
+        pts = surface_path([(0.09 * sx, 0.24, 0.44), (0.13 * sx, 0.16, 0.48), (0.15 * sx, 0.0, 0.52),
+                            (0.145 * sx, -0.15, 0.49), (0.135 * sx, -0.215, 0.42), (0.15 * sx, -0.205, 0.36),
+                            (0.165 * sx, -0.18, 0.325)], 0.03)
+        objs.append(ribbon(f"bp_strap{sx}", pts, 0.036, 0.012, tan))
+    # 가슴끈과 버클
+    pts = surface_path([(0.135, -0.215, 0.415), (0.0, -0.26, 0.41), (-0.135, -0.215, 0.415)], 0.028)
+    objs.append(ribbon("bp_chest", pts, 0.018, 0.008, tan))
+    mid = pts[len(pts) // 2]
+    pn = BVH.find_nearest(mid)[1]
+    b = rounded_box("bp_buckle", (0.044, 0.032, 0.012), buckle_m, 0.005)
+    b.location = mid + pn * 0.008
+    facing(b, pn)
+    objs.append(b)
     return objs
 
 
@@ -900,6 +1001,29 @@ class Rig:
             dist *= worst / fill
         self.cam.location = (0, -dist, 0)
         print(f"RIG dist={dist:.3f} zc={zc:.3f} elev={TURN_ELEV}")
+
+    def extent(self, objs):
+        """objs가 돌려보기 화면(모든 단·방향)에서 차지하는 가장 큰 범위. 1.0 = 화면 가장자리"""
+        from bpy_extras.object_utils import world_to_camera_view
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        pts = []
+        for o in objs:
+            ev = o.evaluated_get(dg)
+            try:
+                me = ev.to_mesh()
+            except RuntimeError:
+                continue
+            pts += [ev.matrix_world @ v.co for v in me.vertices]
+            ev.to_mesh_clear()
+        worst = 0.0
+        for row in range(len(TURN_ELEV)):
+            for i in range(0, TURN_N, 2):
+                self.view(row, i, TW, TH)
+                bpy.context.view_layer.update()
+                vs = [world_to_camera_view(self.sc, self.cam, p) for p in pts]
+                worst = max(worst, max(abs(v.x - 0.5) for v in vs) * 2, max(abs(v.y - 0.5) for v in vs) * 2)
+        return worst
 
     def view(self, row, i, w, h):
         """row = 고도 단(TURN_ELEV), i = 방향 프레임(TURN_N, +는 카메라가 곰의 왼쪽(+X)으로)"""
@@ -1365,14 +1489,21 @@ def main():
         "ITM-T-02": item_safety_vest(),
         "ITM-B-01": item_denim_overalls(),
         "ITM-B-02": item_board_shorts(),
+        "ITM-H-03": item_pinwheel_cap(),
+        "ITM-T-03": item_trail_backpack(),
     }
     medals = {"TTL-00": medal("TTL-00", "3FC1A5"), "TTL-01": medal("TTL-01", "3A7BD5"), "TTL-02": medal("TTL-02", "F2994A")}
     exprs = build_expressions()
 
     bear = [bpy.data.objects[n] for n in BEAR_PARTS]
     worn = [o for objs in items.values() for o in objs]
-    # 카메라: 곰 + 모든 아이템이 모든 방향·고도에서 다 들어오게 (레이어 정렬이 같아야 하므로 한 번만 정한다)
-    rig = Rig(sc, bear + worn)
+    # 카메라: 곰 + 아이템이 모든 방향·고도에서 다 들어오게 (레이어 정렬이 같아야 하므로 한 번만 정한다).
+    # 처음 여섯 아이템(RIG_ITEMS)으로만 맞춘다: 나중에 더한 아이템까지 넣으면 카메라가 달라져 이미 찍어 둔 렌더와 어긋난다.
+    # 새 아이템은 이 화면 안에 들어오게 만들고 FRAME 출력으로 확인한다 (1.0을 넘으면 잘린다)
+    rig = Rig(sc, bear + [o for k in RIG_ITEMS for o in items[k]])
+    for k in items:
+        if k not in RIG_ITEMS:
+            print(f"FRAME {k} worst={rig.extent(items[k]):.3f}")
     rows = [int(r) for r in A.rows.split(",")] if A.rows else list(range(len(TURN_ELEV)))
     codes = [c for c in A.codes.split(",") if c in SKINS] if A.codes else list(SKINS)
 
@@ -1438,7 +1569,7 @@ def main():
         for key, objs in list(items.items()) + list(medals.items()):
             mn, mx = bbox(objs)
             worn_item = key.startswith("ITM")
-            c = make_camera(sc, f"th_{key}", (0.35, -1.0, 0.18) if worn_item else (0.3, -1.0, 0.1),
+            c = make_camera(sc, f"th_{key}", THUMB_DIR.get(key, (0.35, -1.0, 0.18)) if worn_item else (0.3, -1.0, 0.1),
                             (mn + mx) / 2, 60, THUMB, THUMB, objs, 0.86)
             show_only(objs, "holdout" if worn_item else "hidden")
             render(sc, os.path.join(A.out, f"thumb_{key}.webp"))

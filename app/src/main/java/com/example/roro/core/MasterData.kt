@@ -95,17 +95,23 @@ object Items {
         Item("ITM-H-02", "커피콩 모자", Category.HEAD, "C", Source.LANDMARK, "LM-GN-02",
             "커피거리 방문 시 획득", "강릉 커피거리에 방문하면 안개가 걷히면서 바로 받을 수 있어요.",
             "커피 향이 솔솔 나요! 모자 쓰고 한 잔 할까요?"),
+        Item("ITM-H-03", "바람개비 모자", Category.HEAD, "W", Source.LANDMARK, "LM-GN-04",
+            "안반데기 방문 시 획득", "강릉 안반데기에 방문하면 안개가 걷히면서 바로 받을 수 있어요.",
+            "바람이 솔솔 불어요! 바람개비가 빙글빙글 돌 것 같아요!"),
         Item("ITM-T-01", "빨간 고무 앞치마", Category.TOP, "A", Source.LANDMARK, "LM-GN-03",
             "주문진항 방문 시 획득", "강릉 주문진항에 방문하면 안개가 걷히면서 바로 받을 수 있어요.",
             "바다 냄새가 나요! 앞치마 입고 항구 구경 가요!"),
         Item("ITM-T-02", "초보운전 안전 조끼", Category.TOP, "V", Source.QUEST, "QST-02",
             "누적 100 km 주행 시 획득", "누적 100 km를 달리면 도전과제 보상으로 받을 수 있어요.",
             "안전 조끼 입으면 든든해요. 오늘도 안전 운전해요!"),
+        Item("ITM-T-03", "옛길 배낭", Category.TOP, "P", Source.LANDMARK, "LM-GN-05",
+            "대관령 옛길 방문 시 획득", "강릉 대관령 옛길에 방문하면 안개가 걷히면서 바로 받을 수 있어요.",
+            "배낭 메고 옛길을 걸어 볼까요? 간식도 챙겼어요!"),
         Item("ITM-B-01", "데님 멜빵 반바지", Category.BOTTOM, "D", Source.QUEST, "QST-01",
             "10 km 주행 시 획득", "10 km를 달리면 도전과제 보상으로 받을 수 있어요.",
             "이거 입으면 더 귀여워질 것 같아요! 바로 입혀 줄래요?"),
         Item("ITM-B-02", "강릉 서퍼 보드숏", Category.BOTTOM, "S", Source.QUEST, "QST-03",
-            "랜드마크 3곳 방문 시 획득", "강릉 랜드마크 3곳을 모두 방문하면 받을 수 있어요.",
+            "랜드마크 3곳 방문 시 획득", "강릉 랜드마크 3곳을 방문하면 받을 수 있어요.",
             "파도 타러 가요! 보드숏 입혀 줄래요?"),
         Item(DEFAULT_TITLE, "설레는 첫 차 오너", Category.TITLE, "T", Source.DEFAULT, null,
             "기본 제공", "카곰을 만들면 기본으로 받는 칭호예요.", ""),
@@ -178,7 +184,7 @@ object Quests {
         Quest("QST-02", "100 km의 여정", QuestIcon.GAUGE, "누적 100 km 주행", true, QuestKind.DISTANCE, 100, " km", "ITM-T-02", 150,
             "누적 100 km 달성!", "주행", "벌써 100 km를 함께 달렸어요"),
         Quest("QST-03", "강릉 탐험가", QuestIcon.COMPASS, "랜드마크 3곳 방문", true, QuestKind.LANDMARK_PLACES, 3, "곳", "ITM-B-02", 150,
-            "랜드마크 3곳 달성!", "도전과제", "강릉 랜드마크를 모두 둘러봤어요"),
+            "랜드마크 3곳 달성!", "도전과제", "강릉 랜드마크 세 곳을 둘러봤어요"),
         Quest("QST-04", "동해안 정복자", QuestIcon.MAP, "랜드마크 10회 방문", true, QuestKind.LANDMARK_VISITS, 10, "회", "TTL-01", 300,
             "랜드마크 10회 달성!", "도전과제", "동해안 구석구석을 누볐어요"),
         Quest("QST-05", "성실한 카곰 집사", QuestIcon.WRENCH, "정기 점검 1회 완료", false, QuestKind.CHECKUP, 1, "회", "TTL-02", 200,
@@ -194,9 +200,9 @@ object Quests {
 
 // ───────────── 랜드마크 (SCR-05) ─────────────
 
-enum class LandmarkGlyph { SUNRISE, COFFEE, BOAT }
+enum class LandmarkGlyph { SUNRISE, COFFEE, BOAT, WINDMILL, TRAIL }
 
-enum class LandmarkScenery { COAST, TOWER, SIGHTSEEING }
+enum class LandmarkScenery { COAST, TOWER, SIGHTSEEING, HIGHLAND, FOREST }
 
 data class Landmark(
     val id: String,
@@ -226,7 +232,11 @@ object Landmarks {
     val all = listOf(
         Landmark("LM-GN-03", "주문진항", "ITM-T-01", 150, 37.8930, 128.8312, LandmarkGlyph.BOAT, GANGNEUNG, "주문진읍", LandmarkScenery.COAST),
         Landmark("LM-GN-02", "커피거리", "ITM-H-02", 150, 37.7722, 128.9476, LandmarkGlyph.COFFEE, GANGNEUNG, "송정동", LandmarkScenery.COAST),
+        // 좌표: OSM "대관령옛길"(어흘리, 옛길 들머리로 가는 길). 디자인·스펙에 없어 보상과 EXP는 다른 곳과 같게 정했다 (가정)
+        Landmark("LM-GN-05", "대관령 옛길", "ITM-T-03", 150, 37.7141, 128.7956, LandmarkGlyph.TRAIL, GANGNEUNG, "성산면", LandmarkScenery.FOREST),
         Landmark("LM-GN-01", "정동진", "ITM-H-01", 150, 37.6910, 129.0343, LandmarkGlyph.SUNRISE, GANGNEUNG, "강동면", LandmarkScenery.COAST),
+        // 좌표: OSM "멍에 전망대" (안반데기의 전망대)
+        Landmark("LM-GN-04", "안반데기", "ITM-H-03", 150, 37.6262, 128.7415, LandmarkGlyph.WINDMILL, GANGNEUNG, "왕산면", LandmarkScenery.HIGHLAND),
     )
 
     fun byId(id: String?) = all.firstOrNull { it.id == id }
@@ -239,7 +249,7 @@ object Landmarks {
 /**
  * 티어 기준 EXP. 스펙에 수치가 없어 디자인(티어 1 → 2 = 400 EXP)에 맞춘 가정값.
  * QST-06을 넣기 전의 전체 보상 EXP 합계(도전과제 900 + 랜드마크 450 = 1,350)로 티어 4까지 닿도록 잡았다.
- * QST-06(150)이 더해져 지금 합계는 1,500이지만, 이미 오른 티어가 내려가지 않도록 기준은 그대로 둔다.
+ * QST-06(150)과 랜드마크 두 곳(LM-GN-04·05, 300)이 더해져 지금 합계는 1,800이지만, 이미 오른 티어가 내려가지 않도록 기준은 그대로 둔다.
  */
 object Tiers {
     val thresholds = listOf(0, 400, 900, 1350)

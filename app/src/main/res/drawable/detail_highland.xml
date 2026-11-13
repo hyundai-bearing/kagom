@@ -1,0 +1,49 @@
+<!-- 랜드마크 상세 풍경: 안반데기 (LandmarkScenery.HIGHLAND). 디자인에 없어 detail_coast와 같은 크기·톤으로 직접 그렸다 (가정): 고랭지 배추밭 언덕과 풍력발전기 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="640dp" android:height="420dp"
+    android:viewportWidth="640" android:viewportHeight="420">
+    <path android:fillColor="#BDE3F5" android:pathData="M0,0H640V420H0Z"/>
+    <path android:fillColor="#DAEEF1" android:pathData="M0,200Q190,166 380,200T640,194V420H0Z"/>
+    <path android:fillColor="#FFF3CF" android:pathData="M506,80a34,34 0,1 0,68 0a34,34 0,1 0,-68 0Z"/>
+    <path android:fillColor="#FFE39A" android:pathData="M518,80a22,22 0,1 0,44 0a22,22 0,1 0,-44 0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M48,99C37,86 83,74 111,80C130,64 167,63 184,77C194,92 153,106 109,110C78,115 55,109 48,99ZM275,65C278,54 323,49 355,53C376,57 376,65 354,70C320,77 272,75 275,65Z"/>
+    <path android:fillColor="#A9D3C4" android:pathData="M0,250Q160,200 320,235T640,215V420H0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M147.1,266L148.7,182H151.3L152.9,266Z"/>
+    <group android:rotation="14" android:pivotX="150" android:pivotY="182">
+        <path android:fillColor="#FFFFFF" android:pathData="M150,182q-4.6,-17.6 0,-35.3q4.6,17.6 0,35.3Z"/>
+    </group>
+    <group android:rotation="134" android:pivotX="150" android:pivotY="182">
+        <path android:fillColor="#FFFFFF" android:pathData="M150,182q-4.6,-17.6 0,-35.3q4.6,17.6 0,35.3Z"/>
+    </group>
+    <group android:rotation="254" android:pivotX="150" android:pivotY="182">
+        <path android:fillColor="#FFFFFF" android:pathData="M150,182q-4.6,-17.6 0,-35.3q4.6,17.6 0,35.3Z"/>
+    </group>
+    <path android:fillColor="#D5E6EC" android:pathData="M147.1,182a2.9,2.9 0,1 0,5.9 0a2.9,2.9 0,1 0,-5.9 0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M326.1,263L328.2,151H331.8L333.9,263Z"/>
+    <group android:rotation="14" android:pivotX="330" android:pivotY="151">
+        <path android:fillColor="#FFFFFF" android:pathData="M330,151q-6.2,-23.5 0,-47q6.2,23.5 0,47Z"/>
+    </group>
+    <group android:rotation="134" android:pivotX="330" android:pivotY="151">
+        <path android:fillColor="#FFFFFF" android:pathData="M330,151q-6.2,-23.5 0,-47q6.2,23.5 0,47Z"/>
+    </group>
+    <group android:rotation="254" android:pivotX="330" android:pivotY="151">
+        <path android:fillColor="#FFFFFF" android:pathData="M330,151q-6.2,-23.5 0,-47q6.2,23.5 0,47Z"/>
+    </group>
+    <path android:fillColor="#D5E6EC" android:pathData="M326.1,151a3.9,3.9 0,1 0,7.8 0a3.9,3.9 0,1 0,-7.8 0Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M517.3,289L518.8,211H521.2L522.7,289Z"/>
+    <group android:rotation="14" android:pivotX="520" android:pivotY="211">
+        <path android:fillColor="#FFFFFF" android:pathData="M520,211q-4.3,-16.4 0,-32.8q4.3,16.4 0,32.8Z"/>
+    </group>
+    <group android:rotation="134" android:pivotX="520" android:pivotY="211">
+        <path android:fillColor="#FFFFFF" android:pathData="M520,211q-4.3,-16.4 0,-32.8q4.3,16.4 0,32.8Z"/>
+    </group>
+    <group android:rotation="254" android:pivotX="520" android:pivotY="211">
+        <path android:fillColor="#FFFFFF" android:pathData="M520,211q-4.3,-16.4 0,-32.8q4.3,16.4 0,32.8Z"/>
+    </group>
+    <path android:fillColor="#D5E6EC" android:pathData="M517.3,211a2.7,2.7 0,1 0,5.5 0a2.7,2.7 0,1 0,-5.5 0Z"/>
+    <path android:fillColor="#9AD08F" android:pathData="M0,300Q200,235 420,275T640,250V420H0Z"/>
+    <path android:strokeColor="#B9E2A8" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M0,328Q210,266 430,303T640,282"/>
+    <path android:strokeColor="#B9E2A8" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M0,356Q210,298 430,333T640,314"/>
+    <path android:strokeColor="#B9E2A8" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M0,384Q210,330 430,362T640,346"/>
+    <path android:fillColor="#7FC27E" android:pathData="M0,398Q150,366 330,388T640,378V420H0Z"/>
+</vector>

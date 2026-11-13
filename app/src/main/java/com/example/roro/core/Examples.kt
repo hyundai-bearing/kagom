@@ -16,6 +16,8 @@ object Examples {
         PopupExample("EX-POP-03-SUN", "정동진 해금", "landmark:LM-GN-01"),
         PopupExample("EX-POP-03-COFFEE", "커피거리 해금", "landmark:LM-GN-02"),
         PopupExample("EX-POP-03-PORT", "주문진항 해금", "landmark:LM-GN-03"),
+        PopupExample("EX-POP-03-HIGHLAND", "안반데기 해금", "landmark:LM-GN-04"),
+        PopupExample("EX-POP-03-TRAIL", "대관령 옛길 해금", "landmark:LM-GN-05"),
         PopupExample("EX-POP-04", "레벨 업", "level"),
         PopupExample("EX-POP-05", "정비 시트", "maintenance"),
         PopupExample("EX-POP-05-EV", "전기차 점검", "maintenance-ev"),
