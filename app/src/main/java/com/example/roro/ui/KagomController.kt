@@ -77,10 +77,10 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
     /**
      * 홈 배경 "오늘 날씨"(BG-04)가 그릴 날씨. null = 모름(위치·통신 없음) → 기본 그림.
      * 주행 중에는 배경이 갑자기 바뀌어 눈길을 끌지 않도록 그대로 두고, 기어 P가 되면 바뀐 날씨를 반영한다 (가이드 5.2).
-     * 아직 아무것도 못 그린 상태(앱을 주행 중에 켬)에서는 첫 값을 바로 쓴다
+     * 날씨를 모르는 채로 출발했으면(이미 기본 그림이 보인다) 주행 중에 날씨가 들어와도 다음 정차까지 기본 그림이다
      */
     val weather: StateFlow<Weather?> = combine(weatherSource.weather, demoWeather, gear) { real, demo, g -> (demo ?: real) to g.isPark }
-        .runningFold(null as Weather?) { shown, (next, parked) -> if (parked || shown == null) next else shown }
+        .runningFold(null as Weather?) { shown, (next, parked) -> if (parked) next else shown }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
     private var energyLevel = 0
