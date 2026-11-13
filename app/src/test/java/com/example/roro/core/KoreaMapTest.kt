@@ -112,35 +112,18 @@ class KoreaMapTest {
     }
 
     @Test
-    fun `강릉에서 한 곳을 방문하면 해당 구획만 해금된다`() {
-        val map = mapWithGangneungDistricts()
-        assertTrue(map.landmarkVisitAreas(Landmarks.all, emptySet()).isEmpty())
-        val area = map.landmarkVisitAreas(Landmarks.all, setOf("LM-GN-03")).single()
-        assertEquals("주문진읍", area.region.name)
-        assertEquals(Landmarks.GANGNEUNG, area.region.provinceId)
-        assertTrue(area.fullyVisited)
-    }
-
-    @Test
-    fun `강릉 랜드마크를 모두 방문하면 그 다섯 구획만 해금된다`() {
-        val map = mapWithGangneungDistricts()
-        val ids = Landmarks.inUnit(Landmarks.GANGNEUNG).map { it.id }.toSet()
-        val areas = map.landmarkVisitAreas(Landmarks.all, ids)
-        assertEquals(setOf("주문진읍", "시내 13개 동", "강동면", "왕산면", "성산면"), areas.map { it.region.name }.toSet())
-        assertTrue(areas.all { it.fullyVisited })
-    }
-
-    @Test
-    fun `구획 경계가 없는 경우 시군 경계에 일부 해금을 표시한다`() {
-        val map = File("src/main/assets/regions/korea_map.txt").useLines { KoreaMap.parse(it) }
-        val area = map.landmarkVisitAreas(Landmarks.all, setOf("LM-GN-03")).single()
-        assertEquals(Landmarks.GANGNEUNG, area.region.id)
-        assertFalse(area.fullyVisited)
+    fun `지도는 지역 전체를 방문 비율로 칠한다`() {
+        assertEquals(MapFill.NONE, MapFill.of(0, 5))
+        assertEquals(MapFill.PARTIAL, MapFill.of(1, 5))
+        assertEquals(MapFill.PARTIAL, MapFill.of(4, 5))
+        assertEquals(MapFill.FULL, MapFill.of(5, 5))
+        // 랜드마크가 없는 지역은 늘 회색이다
+        assertEquals(MapFill.NONE, MapFill.of(0, 0))
     }
 
     private fun mapWithGangneungDistricts(): KoreaMap =
         File("src/main/assets/regions/korea_map.txt").useLines { base ->
-            File("src/main/assets/regions/gangneung_districts.txt").useLines { districts ->
+            File("src/test/resources/regions/gangneung_districts.txt").useLines { districts ->
                 KoreaMap.parse(base + districts)
             }
         }

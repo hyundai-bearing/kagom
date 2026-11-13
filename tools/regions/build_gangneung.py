@@ -10,7 +10,7 @@ from pathlib import Path
 from geo import in_ring, ring_area, rings_of, simplify_ring
 
 
-OUT = Path(__file__).resolve().parents[2] / "app/src/main/assets/regions/gangneung_districts.txt"
+OUT = Path(__file__).resolve().parents[2] / "app/src/test/resources/regions/gangneung_districts.txt"
 PARENT = "강원/강릉시"
 
 

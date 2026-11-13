@@ -35,6 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -603,6 +606,35 @@ fun LandmarkPin(state: PinState, modifier: Modifier = Modifier, onClick: () -> U
         )
     }
 }
+
+/**
+ * 시 단계 지도의 깃발 (Figma SCR-05 layer=3, 2026-11-13): 방문 = 초록 깃발·검은 깃대, 미방문 = 회색.
+ * 해금 중(보상 팝업이 정차를 기다림)은 초록 깃발이 옅게 숨 쉰다. 고른 깃발은 밑에 둥근 빛을 깐다.
+ * 48×56: 깃대 밑(가로 12, 세로 52)이 랜드마크 자리다 → [FLAG_ANCHOR_X]·[FLAG_ANCHOR_Y]만큼 당겨서 놓는다.
+ */
+@Composable
+fun LandmarkFlag(state: PinState, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    val visited = state != PinState.Locked
+    val pulse = rememberInfiniteTransition(label = "flag")
+    val a by pulse.animateFloat(1f, if (state == PinState.Unlocking) 0.55f else 1f,
+        infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "flagPulse")
+    val flag = if (visited) KagomColor.Map.flagVisited else KagomColor.Map.flagUnvisited
+    val pole = if (visited) KagomColor.Text.primary else KagomColor.Map.poleUnvisited
+    androidx.compose.foundation.Canvas(modifier.size(48.dp, 56.dp).clickable(role = Role.Button, onClick = onClick)) {
+        val u = size.width / 48f
+        if (selected) drawCircle(flag.copy(alpha = 0.35f), 22f * u, Offset(24f * u, 22f * u))
+        drawOval(KagomColor.Text.primary.copy(alpha = 0.18f), Offset(5f * u, 49f * u), Size(14f * u, 6f * u))
+        drawPath(androidx.compose.ui.graphics.Path().apply {
+            moveTo(14f * u, 9f * u); lineTo(42f * u, 19f * u); lineTo(14f * u, 29f * u); close()
+        }, flag, alpha = a)
+        drawLine(pole, Offset(12f * u, 8f * u), Offset(12f * u, 52f * u), 3.5f * u, StrokeCap.Round)
+        drawCircle(pole, 3.5f * u, Offset(12f * u, 7f * u))
+    }
+}
+
+/** 깃발 그림([LandmarkFlag]) 안에서 랜드마크 자리(깃대 밑)의 좌표 (dp) */
+val FLAG_ANCHOR_X = 12.dp
+val FLAG_ANCHOR_Y = 52.dp
 
 /** landmarkDetailPopup (State=Visited|Locked · Name/Reward/Mark/Status). 440×174 */
 /** 잠긴 핀 툴팁 (SCR-05 tooltip): 왼쪽 꼬리가 달린 어두운 말풍선 */
