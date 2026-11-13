@@ -48,6 +48,8 @@ import com.example.roro.core.Quest
 import com.example.roro.core.Severity
 import com.example.roro.data.GeoPoint
 import com.example.roro.ui.components.Chip
+import com.example.roro.ui.components.LocalToday
+import com.example.roro.ui.components.TitlePlate
 import com.example.roro.ui.components.CloseGlyph
 import com.example.roro.ui.components.ItemThumb
 import com.example.roro.ui.components.IviButton
@@ -99,7 +101,10 @@ internal fun QuestDetail(
                     .padding(if (split) KagomSpace.s16 else KagomSpace.s40),
                 contentAlignment = Alignment.Center,
             ) {
-                AchievementPlate(if (firstDrive) "첫 10 km" else quest.name, date, split)
+                // 칭호 번호판과 같은 그림에 과제 이름과 달성일을 쓴다 (2026-11-13 요청)
+                val doneDay = doneAt?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay() } ?: LocalToday.current
+                TitlePlate(if (firstDrive) "첫 10 km" else quest.name, doneDay, avatar.skin,
+                    Modifier.widthIn(max = if (split) 468.dp else 740.dp).fillMaxWidth())
             }
         }
     }
@@ -169,28 +174,6 @@ internal fun QuestDetail(
                 record(Modifier.weight(1f).fillMaxHeight())
                 companion(Modifier.weight(1f).fillMaxHeight(), Modifier)
             }
-        }
-    }
-}
-
-/** 기념 번호판 디자인이 구체화되면 이 컴포넌트만 교체한다. */
-@Composable
-private fun AchievementPlate(title: String, date: String?, split: Boolean) {
-    val shape = RoundedCornerShape(KagomRadius.r20)
-    Column(Modifier.widthIn(max = if (split) 468.dp else 740.dp).fillMaxWidth().aspectRatio(2.12f).clip(shape)
-        .background(KagomColor.Surface.card).border(3.dp, KagomColor.Surface.inverse, shape)) {
-        Row(
-            Modifier.fillMaxWidth().background(KagomColor.Surface.inverse)
-                .padding(horizontal = KagomSpace.s16, vertical = KagomSpace.s10),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("●  " + (date?.let { "$it 획득" } ?: "획득"), style = KagomType.Caption14Strong, color = KagomColor.Text.inverse)
-            Text("KAGOM  ●", style = KagomType.Caption14Strong, color = KagomColor.Text.inverse)
-        }
-        Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center) {
-            Text(title, style = KagomType.Display40, color = KagomColor.Text.primary, textAlign = TextAlign.Center)
-            Text("도전과제 칭호", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
         }
     }
 }

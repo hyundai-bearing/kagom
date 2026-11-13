@@ -42,8 +42,10 @@ import com.example.roro.core.Checkup
 import com.example.roro.core.PendingPopup
 import com.example.roro.core.Progress
 import com.example.roro.ui.components.BottomTabBar
+import java.time.LocalDate
 import com.example.roro.ui.components.IviToast
 import com.example.roro.ui.components.KagomCharacter
+import com.example.roro.ui.components.LocalToday
 import com.example.roro.ui.components.LocalWeather
 import com.example.roro.ui.components.NavRail
 import com.example.roro.ui.components.NavTab
@@ -81,7 +83,11 @@ private data class Notice(val text: String, val id: Long = System.nanoTime())
 @Composable
 fun KagomApp(c: KagomController) = KagomTheme {
     val weather by c.weather.collectAsState()
-    CompositionLocalProvider(LocalWeather provides weather) { KagomAppContent(c) }
+    // 번호판 날짜는 시연 패널의 날짜 넘기기를 따른다 (KagomController.today()와 같은 값)
+    val dayOffset by c.demoDayOffset.collectAsState()
+    CompositionLocalProvider(LocalWeather provides weather, LocalToday provides LocalDate.now().toEpochDay() + dayOffset) {
+        KagomAppContent(c)
+    }
 }
 
 @Composable
