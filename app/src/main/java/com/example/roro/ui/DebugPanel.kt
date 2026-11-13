@@ -28,11 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.roro.ui.components.TouchAct
+import com.example.roro.core.Category
 import com.example.roro.core.Gear
+import com.example.roro.core.Items
 import com.example.roro.core.Examples
 import com.example.roro.core.Landmarks
 import com.example.roro.core.OilLevel
 import com.example.roro.core.Skins
+import com.example.roro.core.Weather
 import com.example.roro.ui.theme.KagomColor
 import com.example.roro.ui.theme.KagomRadius
 import com.example.roro.ui.theme.KagomType
@@ -72,6 +75,17 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
                 Skins.all.forEach { skin ->
                     Btn("${skin.code} ${skin.skinName}", data.profile?.skin == skin.code) { c.demoSetSkin(skin.code) }
                 }
+            }
+            val demoWeather by c.demoWeather.collectAsState()
+            val realWeather by c.weatherSource.weather.collectAsState()
+            Group("날씨 (배경 '오늘 날씨', 저장 안 함) · 실제: ${realWeather?.label ?: "확인 불가"}") {
+                Weather.entries.forEach { w -> Btn(w.label, demoWeather == w) { c.demoWeather.value = w } }
+                Btn("실제 날씨", demoWeather == null) { c.demoWeather.value = null }
+            }
+            val demoBackground by c.demoBackground.collectAsState()
+            Group("배경 미리보기 (홈, 잠긴 배경도, 저장 안 함)") {
+                Items.of(Category.BACKGROUND).forEach { item -> Btn(item.name, demoBackground == item.id) { c.demoBackground.value = item.id; onClose() } }
+                Btn("장착한 배경", demoBackground == null) { c.demoBackground.value = null }
             }
             Group("연료·배터리 %") {
                 listOf(72, 33, 28, 18, 12, 8, 4).forEach { p ->

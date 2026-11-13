@@ -16,6 +16,8 @@ object Examples {
         PopupExample("EX-POP-03-SUN", "정동진 해금", "landmark:LM-GN-01"),
         PopupExample("EX-POP-03-COFFEE", "커피거리 해금", "landmark:LM-GN-02"),
         PopupExample("EX-POP-03-PORT", "주문진항 해금", "landmark:LM-GN-03"),
+        PopupExample("EX-POP-03-HIGHLAND", "안반데기 해금", "landmark:LM-GN-04"),
+        PopupExample("EX-POP-03-TRAIL", "대관령 옛길 해금", "landmark:LM-GN-05"),
         PopupExample("EX-POP-04", "레벨 업", "level"),
         PopupExample("EX-POP-05", "정비 시트", "maintenance"),
         PopupExample("EX-POP-05-EV", "전기차 점검", "maintenance-ev"),
@@ -40,7 +42,8 @@ object Examples {
 
     /**
      * Figma 140:4103 순서·출처 그대로 (03 랜드마크, 04 도전과제 …).
-     * 13·14는 Figma 첫 페이지 밖이라 보이지 않지만, 실제 2개 + 예시 12개 = 14개여야 Full 2페이지(140:4103)·Split 5페이지(140:4330)가 맞는다
+     * 13·14는 Figma 첫 페이지 밖이라 보이지 않는다. Figma(140:4103)는 실제 2개 + 예시 12개 = 14개 기준인데,
+     * 머리 아이템이 3개가 되면서(ITM-H-03) 지금은 15개다: 2페이지인 것은 같고 첫 페이지의 예시가 한 칸씩 밀린다
      */
     val items: List<Item> = listOf(
         3 to true, 4 to false, 5 to false, 6 to true, 7 to false, 8 to true, 9 to false, 10 to true, 11 to false, 12 to true,

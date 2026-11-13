@@ -87,7 +87,7 @@ fun NorthArrowGlyph(modifier: Modifier, color: Color) = Canvas(modifier) {
     drawPath(p, color)
 }
 
-/** 랜드마크 일러스트 (배·해돋이·커피잔). 실 일러스트 교체 지점 */
+/** 랜드마크 일러스트 (배·해돋이·커피잔·풍력발전기·숲길). 실 일러스트 교체 지점 */
 @Composable
 fun LandmarkGlyphView(glyph: LandmarkGlyph, modifier: Modifier, dark: Color = KagomColor.Surface.dark, light: Color = KagomColor.Surface.card) =
     Canvas(modifier) {
@@ -95,8 +95,41 @@ fun LandmarkGlyphView(glyph: LandmarkGlyph, modifier: Modifier, dark: Color = Ka
             LandmarkGlyph.BOAT -> drawBoat(dark, light)
             LandmarkGlyph.SUNRISE -> drawSun()
             LandmarkGlyph.COFFEE -> drawCup(dark, light)
+            LandmarkGlyph.WINDMILL -> drawWindmill(dark, light)
+            LandmarkGlyph.TRAIL -> drawTrail(dark, light)
         }
     }
+
+/** 안반데기: 언덕 위 풍력발전기 */
+private fun DrawScope.drawWindmill(dark: Color, light: Color) {
+    val w = size.width; val h = size.height
+    val hub = Offset(w * 0.5f, h * 0.36f)
+    drawArc(dark, 180f, 180f, true, Offset(-w * 0.1f, h * 0.78f), Size(w * 1.2f, h * 0.5f))
+    drawLine(light, hub, Offset(w * 0.5f, h * 0.84f), w * 0.07f, StrokeCap.Round)
+    for (i in 0..2) rotate(18f + i * 120f, hub) {
+        drawOval(light, Offset(hub.x - w * 0.055f, hub.y - h * 0.36f), Size(w * 0.11f, h * 0.36f))
+    }
+    drawCircle(dark, w * 0.05f, hub)
+}
+
+/** 대관령 옛길: 전나무 두 그루 사이로 난 길 */
+private fun DrawScope.drawTrail(dark: Color, light: Color) {
+    val w = size.width; val h = size.height
+    fun pine(cx: Float, top: Float, half: Float) {
+        for (i in 0..2) {
+            val y = top + (h - top) * 0.22f * i
+            val s = half * (0.6f + 0.2f * i)
+            drawPath(Path().apply { moveTo(cx, y); lineTo(cx - s, y + (h - top) * 0.42f); lineTo(cx + s, y + (h - top) * 0.42f); close() }, dark)
+        }
+    }
+    pine(w * 0.2f, h * 0.08f, w * 0.2f)
+    pine(w * 0.8f, h * 0.22f, w * 0.18f)
+    drawPath(Path().apply {
+        moveTo(w * 0.36f, h); quadraticTo(w * 0.62f, h * 0.72f, w * 0.46f, h * 0.5f)
+        quadraticTo(w * 0.4f, h * 0.38f, w * 0.52f, h * 0.26f); lineTo(w * 0.58f, h * 0.28f)
+        quadraticTo(w * 0.5f, h * 0.4f, w * 0.58f, h * 0.5f); quadraticTo(w * 0.78f, h * 0.74f, w * 0.64f, h); close()
+    }, light)
+}
 
 private fun DrawScope.drawBoat(hull: Color, sail: Color) {
     val w = size.width; val h = size.height

@@ -39,6 +39,7 @@ import com.example.roro.core.Category
 import com.example.roro.core.Examples
 import com.example.roro.core.Expression
 import com.example.roro.core.Item
+import com.example.roro.core.Items
 import com.example.roro.core.Landmarks
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
@@ -147,6 +148,8 @@ private val lockedItemFilter = ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
 internal fun popupDescription(item: Item, locked: Boolean, data: AppData): String {
     if (Examples.isExample(item.id)) return "시연용 예시 아이템이에요."
     if (locked) return item.condition.ifBlank { item.guide }
+    // 날씨 자료의 출처 표시가 설명에 들어 있다
+    if (item.id == Items.WEATHER_BACKGROUND) return item.guide
     val landmark = item.sourceId?.let { Landmarks.byId(it) }
     val visit = landmark?.let { lm -> data.visits.filter { it.landmarkId == lm.id }.minByOrNull { it.day } }
     val date = visit?.let { LocalDate.ofEpochDay(it.day) }

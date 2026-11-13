@@ -113,8 +113,8 @@ fun HomeScreen(
     }
 
     // 장착한 배경 그림 (디자인에 없는 가정). 그림이 없는 ID면 전처럼 스킨 틴트만 보인다.
-    // 정지 그림이라 주행 중에도 그대로 둔다 (바꾸는 것은 옷장에서 기어 P일 때만)
-    val backdrop: @Composable () -> Unit = { BackgroundArt(data.equipped.background, Modifier.fillMaxSize()) }
+    // 주행 중에도 그대로 둔다 (바꾸는 것은 옷장에서 기어 P일 때만). 움직이는 배경("오늘 날씨")은 주행 중에 멈춘다
+    val backdrop: @Composable () -> Unit = { BackgroundArt(data.equipped.background, Modifier.fillMaxSize(), animated = gearP) }
 
     if (split) {
         // 헤더 / 캔버스 / 하단 배지 그룹 세로 스택. 배지 터치 → 바텀시트
