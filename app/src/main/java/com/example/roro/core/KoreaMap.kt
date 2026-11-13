@@ -52,6 +52,8 @@ class MapRegion(
     }
 }
 
+data class MapVisitArea(val region: MapRegion, val fullyVisited: Boolean)
+
 class KoreaMap(
     val provinces: List<MapRegion>,
     val units: List<MapRegion>,
@@ -66,6 +68,21 @@ class KoreaMap(
     fun province(id: String?): MapRegion? = provinceById[id]
     fun districtsOf(unitId: String): List<MapRegion> = districtsByUnit[unitId].orEmpty()
     fun unitAt(lon: Float, lat: Float): MapRegion? = units.firstOrNull { it.contains(lon, lat) }
+    fun districtAt(unitId: String, lon: Float, lat: Float): MapRegion? =
+        districtsOf(unitId).firstOrNull { it.contains(lon, lat) }
+
+    /** 상위 지역의 방문 수는 집계용이다. 지도 색은 위치를 확인할 수 있는 가장 작은 경계에만 입힌다. */
+    fun landmarkVisitAreas(landmarks: List<Landmark>, visitedIds: Set<String>): List<MapVisitArea> {
+        if (visitedIds.isEmpty()) return emptyList()
+        return landmarks.groupBy { landmark ->
+            if (districtsOf(landmark.unitId).isEmpty()) unit(landmark.unitId)
+            else districtAt(landmark.unitId, landmark.lon.toFloat(), landmark.lat.toFloat())
+        }.mapNotNull { (region, entries) ->
+            val visited = entries.count { it.id in visitedIds }
+            if (region == null || visited == 0) null
+            else MapVisitArea(region, fullyVisited = visited == entries.size)
+        }
+    }
 
     companion object {
         /** korea_map.txt 읽기. 형식은 build_korea.py 머리말 참고 */

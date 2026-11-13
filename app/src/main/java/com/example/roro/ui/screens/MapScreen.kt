@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -106,6 +107,7 @@ import com.example.roro.core.Landmarks
 import com.example.roro.core.MapCamera
 import com.example.roro.core.MapProjection
 import com.example.roro.core.MapRegion
+import com.example.roro.core.MapVisitArea
 import com.example.roro.core.MapZoom
 import com.example.roro.core.Severity
 import com.example.roro.core.Visit
@@ -147,15 +149,14 @@ private val PinState.caption: String
         PinState.Unlocked -> "방문 완료"
     }
 
-private data class RegionProgress(val region: MapRegion, val landmarks: List<LandmarkView>) {
+private data class RegionProgress(
+    val region: MapRegion,
+    val landmarks: List<LandmarkView>,
+    val visitAreas: List<MapVisitArea>,
+) {
     val visited: Int = landmarks.count { it.visited }
     val count: String = String.format(Locale.KOREA, "%,d / %,d", visited, landmarks.size)
-    val fill: Color
-        get() = when {
-            visited == 0 -> KagomColor.Map.landFogged
-            visited == landmarks.size -> KagomColor.Map.landUnlocked
-            else -> KagomColor.Map.landPartial
-        }
+    val fullyVisited: Boolean = visitAreas.any { it.region == region && it.fullyVisited }
 }
 
 @Composable
@@ -225,7 +226,7 @@ fun MapScreen(
         val target = loaded?.unit(lm.unitId) ?: return@LaunchedEffect
         provinceId = target.provinceId
         unitId = target.id
-        districtId = loaded.districtsOf(target.id).firstOrNull { it.contains(lm.lon.toFloat(), lm.lat.toFloat()) }?.id
+        districtId = loaded.districtAt(target.id, lm.lon.toFloat(), lm.lat.toFloat())?.id
         pinId = lm.id
         onFocusShown()
     }
@@ -248,13 +249,17 @@ fun MapScreen(
         val city = loaded.unitAt(lon, lat)
         provinceId = city?.provinceId ?: loaded.provinces.firstOrNull { it.contains(lon, lat) }?.id
         unitId = city?.id
-        districtId = city?.let { region -> loaded.districtsOf(region.id).firstOrNull { it.contains(lon, lat) }?.id }
+        districtId = city?.let { loaded.districtAt(it.id, lon, lat)?.id }
         pinId = null
     }
     val province = loaded.province(provinceId)
     val unit = loaded.unit(unitId)
     val regions = remember(loaded, province, unit, views) { mapRegions(loaded, province, unit, views) }
     val district = unit?.let { regions.firstOrNull { it.region.id == districtId } }
+    val showDistrictBoundaries = unit != null && loaded.districtsOf(unit.id).isNotEmpty()
+    val showDistrictCoverage = regions.any { entry ->
+        entry.visitAreas.any { loaded.unit(it.region.provinceId) != null }
+    }
     val districtListState = key(unit?.id) { rememberLazyListState() }
     val count = regions.flatMap { it.landmarks }
     val selectedPin = count.firstOrNull { it.landmark.id == pinId }
@@ -305,7 +310,10 @@ fun MapScreen(
             visiblePins = if (unit != null) count else emptyList(),
             selectedPin = selectedPin,
             split = split,
-            showDistrictAttribution = unit != null && regions.isNotEmpty(),
+            attributions = buildList {
+                if (!showDistrictBoundaries) add("© OpenStreetMap contributors")
+                if (showDistrictBoundaries || showDistrictCoverage) add("경계 © 통계청 SGIS · vuski/admdongkor")
+            },
             hint = when {
                 // 주행 중에는 핀 상세가 막혀 있다. 핀을 누르면 뜨는 정차 안내와 같은 말로 맞춘다 (반대되는 안내가 나란히 보였다)
                 unit != null && !gearP -> "기어 P에서 핀 상세를 볼 수 있어요."
@@ -551,23 +559,29 @@ private fun MapSheet(
 private fun mapRegions(
     map: KoreaMap, province: MapRegion?, unit: MapRegion?, views: List<LandmarkView>,
 ): List<RegionProgress> {
+    val visitedIds = views.filter { it.visited }.map { it.landmark.id }.toSet()
+
+    fun progress(region: MapRegion, landmarks: List<LandmarkView>) = RegionProgress(
+        region, landmarks, map.landmarkVisitAreas(landmarks.map { it.landmark }, visitedIds),
+    )
+
     if (unit != null) {
         val cityLandmarks = views.filter { it.landmark.unitId == unit.id }
         val districts = map.districtsOf(unit.id)
         val byDistrict = cityLandmarks.groupBy { view ->
             val lm = view.landmark
-            districts.firstOrNull { it.contains(lm.lon.toFloat(), lm.lat.toFloat()) }?.id
+            map.districtAt(unit.id, lm.lon.toFloat(), lm.lat.toFloat())?.id
         }
-        val entries = districts.map { RegionProgress(it, byDistrict[it.id].orEmpty()) }
+        val entries = districts.map { progress(it, byDistrict[it.id].orEmpty()) }
         val unassigned = byDistrict[null].orEmpty()
-        return if (unassigned.isEmpty()) entries else entries + RegionProgress(unit, unassigned)
+        return if (unassigned.isEmpty()) entries else entries + progress(unit, unassigned)
     }
     if (province != null) {
         val byUnit = views.groupBy { it.landmark.unitId }
-        return map.units.filter { it.provinceId == province.id }.map { RegionProgress(it, byUnit[it.id].orEmpty()) }
+        return map.units.filter { it.provinceId == province.id }.map { progress(it, byUnit[it.id].orEmpty()) }
     }
     val byProvince = views.groupBy { map.unit(it.landmark.unitId)?.provinceId }
-    return map.provinces.map { RegionProgress(it, byProvince[it.id].orEmpty()) }
+    return map.provinces.map { progress(it, byProvince[it.id].orEmpty()) }
 }
 
 @Composable
@@ -621,6 +635,7 @@ private class MapScene(
     val bounds: GeoBounds,
     val regions: List<RegionProgress>,
     val paths: Map<String, Path>,
+    val visitPaths: Map<String, List<Pair<Path, Color>>>,
     val outline: Path?,
     val camera: MapCamera,
     val selectedId: String?,
@@ -659,7 +674,12 @@ private fun SceneLayer(scene: MapScene, shown: () -> MapCamera, alpha: () -> Flo
                 drawPath(it, KagomColor.Map.landFogged)
                 drawPath(it, KagomColor.Map.boundary, style = Stroke(border))
             }
-            scene.regions.asReversed().forEach { drawPath(scene.paths.getValue(it.region.id), it.fill) }
+            scene.regions.asReversed().forEach { drawPath(scene.paths.getValue(it.region.id), KagomColor.Map.landFogged) }
+            scene.visitPaths.forEach { (regionId, areas) ->
+                clipPath(scene.paths.getValue(regionId)) {
+                    areas.forEach { (path, color) -> drawPath(path, color) }
+                }
+            }
             scene.regions.forEach { drawPath(scene.paths.getValue(it.region.id), KagomColor.Map.boundary, style = Stroke(border)) }
             scene.paths[scene.selectedId]?.let {
                 val dashes = floatArrayOf(7.dp.toPx() / camera.scale, 4.dp.toPx() / camera.scale)
@@ -683,7 +703,7 @@ private fun RegionMap(
     visiblePins: List<LandmarkView>,
     selectedPin: LandmarkView?,
     split: Boolean,
-    showDistrictAttribution: Boolean,
+    attributions: List<String>,
     hint: String,
     gearP: Boolean,
     onRegion: (String) -> Unit,
@@ -698,6 +718,14 @@ private fun RegionMap(
     modifier: Modifier,
 ) {
     val paths = remember(regions) { regions.associate { it.region.id to it.region.outline() } }
+    val visitPaths = remember(regions, paths) {
+        regions.filter { it.visitAreas.isNotEmpty() }.associate { entry ->
+            entry.region.id to entry.visitAreas.map { area ->
+                val path = paths[area.region.id] ?: area.region.outline()
+                path to if (area.fullyVisited) KagomColor.Map.landUnlocked else KagomColor.Map.landPartial
+            }
+        }
+    }
     val outlinePath = remember(outline) { outline?.outline() }
     val measurer = rememberTextMeasurer(cacheSize = 128)
     val labelStyle = KagomType.Caption14.copy(color = KagomColor.Text.primary)
@@ -725,8 +753,8 @@ private fun RegionMap(
         val camera = remember(bounds, w, h, pad, topPx, bottomPx) { MapZoom.fit(bounds, w, h, pad, topPx, bottomPx) }
         // 단계 이동: 떠나온 단계의 그림에서 새 단계의 그림으로 시점이 옮겨 가며 바뀐다 (주행 중에는 바로 바꾼다).
         // 방문 기록만 바뀌거나 화면 크기가 바뀐 것(범위가 같음)은 단계 이동이 아니다
-        val scene = remember(regions, paths, outlinePath, camera, district?.region?.id) {
-            MapScene(bounds, regions, paths, outlinePath, camera, district?.region?.id)
+        val scene = remember(regions, paths, visitPaths, outlinePath, camera, district?.region?.id) {
+            MapScene(bounds, regions, paths, visitPaths, outlinePath, camera, district?.region?.id)
         }
         val scenes = remember { arrayOfNulls<MapScene>(2) }     // [0] 지금 단계, [1] 떠나온 단계
         scenes[0].let { shown ->
@@ -772,21 +800,20 @@ private fun RegionMap(
                 }
             }
         }
-        val attribution = if (showDistrictAttribution) "경계 © 통계청 SGIS · vuski/admdongkor" else "© OpenStreetMap contributors"
-        val locationStatus = locationLabel.takeIf { onLocate == null }
+        val credits = listOfNotNull(locationLabel.takeIf { onLocate == null }) + attributions
         val north = if (split) null else painterResource(R.drawable.map_north)
         // 지도 위에 얹는 글·버튼의 자리 (아래에서 그리는 것과 같은 여백). 구획 이름표와 카곰이 여기를 피해야 서로 겹쳐서 못 읽는 일이 없다
-        val overlays = remember(attribution, locationStatus, locationLabel, hint, north, w, h, measurer, split, topPx, bottomPx) {
+        val overlays = remember(credits, locationLabel, hint, north, w, h, measurer, split, topPx, bottomPx) {
             with(density) {
                 fun sizeOf(text: String, style: TextStyle) = measurer.measure(text, style).size
                 buildList {
-                    val lines = listOfNotNull(locationStatus, attribution).map { sizeOf(it, KagomType.Caption14) }
+                    val lines = credits.map { sizeOf(it, KagomType.Caption14) }
                     val credit = Rect(
                         w - lines.maxOf { it.width } - 2 * KagomSpace.s10.toPx(),
                         h - bottomPx - lines.sumOf { it.height } - 2 * 6.dp.toPx(), w, h - bottomPx,
                     )
                     add(credit)
-                    if (locationStatus == null) {
+                    if (onLocate != null) {
                         val text = sizeOf(locationLabel, KagomType.Body16Strong)
                         val edge = KagomSpace.s12.toPx()
                         val width = text.width + 2 * KagomSpace.s16.toPx()
@@ -834,7 +861,7 @@ private fun RegionMap(
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(region.name.shortRegionName()) }
                     append("  ")
                     withStyle(SpanStyle(color = if (entry.visited > 0) KagomColor.Accent.positive else KagomColor.Text.secondary)) {
-                        if (entry.visited > 0 && entry.visited == entry.landmarks.size) append("✓ ")
+                        if (entry.fullyVisited) append("✓ ")
                         append(entry.count.replace(" ", ""))
                     }
                 }
@@ -1027,8 +1054,7 @@ private fun RegionMap(
                 .padding(horizontal = KagomSpace.s10, vertical = 6.dp),
             horizontalAlignment = Alignment.End,
         ) {
-            if (locationStatus != null) Text(locationStatus, style = KagomType.Caption14, color = KagomColor.Text.secondary)
-            Text(attribution, style = KagomType.Caption14, color = KagomColor.Text.secondary)
+            credits.forEach { Text(it, style = KagomType.Caption14, color = KagomColor.Text.secondary) }
         }
         if (!split) Text(
             hint, Modifier.align(Alignment.BottomStart).padding(KagomSpace.s24)
