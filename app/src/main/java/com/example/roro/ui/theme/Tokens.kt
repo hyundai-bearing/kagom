@@ -69,8 +69,15 @@ object KagomColor {
         val seaEdge = Color(0xFF6E97A3)
         val landLocked = Color(0xFFE4E6EA)
         val landUnlocked = Color(0xFF7DBF78)
-        /** 지도 구획 일부 해금 (1~2/3, Figma green/200, 가이드 v1.2 land-partial) */
-        val landPartial = Color(0xFFC3E2C0)
+        /**
+         * 지도 지역 일부 해금: 모두 해금 초록의 50% 투명 (2026-11-13 요청). 흰 바탕 위에 칠한다 (회색 위에 칠하면 탁해진다)
+         * → 흰 바탕에서 Figma green/200(#C3E2C0)에 가깝다
+         */
+        val landPartial = Color(0x807DBF78)
+        /** 시 단계 깃발 (Figma SCR-05 layer=3, 2026-11-13): 방문 = 초록 깃발·검은 깃대, 미방문 = 회색. 값은 시안을 보고 정했다 (가정) */
+        val flagVisited = Color(0xFF22C25E)
+        val flagUnvisited = Color(0xFFC9CBD0)
+        val poleUnvisited = Color(0xFF8E9097)
         val fog = Color(0x59131417)
         val road = Color(0xFF44464E)
         val boundary = Color(0xFFF6F7F8)
