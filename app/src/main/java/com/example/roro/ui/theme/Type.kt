@@ -24,6 +24,8 @@ val AstaSans = FontFamily(
     Font(R.font.asta_sans, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
     Font(R.font.asta_sans, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
     Font(R.font.asta_sans, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    // 번호판 글자 (PlateDate·PlateName): 원래 번호판 그림의 굵은 글자에 맞춘다. 폰트 굵기 축의 끝(800)이다
+    Font(R.font.asta_sans, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800))),
 )
 
 private fun style(size: Int, line: Int, bold: Boolean, tracking: Float = 0f) = TextStyle(
@@ -78,7 +80,14 @@ object KagomType {
     val ClosetSlotText = style(22, 28, false)
     val ClosetSlotButtonText = style(20, 24, false)
     val ClosetSlotNumber = style(40, 48, false).copy(fontWeight = FontWeight.Medium)
+    /**
+     * 번호판 글자 (ui/components/ClosetTitlePlate.kt). 크기는 화면 sp가 아니라 번호판 그림 px로 읽고 번호판 크기만큼 줄여 그린다.
+     * 원래 그림의 글자 높이(날짜 줄 약 35px, 이름 줄 약 83px)에 맞춘 값이다 (tools/plates/build_plates.py 출력, 에뮬레이터에서 나란히 놓고 맞춤)
+     */
     val ClosetSlotNumberCompact = style(24, 30, false).copy(fontWeight = FontWeight.Medium)
+    // (번호판 글자 설명은 위 주석) Figma 스타일이 아니라 번호판 그림 px 기준이라 Figma 이름이 없다
+    val PlateDate = style(50, 58, true, tracking = 4f).copy(fontWeight = FontWeight.ExtraBold)
+    val PlateName = style(88, 102, true).copy(fontWeight = FontWeight.ExtraBold)
     val ClosetSmallStrong = style(28, 34, true)
     // Figma POP-04 levelUpTitle / levelNumber 전용. 이미 Pleos Headline보다 커서 Figma 값 그대로 둔다
     val LevelTitle = style(64, 70, true)

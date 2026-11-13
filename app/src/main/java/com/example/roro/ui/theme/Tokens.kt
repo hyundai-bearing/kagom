@@ -116,6 +116,16 @@ object KagomColor {
         val slotSave = Color(0xFF8A73B4)
     }
 
+    /** 칭호 번호판 글자 색: 원래 번호판 그림의 글자 화소 중앙값 (tools/plates/build_plates.py 출력) */
+    object TitlePlate {
+        /** 밝은 판 4종 (P05·P01·P02·P03) */
+        val ink = Color(0xFF141414)
+        val inkOnCharcoal = Color(0xFFFBF8F5)
+        val inkChocolate = Color(0xFF462E1A)
+        val inkTeal = Color(0xFF054F4B)
+        val inkRose = Color(0xFF824030)
+    }
+
     object Accent {
         val positive = Color(0xFF2F6F4E)
         val tier = Color(0xFFF3E6C8)
