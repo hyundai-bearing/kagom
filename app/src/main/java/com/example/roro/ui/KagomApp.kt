@@ -44,6 +44,7 @@ import com.example.roro.core.Progress
 import com.example.roro.ui.components.BottomTabBar
 import com.example.roro.ui.components.IviToast
 import com.example.roro.ui.components.KagomCharacter
+import com.example.roro.ui.components.LocalToday
 import com.example.roro.ui.components.LocalWeather
 import com.example.roro.ui.components.NavRail
 import com.example.roro.ui.components.NavTab
@@ -69,6 +70,7 @@ import com.example.roro.ui.theme.KagomTheme
 import com.example.roro.ui.theme.LayoutMode
 import com.example.roro.ui.theme.LocalLayoutMode
 import kotlinx.coroutines.delay
+import java.time.LocalDate
 
 /** 정차 중 사용자 동작의 결과 알림 (정비 시트 버튼). [id]가 달라야 같은 문구도 다시 뜬다 */
 private data class Notice(val text: String, val id: Long = System.nanoTime())
@@ -81,7 +83,11 @@ private data class Notice(val text: String, val id: Long = System.nanoTime())
 @Composable
 fun KagomApp(c: KagomController) = KagomTheme {
     val weather by c.weather.collectAsState()
-    CompositionLocalProvider(LocalWeather provides weather) { KagomAppContent(c) }
+    // 번호판 날짜는 시연 패널의 날짜 넘기기를 따른다 (KagomController.today()와 같은 값)
+    val dayOffset by c.demoDayOffset.collectAsState()
+    CompositionLocalProvider(LocalWeather provides weather, LocalToday provides LocalDate.now().toEpochDay() + dayOffset) {
+        KagomAppContent(c)
+    }
 }
 
 @Composable
