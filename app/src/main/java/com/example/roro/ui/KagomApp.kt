@@ -172,7 +172,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
                         KagomCharacter(profile.skin, status.expression, modifier, worn = worn)
                     }
                 }
-                NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, c::saveEquipped, c::saveOutfit, examples) { next, landmarkId ->
+                NavTab.CLOSET -> ClosetScreen(profile, data, c.progressContext(data), gearP, status.expression, c::saveEquipped, c::saveOutfit, examples) { next, landmarkId ->
                     mapFocus = landmarkId.takeIf { next == NavTab.MAP }
                     tab = next
                 }

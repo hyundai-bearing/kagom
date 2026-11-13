@@ -52,6 +52,8 @@ class MapRegion(
     }
 }
 
+data class MapVisitArea(val region: MapRegion, val fullyVisited: Boolean)
+
 class KoreaMap(
     val provinces: List<MapRegion>,
     val units: List<MapRegion>,
@@ -66,6 +68,21 @@ class KoreaMap(
     fun province(id: String?): MapRegion? = provinceById[id]
     fun districtsOf(unitId: String): List<MapRegion> = districtsByUnit[unitId].orEmpty()
     fun unitAt(lon: Float, lat: Float): MapRegion? = units.firstOrNull { it.contains(lon, lat) }
+    fun districtAt(unitId: String, lon: Float, lat: Float): MapRegion? =
+        districtsOf(unitId).firstOrNull { it.contains(lon, lat) }
+
+    /** 상위 지역의 방문 수는 집계용이다. 지도 색은 위치를 확인할 수 있는 가장 작은 경계에만 입힌다. */
+    fun landmarkVisitAreas(landmarks: List<Landmark>, visitedIds: Set<String>): List<MapVisitArea> {
+        if (visitedIds.isEmpty()) return emptyList()
+        return landmarks.groupBy { landmark ->
+            if (districtsOf(landmark.unitId).isEmpty()) unit(landmark.unitId)
+            else districtAt(landmark.unitId, landmark.lon.toFloat(), landmark.lat.toFloat())
+        }.mapNotNull { (region, entries) ->
+            val visited = entries.count { it.id in visitedIds }
+            if (region == null || visited == 0) null
+            else MapVisitArea(region, fullyVisited = visited == entries.size)
+        }
+    }
 
     companion object {
         /** korea_map.txt 읽기. 형식은 build_korea.py 머리말 참고 */
@@ -140,12 +157,15 @@ object MapZoom {
     const val STEP = 3f
     const val MAX_LEVEL = 2
 
-    /** 0단계: [b]가 화면([w]×[h], 여백 [pad] px)에 꼭 들어가게 */
-    fun fit(b: GeoBounds, w: Float, h: Float, pad: Float): MapCamera {
+    /**
+     * 0단계: [b]가 화면([w]×[h], 여백 [pad] px)에 꼭 들어가게.
+     * [top]·[bottom] = 지도 위에 얹힌 것(Split의 머리줄, 접힌 시트)이 가리는 높이 px. 그만큼을 뺀 자리의 가운데에 맞춘다
+     */
+    fun fit(b: GeoBounds, w: Float, h: Float, pad: Float, top: Float = 0f, bottom: Float = 0f): MapCamera {
         val x0 = MapProjection.x(b.west); val x1 = MapProjection.x(b.east)
         val y0 = MapProjection.y(b.north); val y1 = MapProjection.y(b.south)
-        val s = min((w - 2 * pad) / (x1 - x0), (h - 2 * pad) / (y1 - y0))
-        return MapCamera((x0 + x1) / 2, (y0 + y1) / 2, s)
+        val s = min((w - 2 * pad) / (x1 - x0), (h - top - bottom - 2 * pad) / (y1 - y0))
+        return MapCamera((x0 + x1) / 2, (y0 + y1) / 2 + (bottom - top) / 2 / s, s)
     }
 
     /**

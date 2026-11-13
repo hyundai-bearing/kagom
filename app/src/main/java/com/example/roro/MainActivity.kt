@@ -37,6 +37,8 @@ import kotlinx.coroutines.cancel
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ez demo_new_vehicle true # 새 차에서 이전 카곰 기록 발견 (SCR-00 Carry-over)
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_popup reward  # reward/reveal/landmark:LM-GN-01/level/maintenance/maintenance-ev/maintenance-done/off (저장 안 함)
  *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_act wave      # 캐릭터 동작 한 번: wave/cheer/stomp/bow/spin (홈, 기어 P + 대기 표정)
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --es demo_skin P04      # 캐릭터 색 P01~P08 (카곰을 만든 뒤, 저장됨)
+ *   adb shell am start --activity-single-top -n com.example.roro/.MainActivity --ei demo_days 300      # 오늘을 N일 뒤로 (엔진오일 교체 시기 MNT-01). 0 = 실제 날짜 (저장 안 함)
  */
 class MainActivity : ComponentActivity() {
 
@@ -88,6 +90,8 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra("demo_visit")?.let { c.demoVisit(it.takeIf { id -> id.isNotBlank() }) }
         if (intent.hasExtra("demo_examples")) c.demoExamples.value = intent.getBooleanExtra("demo_examples", false)
         if (intent.hasExtra("demo_new_vehicle")) c.demoNewVehicle(intent.getBooleanExtra("demo_new_vehicle", false))
+        intent.getStringExtra("demo_skin")?.let { c.demoSetSkin(it.uppercase()) }
+        if (intent.hasExtra("demo_days")) c.demoSetDayOffset(intent.getIntExtra("demo_days", 0).toLong())
     }
 
     override fun onDestroy() {

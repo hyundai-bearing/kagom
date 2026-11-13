@@ -53,6 +53,18 @@ class KoreaMapTest {
     }
 
     @Test
+    fun `위아래가 가려지면 남은 자리에 꼭 맞추고 그 가운데에 둔다`() {
+        val b = GeoBounds(126f, 36f, 127f, 37f)
+        // 높이 900에서 위 100(머리줄), 아래 200(접힌 시트)이 가려진다 → 보이는 자리는 100..700
+        val camera = MapZoom.fit(b, 2000f, 900f, 0f, top = 100f, bottom = 200f)
+        assertEquals(100f, camera.toScreenY(MapProjection.y(37f), 900f), 1e-2f)
+        assertEquals(700f, camera.toScreenY(MapProjection.y(36f), 900f), 1e-2f)
+        assertEquals(1000f, camera.toScreenX(MapProjection.x(126.5f), 2000f), 1e-2f)
+        // 가림이 없으면 전과 같다
+        assertEquals(MapZoom.fit(b, 2000f, 900f, 0f), MapZoom.fit(b, 2000f, 900f, 0f, top = 0f, bottom = 0f))
+    }
+
+    @Test
     fun `화면 좌표와 평면 좌표는 서로 되돌아온다`() {
         val cam = MapCamera(100f, -37f, 1234f)
         val x = cam.toPlaneX(321f, 800f); val y = cam.toPlaneY(123f, 600f)
@@ -85,11 +97,7 @@ class KoreaMapTest {
 
     @Test
     fun `강릉 랜드마크는 각각 하나의 실제 구획에 들어간다`() {
-        val map = File("src/main/assets/regions/korea_map.txt").useLines { base ->
-            File("src/main/assets/regions/gangneung_districts.txt").useLines { districts ->
-                KoreaMap.parse(base + districts)
-            }
-        }
+        val map = mapWithGangneungDistricts()
         val gangneung = map.districtsOf(Landmarks.GANGNEUNG)
         assertEquals(9, gangneung.size)
         val expected = mapOf("LM-GN-01" to "강동면", "LM-GN-02" to "시내 13개 동", "LM-GN-03" to "주문진읍")
@@ -99,4 +107,38 @@ class KoreaMapTest {
             assertEquals(listOf(name), matches.map { it.name })
         }
     }
+
+    @Test
+    fun `강릉에서 한 곳을 방문하면 해당 구획만 해금된다`() {
+        val map = mapWithGangneungDistricts()
+        assertTrue(map.landmarkVisitAreas(Landmarks.all, emptySet()).isEmpty())
+        val area = map.landmarkVisitAreas(Landmarks.all, setOf("LM-GN-03")).single()
+        assertEquals("주문진읍", area.region.name)
+        assertEquals(Landmarks.GANGNEUNG, area.region.provinceId)
+        assertTrue(area.fullyVisited)
+    }
+
+    @Test
+    fun `강릉 랜드마크를 모두 방문해도 세 구획만 해금된다`() {
+        val map = mapWithGangneungDistricts()
+        val ids = Landmarks.inUnit(Landmarks.GANGNEUNG).map { it.id }.toSet()
+        val areas = map.landmarkVisitAreas(Landmarks.all, ids)
+        assertEquals(setOf("주문진읍", "시내 13개 동", "강동면"), areas.map { it.region.name }.toSet())
+        assertTrue(areas.all { it.fullyVisited })
+    }
+
+    @Test
+    fun `구획 경계가 없는 경우 시군 경계에 일부 해금을 표시한다`() {
+        val map = File("src/main/assets/regions/korea_map.txt").useLines { KoreaMap.parse(it) }
+        val area = map.landmarkVisitAreas(Landmarks.all, setOf("LM-GN-03")).single()
+        assertEquals(Landmarks.GANGNEUNG, area.region.id)
+        assertFalse(area.fullyVisited)
+    }
+
+    private fun mapWithGangneungDistricts(): KoreaMap =
+        File("src/main/assets/regions/korea_map.txt").useLines { base ->
+            File("src/main/assets/regions/gangneung_districts.txt").useLines { districts ->
+                KoreaMap.parse(base + districts)
+            }
+        }
 }

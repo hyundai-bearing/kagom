@@ -24,20 +24,23 @@ data class Profile(
     val carriedKm: Float = 0f,
 )
 
-/** 착용 중인 치장 (머리·상의·하의·칭호) */
+/** 착용 중인 치장 (머리·상의·하의·칭호·홈 배경) */
 data class Equipped(
     val head: String? = null,
     val top: String? = null,
     val bottom: String? = null,
     val title: String? = Items.DEFAULT_TITLE,
+    val background: String? = Items.DEFAULT_BACKGROUND,
 ) {
     operator fun get(c: Category): String? = when (c) {
         Category.HEAD -> head; Category.TOP -> top; Category.BOTTOM -> bottom; Category.TITLE -> title
+        Category.BACKGROUND -> background
     }
 
     fun with(c: Category, id: String?): Equipped = when (c) {
         Category.HEAD -> copy(head = id); Category.TOP -> copy(top = id)
         Category.BOTTOM -> copy(bottom = id); Category.TITLE -> copy(title = id)
+        Category.BACKGROUND -> copy(background = id)
     }
 }
 
@@ -47,7 +50,7 @@ data class AppData(
     val equipped: Equipped = Equipped(),
     /** 저장 순서대로 최대 세 착장. 기존 저장 데이터에는 없을 수 있다. */
     val savedOutfits: List<Equipped> = emptyList(),
-    val owned: Set<String> = setOf(Items.DEFAULT_TITLE),
+    val owned: Set<String> = Items.defaults,
     val exp: Int = 0,
     val points: Int = 0,
     val visits: List<Visit> = emptyList(),
@@ -115,14 +118,8 @@ class KagomStore(context: Context) {
                     put("carriedKm", p.carriedKm.toDouble())
                 })
             }
-            put("equipped", JSONObject().apply {
-                d.equipped.head?.let { put("head", it) }; d.equipped.top?.let { put("top", it) }
-                d.equipped.bottom?.let { put("bottom", it) }; d.equipped.title?.let { put("title", it) }
-            })
-            put("savedOutfits", JSONArray(d.savedOutfits.take(3).map { outfit -> JSONObject().apply {
-                outfit.head?.let { put("head", it) }; outfit.top?.let { put("top", it) }
-                outfit.bottom?.let { put("bottom", it) }; outfit.title?.let { put("title", it) }
-            } }))
+            put("equipped", encodeEquipped(d.equipped))
+            put("savedOutfits", JSONArray(d.savedOutfits.take(3).map { encodeEquipped(it) }))
             put("owned", JSONArray(d.owned.toList()))
             put("exp", d.exp); put("points", d.points)
             put("visits", JSONArray(d.visits.map { JSONObject().put("id", it.landmarkId).put("day", it.day) }))
@@ -148,13 +145,9 @@ class KagomStore(context: Context) {
                     if (it.has("baseOdoKm")) it.getDouble("baseOdoKm").toFloat() else null,
                     it.optDouble("carriedKm", 0.0).toFloat())
             },
-            equipped = o.optJSONObject("equipped")?.let {
-                Equipped(it.optStringOrNull("head"), it.optStringOrNull("top"), it.optStringOrNull("bottom"), it.optStringOrNull("title"))
-            } ?: Equipped(),
-            savedOutfits = o.optJSONArray("savedOutfits").objects().take(3).map {
-                Equipped(it.optStringOrNull("head"), it.optStringOrNull("top"), it.optStringOrNull("bottom"), it.optStringOrNull("title"))
-            },
-            owned = o.optJSONArray("owned").strings().toSet().ifEmpty { setOf(Items.DEFAULT_TITLE) },
+            equipped = o.optJSONObject("equipped")?.let { decodeEquipped(it) } ?: Equipped(),
+            savedOutfits = o.optJSONArray("savedOutfits").objects().take(3).map { decodeEquipped(it) },
+            owned = o.optJSONArray("owned").strings().toSet() + Items.defaults,
             exp = o.optInt("exp"), points = o.optInt("points"),
             visits = o.optJSONArray("visits").objects().map { Visit(it.getString("id"), it.getLong("day")) },
             completedQuests = o.optJSONArray("completed").strings().toSet(),
@@ -174,6 +167,18 @@ class KagomStore(context: Context) {
             questDoneAt = o.optJSONObject("questDoneAt")?.let { m -> m.keys().asSequence().associateWith { m.optLong(it) } }.orEmpty(),
             lastDrivenKm = o.optInt("lastDrivenKm"),
             newVehicle = o.optBoolean("newVehicle"),
+        )
+
+        fun encodeEquipped(e: Equipped) = JSONObject().apply {
+            e.head?.let { put("head", it) }; e.top?.let { put("top", it) }
+            e.bottom?.let { put("bottom", it) }; e.title?.let { put("title", it) }
+            e.background?.let { put("background", it) }
+        }
+
+        /** 배경이 생기기 전에 저장한 착장에는 background가 없다 → 기본 배경으로 읽는다 */
+        fun decodeEquipped(o: JSONObject) = Equipped(
+            o.optStringOrNull("head"), o.optStringOrNull("top"), o.optStringOrNull("bottom"), o.optStringOrNull("title"),
+            o.optStringOrNull("background") ?: Items.DEFAULT_BACKGROUND,
         )
 
         fun encodePopup(p: PendingPopup) = when (p) {

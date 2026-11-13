@@ -74,6 +74,7 @@ object KagomType {
     val ClosetItemName = style(30, 36, true)
     val ClosetSmallText = style(28, 34, false)
     val ClosetStatusText = style(21, 26, false)
+    val ClosetDetailsText = style(24, 30, true)
     val ClosetSlotText = style(22, 28, false)
     val ClosetSlotButtonText = style(20, 24, false)
     val ClosetSlotNumber = style(40, 48, false).copy(fontWeight = FontWeight.Medium)
