@@ -41,11 +41,7 @@ import com.example.roro.core.Tiers
 import com.example.roro.core.VehicleStatus
 import com.example.roro.data.AppData
 import com.example.roro.data.Profile
-<<<<<<< HEAD
-=======
 import com.example.roro.ui.components.BackgroundArt
-import com.example.roro.ui.components.DriveLockBanner
->>>>>>> origin/main
 import com.example.roro.ui.components.HeaderProfile
 import com.example.roro.ui.components.KagomCharacter
 import com.example.roro.ui.components.ClosetTitlePlate
