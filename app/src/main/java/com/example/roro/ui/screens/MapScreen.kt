@@ -67,7 +67,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -248,7 +247,7 @@ fun MapScreen(
     val province = loaded.province(provinceId)
     val unit = loaded.unit(unitId)
     val regions = remember(loaded, province, unit, views) { mapRegions(loaded, province, unit, views) }
-    val districtListState = key(unit?.id) { rememberLazyListState() }
+    val landmarkListState = key(unit?.id) { rememberLazyListState() }
     val count = regions.flatMap { it.landmarks }
     val selectedPin = count.firstOrNull { it.landmark.id == pinId }
     val detail = selectedPin.takeIf { gearP }
@@ -264,19 +263,18 @@ fun MapScreen(
     }
 
     fun chooseRegion(id: String) {
-        pinId = null
         when {
-            // 시 단계는 시 한 덩어리다 (구획 없음): 지도를 누르면 고른 깃발만 닫는다
-            unit != null -> Unit
-            province != null -> unitId = id
-            else -> provinceId = id
+            // 시 단계는 시 한 덩어리다 (구획 없음): 땅을 누르면 바다를 누를 때처럼 상세만 닫고 시트를 목록 높이로 내린다
+            unit != null -> closeLandmarkDetail()
+            province != null -> { pinId = null; unitId = id }
+            else -> { pinId = null; provinceId = id }
         }
     }
 
     val panelTitle = province?.let { "${it.name.shortRegionName()} 시·군별 해금 현황" } ?: "시·도별 해금 현황"
     val panelHint = when {
-        !split -> "구획을 누르면 다음 단계로 들어가요 · 숫자는 해금 / 전체 랜드마크"
-        province != null -> "시·군을 누르면 구획 지도로 들어가요"
+        !split -> "지역을 누르면 다음 단계로 들어가요 · 숫자는 해금 / 전체 랜드마크"
+        province != null -> "시·군을 누르면 그 시·군 지도로 들어가요"
         else -> "시·도를 누르면 그 지역으로 들어가요"
     }
     // [top]·[bottom] = 지도 위에 얹힌 머리줄·접힌 시트의 높이, [sheetRise] = 시트가 접힌 자리보다 올라온 높이 px (Split만)
@@ -294,7 +292,6 @@ fun MapScreen(
             bounds = unit?.bounds ?: province?.bounds ?: loaded.bounds,
             regions = regions,
             outline = unit?.takeIf { regions.isEmpty() },
-            district = null,
             visiblePins = if (unit != null) count else emptyList(),
             selectedPin = selectedPin,
             split = split,
@@ -305,7 +302,7 @@ fun MapScreen(
                 unit != null && !gearP -> "기어 P에서 플래그 상세를 볼 수 있어요."
                 // Figma SCR-05 layer=3 (149:4593)
                 unit != null -> "플래그를 누르면 그날의 기록과 얻은 착장을 볼 수 있어요"
-                province != null -> "시·군을 누르면 구획 지도로 들어가요."
+                province != null -> "시·군을 누르면 그 시·군 지도로 들어가요."
                 else -> "시·도를 누르면 그 지역으로 들어가요."
             },
             gearP = gearP,
@@ -329,7 +326,7 @@ fun MapScreen(
                     modifier = modifier)
             }
         } else if (unit != null) {
-            LandmarkOverviewPanel(unit.name, count, selectedPin?.landmark?.id, split, districtListState, ::selectPin, modifier)
+            LandmarkOverviewPanel(unit.name, count, selectedPin?.landmark?.id, split, landmarkListState, ::selectPin, modifier)
         } else {
             RegionPanel(panelTitle, panelHint, regions, split, ::chooseRegion, modifier)
         }
@@ -565,29 +562,20 @@ private fun Breadcrumb(label: String, style: TextStyle, onClick: () -> Unit) {
         maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
-/** 범례: 시 단계는 깃발 색(미방문·방문), 위 단계는 칠하기 색 (Figma SCR-05) */
+/** 범례 (Full 머리줄): 시 단계는 깃발 색(미방문·방문), 위 단계는 칠하기 색 (Figma SCR-05). 고른 지역 점선은 더 그리지 않아 "선택 중"은 뺐다 */
 @Composable
 private fun MapLegend(cityLayer: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
         (if (cityLayer) listOf(
-            KagomColor.Map.poleUnvisited to "미방문",
+            KagomColor.Map.flagUnvisited to "미방문",
             KagomColor.Map.flagVisited to "방문",
-            KagomColor.Text.primary to "선택 중",
         ) else listOf(
             KagomColor.Map.landFogged to "미해금 · 안개",
             KagomColor.Map.landPartial to "일부 해금",
             KagomColor.Map.landUnlocked to "모두 해금",
-            KagomColor.Text.primary to "선택 중",
         )).forEach { (color, label) ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (label == "선택 중") {
-                    Canvas(Modifier.size(14.dp)) {
-                        val inset = 1.dp.toPx()
-                        drawRoundRect(color, Offset(inset, inset), Size(size.width - 2 * inset, size.height - 2 * inset),
-                            cornerRadius = CornerRadius(3.dp.toPx()),
-                            style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 2.dp.toPx()))))
-                    }
-                } else if (cityLayer) {
+                if (cityLayer) {
                     Box(Modifier.size(12.dp).background(color, CircleShape))
                 } else {
                     // 일부 해금은 반투명 초록이라 지도처럼 흰 바탕 위에 칠한다
@@ -626,7 +614,6 @@ private class MapScene(
     val paths: Map<String, Path>,
     val outline: Path?,
     val camera: MapCamera,
-    val selectedId: String?,
 )
 
 /** 두 시점 사이 ([t] 0..1). 화면에서 모든 점이 곧게 움직이도록 배율과 화면 위 이동량을 같이 보간한다 */
@@ -672,10 +659,6 @@ private fun SceneLayer(scene: MapScene, shown: () -> MapCamera, alpha: () -> Flo
                 }
             }
             scene.regions.forEach { drawPath(scene.paths.getValue(it.region.id), KagomColor.Map.boundary, style = Stroke(border)) }
-            scene.paths[scene.selectedId]?.let {
-                val dashes = floatArrayOf(7.dp.toPx() / camera.scale, 4.dp.toPx() / camera.scale)
-                drawPath(it, KagomColor.Text.primary, style = Stroke(2.5.dp.toPx() / camera.scale, pathEffect = PathEffect.dashPathEffect(dashes)))
-            }
         }
     }
 }
@@ -690,7 +673,6 @@ private fun RegionMap(
     bounds: GeoBounds,
     regions: List<RegionProgress>,
     outline: MapRegion?,
-    district: RegionProgress?,
     visiblePins: List<LandmarkView>,
     selectedPin: LandmarkView?,
     split: Boolean,
@@ -736,8 +718,8 @@ private fun RegionMap(
         val camera = remember(bounds, w, h, pad, topPx, bottomPx) { MapZoom.fit(bounds, w, h, pad, topPx, bottomPx) }
         // 단계 이동: 떠나온 단계의 그림에서 새 단계의 그림으로 시점이 옮겨 가며 바뀐다 (주행 중에는 바로 바꾼다).
         // 방문 기록만 바뀌거나 화면 크기가 바뀐 것(범위가 같음)은 단계 이동이 아니다
-        val scene = remember(regions, paths, outlinePath, camera, district?.region?.id) {
-            MapScene(bounds, regions, paths, outlinePath, camera, district?.region?.id)
+        val scene = remember(regions, paths, outlinePath, camera) {
+            MapScene(bounds, regions, paths, outlinePath, camera)
         }
         val scenes = remember { arrayOfNulls<MapScene>(2) }     // [0] 지금 단계, [1] 떠나온 단계
         scenes[0].let { shown ->
@@ -768,7 +750,7 @@ private fun RegionMap(
                     val name = measurer.measure(v.landmark.name, KagomType.Caption14Strong).size
                     val width = minOf(360.dp.toPx(), w, name.width + 2 * KagomSpace.s10.toPx())
                     val height = name.height + 2 * KagomSpace.s4.toPx()
-                    // 깃발 천의 가운데(깃대 밑에서 위로 약 38) 높이에 맞춘다. 오른쪽에 자리가 없으면 깃발 아래
+                    // 깃발 천(깃대 밑에서 위로 23~43)의 가운데보다 조금 위, 깃대 끝 쪽에 맞춘다. 오른쪽에 자리가 없으면 깃발 아래
                     val right = p.x + 34.dp.toPx()
                     val beside = right + width <= w
                     PinLabel(v, Rect(
@@ -823,7 +805,7 @@ private fun RegionMap(
                 }
             }
         }
-        val labels = remember(regions, district, camera, w, h, measurer, labelStyle, split, sceneId, overlays, pinLabels) {
+        val labels = remember(regions, camera, w, h, measurer, labelStyle, split, sceneId, overlays, pinLabels) {
             val gap = with(density) { KagomSpace.s4.toPx() }
             val inset = with(density) { KagomSpace.s10.toPx() }
             val placed = mutableListOf<RegionLabel>()
@@ -831,8 +813,7 @@ private fun RegionMap(
             if (visiblePins.isNotEmpty()) return@remember placed
             val keepClear = overlays
             val ordered = regions.sortedWith(
-                compareByDescending<RegionProgress> { it.region.id == district?.region?.id }
-                    .thenByDescending { it.landmarks.isNotEmpty() }
+                compareByDescending<RegionProgress> { it.landmarks.isNotEmpty() }
                     .thenByDescending { (it.region.bounds.east - it.region.bounds.west) * (it.region.bounds.north - it.region.bounds.south) },
             )
             for (entry in ordered) {
@@ -860,7 +841,6 @@ private fun RegionMap(
             placed
         }
         val focus = selectedPin?.let { pinLocations[it.landmark.id]?.y }
-            ?: labels.firstOrNull { it.id == district?.region?.id }?.rect?.center?.y
         SideEffect { focusY.floatValue = focus ?: Float.NaN }
         val tap by rememberUpdatedState<(Offset) -> Unit> { pos ->
             val id = labels.firstOrNull { it.rect.contains(pos) }?.id ?: regions.firstOrNull { entry ->
@@ -915,9 +895,6 @@ private fun RegionMap(
                 val rect = label.rect
                 val radius = CornerRadius(rect.height / 2)
                 drawRoundRect(KagomColor.Surface.card, rect.topLeft, rect.size, radius, alpha = labelAlpha)
-                if (label.id == district?.region?.id) {
-                    drawRoundRect(KagomColor.Text.primary, rect.topLeft, rect.size, radius, alpha = labelAlpha, style = Stroke(1.dp.toPx()))
-                }
                 drawText(label.text, topLeft = rect.center - Offset(label.text.size.width / 2f, label.text.size.height / 2f), alpha = labelAlpha)
             }
         }
@@ -1147,7 +1124,7 @@ private fun LandmarkRow(view: LandmarkView, highlighted: Boolean, onClick: () ->
     ) {
         val icon = Modifier.size(36.dp)
         if (view.pin == PinState.Unlocking) {
-            // Figma 목록 핀에는 해금 중이 없어서 지도 핀(landmarkPin State=Unlocking)과 같은 색·점으로 그린다
+            // Figma 목록 핀에는 해금 중이 없어서 landmarkPin State=Unlocking의 색·점으로 그린다 (지도는 깜빡이는 깃발이다)
             Box(icon.background(KagomColor.Progress.fill, CircleShape), contentAlignment = Alignment.Center) {
                 Box(Modifier.fillMaxSize(0.625f).border(1.5.dp, KagomColor.Text.inverse, CircleShape), contentAlignment = Alignment.Center) {
                     Box(Modifier.fillMaxSize(0.32f).background(KagomColor.Text.inverse, CircleShape))
