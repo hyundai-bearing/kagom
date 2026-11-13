@@ -263,6 +263,8 @@ data class ScenePalette(
     val skyMid: Color? = null,
     /** 바다: 수평선 쪽과 가까운 쪽 */
     val sea: Color = hillFar, val seaDeep: Color = hillMid,
+    /** 해의 밝은 면, 물결, 번쩍임에 섞는 흰색 */
+    val white: Color = Color(0xFFFFFFFF),
 )
 
 object KagomScenePalette {

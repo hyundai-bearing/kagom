@@ -26,7 +26,8 @@ import kotlin.random.Random
 /**
  * 지금 있는 곳의 날씨 (홈 배경 "오늘 날씨" BG-04). 노르웨이 기상청 MET Norway의 Locationforecast 2.0을 쓴다:
  * 키 없이 쓸 수 있고 자료가 CC BY 4.0 / NLOD 2.0이라 출처만 밝히면 된다 (THIRD_PARTY_NOTICES.md).
- * 위치가 없거나 요청이 실패하면 null로 남고 배경은 기본 그림을 쓴다. 위치는 약 11 km 칸으로 줄여서만 보내고 저장하지 않는다.
+ * 위치가 없거나 한 번도 받지 못했으면 null이고 배경은 기본 그림을 쓴다. 받은 뒤에 통신이 끊기면 받아 둔 예보에서 지금 시각의 날씨를 계속 고른다
+ * (예보는 며칠 치다). 위치는 약 11 km 칸으로 줄여서만 보내고 저장하지 않는다.
  *
  * 이용 조건(api.met.no/doc/TermsOfService)에서 지키는 것: 앱을 알아볼 수 있는 User-Agent, 응답의 Expires 전에는 다시 묻지 않기,
  * If-Modified-Since, 앱을 쓰지 않는 동안에는 묻지 않기([active]).
@@ -40,6 +41,8 @@ class WeatherSource {
     val active = MutableStateFlow(true)
 
     private var job: Job? = null
+    /** 마지막으로 요청을 보낸 시각. 칸이 바뀌어도 이어 간다 */
+    private var lastRequestAt = 0L
 
     fun start(scope: CoroutineScope, location: Flow<GeoPoint?>) {
         if (job != null) return
@@ -47,23 +50,27 @@ class WeatherSource {
             location.map { p -> p?.let { Weather.coarse(it.lat) to Weather.coarse(it.lon) } }
                 .distinctUntilChanged()
                 .collectLatest { cell ->
-                    // 칸이 바뀌면 앞 칸의 날씨는 맞지 않으므로 새 값이 올 때까지 기본 그림으로 돌린다
-                    state.value = null
-                    if (cell == null) return@collectLatest
+                    if (cell == null) { state.value = null; return@collectLatest }
+                    // 칸의 경계에서 위치가 흔들리면 칸이 번갈아 바뀐다. 그때마다 바로 묻지 않도록 앞 요청과 간격을 두고,
+                    // 옆 칸(약 11 km)의 날씨는 크게 다르지 않으므로 새 값이 올 때까지 앞 칸의 날씨를 그대로 보인다
+                    delay((lastRequestAt + RETRY_MS - System.currentTimeMillis()).coerceAtLeast(0L))
                     var lastModified: String? = null
                     var forecast: String? = null
                     while (true) {
                         active.first { it }
+                        lastRequestAt = System.currentTimeMillis()
                         val reply = withContext(Dispatchers.IO) { fetch(cell.first, cell.second, lastModified) }
                         if (reply?.body != null) {
                             forecast = reply.body
                             lastModified = reply.lastModified
                         }
-                        // 예보가 그대로여도(304) 시각이 넘어가면 지금 칸이 달라지므로 받아 둔 예보에서 다시 고른다
-                        if (reply != null) forecast?.let { body ->
-                            runCatching { Weather.fromSymbol(currentSymbol(body)) }.getOrNull()?.let { state.value = it }
+                        // 예보가 그대로이거나(304) 요청이 실패해도 시각이 넘어가면 지금 칸이 달라지므로 받아 둔 예보에서 다시 고른다.
+                        // 모르는 기호나 읽지 못한 예보는 "모름"이다 (앞 시각의 날씨를 붙들고 있지 않는다)
+                        forecast?.let { body ->
+                            state.value = withContext(Dispatchers.Default) { runCatching { Weather.fromSymbol(currentSymbol(body)) }.getOrNull() }
                         }
-                        val wait = if (reply == null) RETRY_MS else maxOf(REFRESH_MS, reply.expiresAt - System.currentTimeMillis())
+                        // 기기 시계가 틀려 Expires가 아주 멀게 보여도 [MAX_WAIT_MS]를 넘겨 기다리지 않는다
+                        val wait = if (reply == null) RETRY_MS else (reply.expiresAt - System.currentTimeMillis()).coerceIn(REFRESH_MS, MAX_WAIT_MS)
                         // 여러 차가 같은 시각에 몰리지 않게 조금씩 흩는다
                         delay(wait + Random.nextLong(SPREAD_MS))
                     }
@@ -137,5 +144,6 @@ class WeatherSource {
         /** 이용 조건: 되풀이 요청은 10분에 한 번을 넘기지 않는다 */
         private const val RETRY_MS = 10 * 60_000L
         private const val SPREAD_MS = 5 * 60_000L
+        private const val MAX_WAIT_MS = 2 * 60 * 60_000L
     }
 }

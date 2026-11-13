@@ -77,7 +77,9 @@ fun BackgroundScene(kind: SceneKind, animated: Boolean, modifier: Modifier = Mod
         if (!animated) return@LaunchedEffect
         var last = withFrameNanos { it }
         while (true) withFrameNanos { now ->
-            time.floatValue += (now - last) / 1e9f
+            // 앱이 가려졌다 돌아오면 프레임 사이가 몇 분씩 벌어진다 → 그만큼 건너뛰지 않고 한 프레임만 나아간다.
+            // 시간이 한없이 커지면 Float 정밀도가 떨어져 움직임이 끊기므로 한 시간마다 되감는다 (그때 구름 자리가 한 번 바뀐다)
+            time.floatValue = (time.floatValue + ((now - last) / 1e9f).coerceIn(0f, MAX_FRAME_SECONDS)).mod(TIME_WRAP_SECONDS)
             last = now
         }
     }
@@ -106,6 +108,8 @@ private const val SCENE_H = 1080f
 private const val BLEED = 240f
 private const val TAU = (2 * PI).toFloat()
 private const val HORIZON = 600f
+private const val MAX_FRAME_SECONDS = 0.1f
+private const val TIME_WRAP_SECONDS = 3600f
 
 private class Cloud(val x: Float, val y: Float, val scale: Float, val speed: Float, val alpha: Float)
 private class Particle(val x: Float, val phase: Float, val speed: Float, val size: Float, val sway: Float)
@@ -341,7 +345,7 @@ private fun DrawScope.drawCoast(m: SceneModel, p: ScenePalette, t: Float) {
         repeat(5) { i ->
             val half = 34f + 15f * i + 9f * sin(t * 1.3f + i * 1.7f)
             val alpha = 0.5f + 0.22f * sin(t * 1.7f + i * 1.3f)
-            drawOval(lerp(sun, Color.White, 0.65f).copy(alpha = alpha), Offset(SUN_COAST.x - half, 613f + 17f * i), Size(half * 2, 8f))
+            drawOval(lerp(sun, p.white, 0.65f).copy(alpha = alpha), Offset(SUN_COAST.x - half, 613f + 17f * i), Size(half * 2, 8f))
         }
     }
     m.waves.forEach { wave ->
@@ -408,7 +412,7 @@ private fun DrawScope.drawSun(m: SceneModel, p: ScenePalette, t: Float) {
         }
     }
     val highlight = center + Offset(-radius * 0.24f, -radius * 0.24f)
-    drawCircle(Brush.radialGradient(listOf(lerp(sun, Color.White, 0.4f), sun), highlight, radius * 1.37f), radius, center, alpha = if (veiled) 0.75f else 1f)
+    drawCircle(Brush.radialGradient(listOf(lerp(sun, p.white, 0.4f), sun), highlight, radius * 1.37f), radius, center, alpha = if (veiled) 0.75f else 1f)
 }
 
 private fun DrawScope.drawCloud(m: SceneModel, p: ScenePalette, c: Cloud, t: Float) {
@@ -472,7 +476,7 @@ private fun DrawScope.drawPuddle(p: ScenePalette, puddle: Puddle, t: Float) {
     repeat(2) { i ->
         val grow = (t / 2.4f + puddle.phase + i * 0.5f).mod(1f)
         val rx = puddle.rx * (0.15f + 0.75f * grow); val ry = puddle.ry * (0.15f + 0.75f * grow)
-        drawOval(Color.White.copy(alpha = 0.7f * (1f - grow)), center - Offset(rx, ry), Size(rx * 2, ry * 2), style = Stroke(2.5f))
+        drawOval(p.white.copy(alpha = 0.7f * (1f - grow)), center - Offset(rx, ry), Size(rx * 2, ry * 2), style = Stroke(2.5f))
     }
 }
 
@@ -502,20 +506,21 @@ private const val FLASH_EVERY = 6.5f
 private fun DrawScope.drawLightning(m: SceneModel, p: ScenePalette, t: Float, still: Boolean) {
     val cycle = (t / FLASH_EVERY).toInt()
     val at = t - cycle * FLASH_EVERY
-    // 멈춘 그림(주행 중·썸네일)에서는 번개가 보이는 채로 두고 하늘은 번쩍이지 않는다
+    // 한 번도 움직인 적 없는 그림(썸네일, 주행 중에 켠 홈)에는 번개를 그려 둔다. 움직이다 멈춘 그림(주행 시작)에는
+    // 번개를 새로 띄우지 않는다 (기어를 바꾸는 순간 그림이 달라지지 않게). 어느 쪽도 하늘은 번쩍이지 않는다
     val strength = when {
-        still -> 1f
+        still -> if (t == 0f) 1f else 0f
         at > FLASH_SECONDS -> 0f
         at < 0.1f -> 1f
         at < 0.18f -> 0.15f
         else -> 0.9f * (1f - (at - 0.18f) / (FLASH_SECONDS - 0.18f))
     }
     if (strength <= 0f) return
-    if (!still) drawRect(Color.White.copy(alpha = 0.2f * strength), Offset(-BLEED, 0f), Size(SCENE_W + 2 * BLEED, SCENE_H))
+    if (!still) drawRect(p.white.copy(alpha = 0.2f * strength), Offset(-BLEED, 0f), Size(SCENE_W + 2 * BLEED, SCENE_H))
     // 오른쪽과 왼쪽 구름 아래에서 번갈아 친다. 왼쪽은 Split 헤더(위쪽) 아래에 둔다
     val origin = if (still || cycle % 2 == 0) Offset(950f, 205f) else Offset(330f, 300f)
     withTransform({ translate(origin.x, origin.y) }) {
-        drawPath(m.bolt, lerp(p.accent, Color.White, 0.6f).copy(alpha = 0.4f * strength), style = Stroke(14f, join = StrokeJoin.Round))
+        drawPath(m.bolt, lerp(p.accent, p.white, 0.6f).copy(alpha = 0.4f * strength), style = Stroke(14f, join = StrokeJoin.Round))
         drawPath(m.bolt, p.accent, alpha = strength)
     }
 }
@@ -530,7 +535,7 @@ private fun DrawScope.drawLighthouse(p: ScenePalette, base: Offset, t: Float) {
     }, p.particle)
     drawRect(p.accent, Offset(base.x - 12.6f, base.y - 46f), Size(25.2f, 13f))
     drawRoundRect(p.trunk, Offset(base.x - 14f, base.y - 86f), Size(28f, 6f), CornerRadius(2f))
-    drawRect(lerp(p.sunGlow ?: p.particle, Color.White, 0.3f), Offset(base.x - 8f, base.y - 102f), Size(16f, 16f))
+    drawRect(lerp(p.sunGlow ?: p.particle, p.white, 0.3f), Offset(base.x - 8f, base.y - 102f), Size(16f, 16f))
     drawPath(Path().apply { moveTo(base.x - 13f, base.y - 102f); lineTo(base.x, base.y - 120f); lineTo(base.x + 13f, base.y - 102f); close() }, p.accent)
 }
 
