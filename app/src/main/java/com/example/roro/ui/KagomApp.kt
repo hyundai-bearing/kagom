@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -129,7 +130,11 @@ fun KagomApp(c: KagomController) = KagomTheme {
             } else if (profile == null || target == null) {
                 OnboardingFlow(onboarding, gearP) { name, answers -> c.createProfile(name, answers) }
             } else when (target) {
-                NavTab.HOME -> HomeScreen(profile, data, status, gearP, demoAct, { c.demoAct.value = null }) { if (gearP) sheetOpen = true }
+                NavTab.HOME -> HomeScreen(
+                    profile, data, status, gearP, demoAct, { c.demoAct.value = null },
+                    onOpenSheet = { sheetOpen = true },
+                    onBlockedSheet = { notice = Notice("정비 시트는 정차 후 이용할 수 있어요") },
+                )
                 NavTab.QUESTS -> QuestsScreen(
                     Progress.all(c.progressContext(data), data.completedQuests), data.questDoneAt, gearP,
                     DetailAvatar(profile.skin, status.expression, wornLayers(data.equipped.head, data.equipped.top, data.equipped.bottom)),
@@ -193,7 +198,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
             status = status, data = data, gearP = gearP,
             onClose = { sheetOpen = false },
             onRefilled = { c.refilledEngineOil(); notice = Notice("엔진오일 경고 배지를 숨겼어요") },
-            onOilChanged = { c.oilChanged(); notice = Notice("오일 교체를 기록했어요") },
+            onOilChanged = { c.oilChanged(); notice = Notice("오일 교체일을 오늘로 기록했어요") },
             onSevere = c::setSevere,
             onRecommendedOil = c::setRecommendedOil,
             onToggleCheck = c::toggleCheck,
@@ -204,8 +209,9 @@ fun KagomApp(c: KagomController) = KagomTheme {
             },
             onFindShop = {
                 runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode("자동차 정비소")))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    context.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MAPS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT))
+                    sheetOpen = false
                 }.onFailure {
                     Log.w("Kagom", "지도 앱 없음", it)
                     notice = Notice("지도 앱을 열 수 없어요")
@@ -245,7 +251,7 @@ fun KagomApp(c: KagomController) = KagomTheme {
         var lastNotice by remember { mutableStateOf("") }
         notice?.let { lastNotice = it.text }
         AnimatedVisibility(
-            notice != null && toast == null, toastTop,
+            notice != null, toastTop.zIndex(10f),
             enter = fadeIn() + slideInVertically { -it }, exit = fadeOut() + slideOutVertically { -it },
         ) {
             IviToast(lastNotice, Modifier.padding(horizontal = 20.dp))

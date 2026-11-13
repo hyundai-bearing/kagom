@@ -159,6 +159,7 @@ private fun ModalScaffold(
     heroChip: String,
     enter: Boolean = true,
     flash: Boolean = false,
+    cardHeight: Dp? = null,
     actions: @Composable () -> Unit,
     hero: @Composable BoxScope.() -> Unit,
     body: @Composable ColumnScope.() -> Unit,
@@ -181,6 +182,7 @@ private fun ModalScaffold(
         Column(
             Modifier.width(if (split) 600.dp else 880.dp)
                 .heightIn(max = maxHeight - 48.dp)
+                .then(if (cardHeight != null) Modifier.height(cardHeight.coerceAtMost(maxHeight - 48.dp)) else Modifier)
                 .graphicsLayer {
                     val t = appear.value
                     scaleX = 0.9f + 0.1f * t; scaleY = 0.9f + 0.1f * t
@@ -198,11 +200,12 @@ private fun ModalScaffold(
                 if (flash) Box(Modifier.fillMaxSize().graphicsLayer { alpha = glow.value }.background(KagomColor.Overlay.flash))
             }
             // 승인된 높이 부족 정책: 본문만 스크롤하고 선택 버튼은 항상 보이게 둔다.
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
+            Column(Modifier.weight(1f, fill = cardHeight != null).verticalScroll(rememberScrollState())
                 .padding(start = if (split) 24.dp else 40.dp, end = if (split) 24.dp else 40.dp,
-                    top = if (split) 24.dp else 28.dp), content = body)
+                    top = if (cardHeight != null) 16.dp else if (split) 24.dp else 28.dp), content = body)
             Column(Modifier.padding(horizontal = if (split) 24.dp else 40.dp)
-                .padding(top = if (split) 14.dp else 16.dp, bottom = if (split) 24.dp else 28.dp)) { actions() }
+                .padding(top = if (cardHeight != null) 12.dp else if (split) 14.dp else 16.dp,
+                    bottom = if (cardHeight != null) 20.dp else if (split) 24.dp else 28.dp)) { actions() }
         }
     }
 }
@@ -356,6 +359,8 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
     val item = Items.byId(p.itemId) ?: return
     val palette = KagomSkinPalette.of(profile.skin)
     val heroH = if (split) 260.dp else 300.dp
+    // POP-02는 공개 본문의 EXP 행이 추가되어도 바깥 카드와 버튼 위치를 유지한다.
+    val cardH = if (split) 658.dp else 646.dp
     var unboxing by remember(p.key) { mutableStateOf(!p.opened) }
 
     if (!p.opened || unboxing) {
@@ -371,7 +376,7 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
                 scope.launch { opening.animateTo(1f, tween(Motion.OPEN_MS, easing = LinearEasing)); unboxing = false }
             }
         }
-        ModalScaffold(heroH, "보상 도착", actions = {
+        ModalScaffold(heroH, "보상 도착", cardHeight = cardH, actions = {
             ModalActions("선물 열기", open, "나중에", onLater)
         }, hero = {
             Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(listOf(palette.heroGlow, palette.body), center, size.width * 0.32f)) })
@@ -392,7 +397,7 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
         return
     }
 
-    ModalScaffold(heroH, "보상 획득!", enter = false, flash = true, actions = {
+    ModalScaffold(heroH, "보상 도착", enter = false, flash = true, cardHeight = cardH, actions = {
         ModalActions("바로 장착하기", { onFinish(true) }, "나중에", { onFinish(false) })
     }, hero = {
         Box(Modifier.fillMaxSize().drawBehind { drawRect(Brush.radialGradient(listOf(palette.heroGlow, palette.body),
@@ -405,9 +410,9 @@ fun RewardModal(p: PendingPopup.Reward, profile: Profile, equipped: Equipped, on
     }) {
         // Figma 62:3263 / 64:3893 최신본: 공개 본문은 아이템명부터 시작해 카드 높이를 줄인다.
         ItemTitleRow(item.name, listOf(item.category.label to false, "NEW" to true))
-        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
+        Spacer(Modifier.height(KagomSpace.s8))
         ExpGain(p.exp, p.expBefore, p.expAfter)
-        Spacer(Modifier.height(if (split) 14.dp else 16.dp))
+        Spacer(Modifier.height(KagomSpace.s8))
         PopupQuote(item.line.ifEmpty { "멋진 보상이에요! 바로 해 볼까요?" })
     }
 }
@@ -608,12 +613,12 @@ fun MaintenanceSheet(
         val shape = if (split) RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp) else RoundedCornerShape(0.dp)
         AnimatedVisibility(
             visible,
-            if (split) Modifier.align(Alignment.BottomCenter).padding(top = 128.dp) else Modifier.align(Alignment.CenterEnd),
+            if (split) Modifier.align(Alignment.BottomCenter).padding(top = 74.dp) else Modifier.align(Alignment.CenterEnd),
             enter = if (split) slideInVertically(slideIn) { it } else slideInHorizontally(slideIn) { it },
             exit = if (split) slideOutVertically(slideOut) { it } else slideOutHorizontally(slideOut) { it },
         ) {
             Column(
-                (if (split) Modifier.fillMaxWidth().heightIn(max = 952.dp) else Modifier.width(640.dp).fillMaxHeight())
+                (if (split) Modifier.fillMaxWidth().heightIn(max = 1006.dp) else Modifier.width(640.dp).fillMaxHeight())
                     .background(KagomColor.Surface.card, shape)
                     .clip(shape)
                     .clickable(remember0(), null) {}
@@ -624,32 +629,39 @@ fun MaintenanceSheet(
             ) {
                 Text("정비", style = KagomType.Title32, color = KagomColor.Text.primary)
 
-                // Figma 7:2433 / 7:2471: 섹션은 차량 상태로 고르고 스타일·문구는 같은 카드를 쓴다.
-                status.shopGuide?.let { g ->
-                    MaintenanceSection(KagomColor.Severity.bg(Severity.URGENT)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(g.label, style = KagomType.Body18Strong, color = KagomColor.Severity.fg(Severity.URGENT))
-                            com.example.roro.ui.components.StatusBadge(Severity.URGENT, "긴급")
-                        }
-                        Text("가까운 정비소에서 바로 점검받으세요.", style = KagomType.Body16, color = KagomColor.Text.secondary)
-                        IviButton("가까운 정비소 찾기", onFindShop, enabled = gearP)
-                    }
+                // Figma 459:5685 / 459:5784: 긴급 여부와 관계없이 같은 위치에서 정비소 진입점을 제공한다.
+                MaintenanceSection {
+                    Text("정비소 찾기", style = KagomType.Heading22, color = KagomColor.Text.primary)
+                    Text(
+                        "정비가 필요할 때 가까운 정비소를 바로 찾아요",
+                        style = KagomType.Body16,
+                        color = KagomColor.Text.secondary,
+                    )
+                    IviButton("가까운 정비소 찾기", onFindShop, enabled = gearP)
                 }
-                if (status.engineType != com.example.roro.core.EngineType.EV && (status.oilChange != null || status.engineOilAlert)) {
+                if (status.engineType != com.example.roro.core.EngineType.EV) {
                     MaintenanceSection {
                         Text("엔진오일 교체 시기", style = KagomType.Heading22, color = KagomColor.Text.primary)
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            IviButton("보충했어요", onRefilled, enabled = gearP && status.engineOilAlert && !data.maintenance.engineOilDismissed)
-                            IviButton("오일 교체했어요", onOilChanged, type = IviButtonType.Primary, enabled = gearP)
-                        }
-                        ToggleRow("짧은 거리 위주로 타거나 험한 길을 자주 달려요", data.maintenance.severe, gearP, onSevere)
-                        ToggleRow("제조사 추천(순정) 오일을 써요", data.maintenance.recommendedOil, gearP, onRecommendedOil)
+                        val changedDay = data.maintenance.oilChangedDay
+                        val changedToday = changedDay == LocalDate.now().toEpochDay()
+                        MaintenanceValueRow("최근 교체일", changedDay?.let { maintenanceDate(it) + if (changedToday) " (오늘)" else "" } ?: "기록 없음")
+                        MaintenanceValueRow("다음 교체까지", oilCalendarDisplay(changedDay))
+                        Text(if (changedDay == null) "오일을 교체한 날 버튼을 누르면 12개월(365일) 뒤 교체 시기를 알려드려요"
+                            else "12개월(365일)마다 교체를 권장해요", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
+                        IviButton("오일 교체했어요", onOilChanged, type = IviButtonType.Primary, enabled = gearP && !changedToday)
                     }
                 }
                 MaintenanceSection {
-                    Text(if (status.checkup.due) "${status.checkup.round}만 km 정기 점검" else "정기 점검",
-                        style = KagomType.Heading22, color = KagomColor.Text.primary)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("1만 km 셀프 점검", style = KagomType.Heading22,
+                            color = KagomColor.Text.primary, modifier = Modifier.weight(1f))
+                        com.example.roro.ui.components.StatusBadge(
+                            if (status.checkup.due) Severity.RECOMMEND else Severity.OK,
+                            if (status.checkup.due) "점검 필요" else if (data.maintenance.checkupRoundsDone > 0) "점검 완료" else "대기",
+                        )
+                    }
                     if (status.checkup.due) {
+                        Text(status.checkup.display, style = KagomType.Body18, color = KagomColor.Text.secondary)
                         Checkup.itemsFor(status.engineType).forEach { item ->
                             Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -662,16 +674,34 @@ fun MaintenanceSheet(
                         IviButton("점검 다 했어요", onCompleteCheckup, type = IviButtonType.Primary,
                             enabled = gearP && Checkup.canComplete(status.checkup, status.engineType, data.checkupChecks))
                     } else {
-                        if (data.maintenance.checkupRoundsDone > 0) {
-                            Text("${data.maintenance.checkupRoundsDone}만 km 점검을 완료했어요",
-                                style = KagomType.Body20, color = KagomColor.Text.primary)
-                        }
-                        Text("다음 점검: ${status.checkup.round}만 km · ${status.checkup.display}",
+                        Text("다음 점검까지 ${status.checkup.display.replace(" 남음", " 남았어요")}",
                             style = KagomType.Body20, color = KagomColor.Text.secondary)
                     }
                 }
             }
         }
+    }
+}
+
+private fun maintenanceDate(epochDay: Long): String =
+    LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
+
+/** 최신 POP-05는 교체 기록일부터 365일 기준이며 주행거리·운전 습관으로 기간을 줄이지 않는다. */
+internal fun oilCalendarDisplay(changedDay: Long?): String {
+    if (changedDay == null) return "기록 후 안내"
+    val remaining = 365 - (LocalDate.now().toEpochDay() - changedDay).coerceAtLeast(0)
+    return if (remaining <= 0) "교체 시기 지남" else "${remaining}일 남음"
+}
+
+internal fun oilCalendarRatio(changedDay: Long?): Float = changedDay?.let {
+    ((365 - (LocalDate.now().toEpochDay() - it).coerceAtLeast(0)) / 365f).coerceIn(0f, 1f)
+} ?: 0f
+
+@Composable
+private fun MaintenanceValueRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = KagomType.Body18, color = KagomColor.Text.secondary, modifier = Modifier.weight(1f))
+        Text(value, style = KagomType.Body18Strong, color = KagomColor.Text.primary)
     }
 }
 

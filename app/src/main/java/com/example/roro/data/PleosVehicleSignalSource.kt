@@ -11,7 +11,6 @@ import ai.pleos.playground.vehicle.listener.FuelPercentListener
 import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import ai.pleos.playground.vehicle.listener.LowWasherFluidWaringListener
 import ai.pleos.playground.vehicle.listener.OilLevelStateListener
-import ai.pleos.playground.vehicle.listener.PowerDownWarningIndicatorListener
 import android.content.Context
 import android.util.Log
 import com.example.roro.core.Gear
@@ -105,16 +104,6 @@ class PleosVehicleSignalSource(private val context: Context) : VehicleSignalSour
             safety.getTransmissionOilLevelState({ s -> set { it.copy(transmissionOil = oil(s)) } }, failed("getTransmissionOilLevelState"))
             val l = oilListener("TransmissionOil") { s -> set { it.copy(transmissionOil = oil(s)) } }
             safety.registerTransmissionOilLevelState(l); unregisters += { safety.unregisterTransmissionOilLevelState(l) }
-        }
-
-        // SEN-06 엔진 이상: 출력 저하 경고등
-        whenSupported(Signal.ENGINE_WARNING, { ok, fail -> safety.checkPowerDownWarningIndicatorCapabilities(ok, fail) }) {
-            safety.hasPowerDownWarningIndicator({ b -> set { it.copy(engineWarning = b) } }, failed("hasPowerDownWarningIndicator"))
-            val l = object : PowerDownWarningIndicatorListener {
-                override fun onPowerDownWarningIndicatorUpdated(p0: Boolean?) = set { it.copy(engineWarning = p0) }
-                override fun onFailed(p0: Exception) { failed("PowerDownWarning")(p0) }
-            }
-            safety.registerPowerDownWarningIndicator(l); unregisters += { safety.unregisterPowerDownWarningIndicator(l) }
         }
 
         // SEN-07 워셔액 부족

@@ -1,6 +1,5 @@
 package com.example.roro.core
 
-import kotlin.math.floor
 
 /**
  * 차량 상태 엔진 (spec 4장, 가이드 5.3).
@@ -20,6 +19,7 @@ data class MaintenanceState(
     /** 완료한 정기 점검 회차 수 */
     val checkupRoundsDone: Int = 0,
     val checkupDoneDay: Long? = null,
+    val checkupDoneKm: Float? = null,
     /** [보충했어]로 엔진오일 경고 배지를 숨김 (센서가 NORMAL로 돌아오면 풀림) */
     val engineOilDismissed: Boolean = false,
 )
@@ -115,13 +115,15 @@ object StateEngine {
         return OilChangeInfo(severity, ratio.coerceIn(0f, 1f), display, intervalKm, intervalDays)
     }
 
-    /** 승인된 MNT-02 정책: 차량 누적 거리 1만 km마다 한 번. 신호가 없으면 완료를 허용하지 않는다. */
+    /** 마지막 완료 거리부터 1만 km. 기존 기록은 회차의 누적 거리로 기준을 복원한다. */
     fun checkup(m: MaintenanceState, odoKm: Float?): CheckupInfo {
         val known = odoKm != null && odoKm.isFinite() && odoKm >= 0f
         val odo = if (known) odoKm else 0f
-        val byKm = floor(odo / Checkup.INTERVAL_KM).toInt()
-        val round = maxOf(m.checkupRoundsDone + 1, byKm)
-        val dueKm = round * Checkup.INTERVAL_KM
+        val round = m.checkupRoundsDone + 1
+        val recorded = m.checkupDoneKm ?: (m.checkupRoundsDone * Checkup.INTERVAL_KM).toFloat()
+        // 에뮬레이터 초기화 등으로 누적 거리가 감소해도 한 주기보다 길게 표시하지 않는다.
+        val baseline = if (known) minOf(recorded, odo) else recorded
+        val dueKm = (baseline + Checkup.INTERVAL_KM).toInt()
         val due = known && odo >= dueKm
         val display = if (!known) "주행거리 확인 불가" else if (due) "${fmt(dueKm)} km 도래" else "${fmt((dueKm - odo).toInt())} km 남음"
         return CheckupInfo(due, round, dueKm, display)
@@ -151,14 +153,15 @@ object StateEngine {
             expressions += when (level) { 1 -> Expression.HUNGRY_1; 2 -> Expression.HUNGRY_2; else -> Expression.HUNGRY_3 }
         }
 
-        // SEN-03 엔진오일 (내연기관·HEV)
-        val engineOilAvailable = !isEv && Signal.ENGINE_OIL !in s.unsupported && s.engineOil != null && s.engineOil != OilLevel.ERROR
+        // 차종 추정 대신 실제 지원 여부와 수신한 값으로 판단한다.
+        val engineOilAvailable = Signal.ENGINE_OIL !in s.unsupported && s.engineOil != null && s.engineOil != OilLevel.ERROR
         val engineOilSeverity = if (engineOilAvailable) when (s.engineOil) {
             OilLevel.LOW, OilLevel.HIGH -> Severity.RECOMMEND
             OilLevel.CRITICALLY_LOW -> Severity.URGENT
             else -> null
         } else null
-        val engineOilBadgeShown = engineOilSeverity != null && !m.engineOilDismissed
+        // 보충 기록과 무관하게 현재 센서가 이상을 보고하면 알린다.
+        val engineOilBadgeShown = engineOilSeverity != null
         if (engineOilSeverity != null) {
             if (engineOilBadgeShown) badges += StatusBadge(StatusId.SEN_03, engineOilSeverity, when (s.engineOil) {
                 OilLevel.HIGH -> "엔진오일 과다"
@@ -168,12 +171,16 @@ object StateEngine {
             expressions += if (engineOilSeverity == Severity.URGENT) Expression.SICK else Expression.STAIN
         }
 
-        // SEN-04 브레이크액 (LOW·거의 없음 모두 즉시 긴급)
+        // SEN-04 브레이크액: 알림 단계와 기존 캐릭터 표정 규칙은 별개다.
         val brakeAvailable = Signal.BRAKE_FLUID !in s.unsupported && s.brakeFluid != null && s.brakeFluid != OilLevel.ERROR
         val brakeLow = brakeAvailable && (s.brakeFluid == OilLevel.LOW || s.brakeFluid == OilLevel.CRITICALLY_LOW)
+        val brakeSeverity = if (brakeLow) {
+            if (s.brakeFluid == OilLevel.CRITICALLY_LOW) Severity.URGENT else Severity.RECOMMEND
+        } else null
         var shopGuide: StatusBadge? = null
         if (brakeLow) {
-            val b = StatusBadge(StatusId.SEN_04, Severity.URGENT, "브레이크액 부족")
+            val b = StatusBadge(StatusId.SEN_04, brakeSeverity!!,
+                if (s.brakeFluid == OilLevel.CRITICALLY_LOW) "브레이크액 거의 없음" else "브레이크액 부족")
             badges += b; shopGuide = b
             expressions += Expression.SICK
         }
@@ -181,15 +188,9 @@ object StateEngine {
         // SEN-05 미션오일
         if (Signal.TRANSMISSION_OIL !in s.unsupported) when (s.transmissionOil) {
             OilLevel.LOW -> { badges += StatusBadge(StatusId.SEN_05, Severity.RECOMMEND, "미션오일 부족"); expressions += Expression.STAIN }
+            OilLevel.HIGH -> { badges += StatusBadge(StatusId.SEN_05, Severity.RECOMMEND, "미션오일 과다"); expressions += Expression.STAIN }
             OilLevel.CRITICALLY_LOW -> { badges += StatusBadge(StatusId.SEN_05, Severity.URGENT, "미션오일 거의 없음"); expressions += Expression.SICK }
             else -> Unit
-        }
-
-        // SEN-06 엔진 이상 (출력 저하 경고등)
-        if (!isEv && Signal.ENGINE_WARNING !in s.unsupported && s.engineWarning == true) {
-            val b = StatusBadge(StatusId.SEN_06, Severity.URGENT, "엔진 경고등")
-            badges += b; if (shopGuide == null) shopGuide = b
-            expressions += Expression.SICK
         }
 
         // SEN-07 워셔액 (표정 변화 없음, 배지만)
@@ -217,11 +218,10 @@ object StateEngine {
                 StatusRow("주행거리", "${fmt(s.odometerKm.toInt())} km", if (checkup.due) Severity.RECOMMEND else null, if (checkup.due) "점검 도래" else null)
             else StatusRow("주행거리", "확인 불가", unavailable = true),
             when {
-                isEv -> StatusRow("엔진오일", "해당 없음", unavailable = true)
                 !engineOilAvailable -> StatusRow("엔진오일", "확인 불가", unavailable = true)
                 else -> StatusRow("엔진오일", oilText(s.engineOil), engineOilSeverity.takeIf { engineOilBadgeShown })
             },
-            if (brakeAvailable) StatusRow("브레이크액", if (brakeLow) fluidText(s.brakeFluid) else "정상", if (brakeLow) Severity.URGENT else null)
+            if (brakeAvailable) StatusRow("브레이크액", if (brakeLow) fluidText(s.brakeFluid) else "정상", brakeSeverity)
             else StatusRow("브레이크액", "확인 불가", unavailable = true),
             if (washerAvailable) StatusRow("워셔액", if (s.washerLow == true) "부족" else "정상", if (s.washerLow == true) Severity.RECOMMEND else null)
             else StatusRow("워셔액", "확인 불가", unavailable = true),

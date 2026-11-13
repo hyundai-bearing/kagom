@@ -132,6 +132,7 @@ class KagomStore(context: Context) {
                 put("severe", m.severe); put("recommendedOil", m.recommendedOil)
                 m.oilChangedKm?.let { put("oilKm", it.toDouble()) }; m.oilChangedDay?.let { put("oilDay", it) }
                 put("rounds", m.checkupRoundsDone); m.checkupDoneDay?.let { put("checkupDay", it) }
+                m.checkupDoneKm?.let { put("checkupKm", it.toDouble()) }
                 put("dismissed", m.engineOilDismissed)
             })
             put("checks", JSONArray(d.checkupChecks.toList()))
@@ -163,6 +164,7 @@ class KagomStore(context: Context) {
                     oilChangedKm = if (it.has("oilKm")) it.getDouble("oilKm").toFloat() else null,
                     oilChangedDay = if (it.has("oilDay")) it.getLong("oilDay") else null,
                     checkupRoundsDone = it.optInt("rounds"),
+                    checkupDoneKm = if (it.has("checkupKm")) it.getDouble("checkupKm").toFloat() else null,
                     checkupDoneDay = if (it.has("checkupDay")) it.getLong("checkupDay") else null,
                     engineOilDismissed = it.optBoolean("dismissed"),
                 )

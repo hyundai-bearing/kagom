@@ -283,9 +283,13 @@ fun QuickMaintenanceCard(
     oilRemaining: String?,
     oilRatio: Float,
     inspection: String,
+    inspectionRatio: Float,
+    issues: List<com.example.roro.core.StatusBadge>,
     hint: String,
+    hasAlert: Boolean,
     ctaEnabled: Boolean,
     onCta: () -> Unit,
+    onBlockedCta: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -294,14 +298,40 @@ fun QuickMaintenanceCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("빠른 정비", style = KagomType.Heading20, color = KagomColor.Text.primary, modifier = Modifier.weight(1f))
-            Text(hint, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
+            if (hint.isNotEmpty()) Text(hint, style = KagomType.Caption14, color = KagomColor.Text.tertiary)
+        }
+        if (issues.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s12)) {
+            issues.forEach { issue ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(issue.label, style = KagomType.Body16, color = KagomColor.Text.primary, modifier = Modifier.weight(1f))
+                    val severity = issue.severity
+                    StatusBadge(severity, if (severity == Severity.URGENT) "긴급" else "점검 필요")
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(KagomColor.Border.divider))
         }
         if (oilRemaining != null) Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
             LabelValue("엔진오일 교체까지", oilRemaining)
             ProgressBar(oilRatio, Modifier.fillMaxWidth(), height = 6.dp)
         }
-        LabelValue("정기 점검(건강검진)", inspection)
-        IviButton("정비 시트 열기", onCta, enabled = ctaEnabled, type = IviButtonType.Secondary, size = IviButtonSize.Medium)
+        Column(verticalArrangement = Arrangement.spacedBy(KagomSpace.s8)) {
+            LabelValue("1만 km 셀프 체크", inspection)
+            ProgressBar(if (hasAlert) 1f else inspectionRatio, Modifier.fillMaxWidth(), height = 6.dp)
+        }
+        Box {
+            IviButton("정비 시트 열기", onCta, enabled = ctaEnabled, type = IviButtonType.Secondary, size = IviButtonSize.Medium)
+            if (!ctaEnabled) Box(
+                Modifier.matchParentSize().clickable(role = Role.Button, onClick = onBlockedCta),
+            )
+            if (hasAlert) Box(
+                Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).size(28.dp)
+                    .background(KagomColor.Severity.fg(Severity.URGENT), CircleShape)
+                    .border(2.dp, KagomColor.Surface.card, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("!", style = KagomType.Caption14Strong, color = KagomColor.Text.inverse)
+            }
+        }
     }
 }
 

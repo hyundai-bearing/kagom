@@ -57,12 +57,12 @@ class StateEngineTest {
         assertEquals(Expression.HUNGRY_3, r.expression)
         assertEquals("배터리 4%", r.badges.single().label)
         assertNull(r.oilChange)
-        assertTrue(r.rows[2].unavailable)
+        assertFalse(r.rows[2].unavailable)
     }
 
     // ── SEN-03 ~ 07 ──
 
-    @Test fun engineOilLowIsStainAndDismissHidesOnlyBadge() {
+    @Test fun engineOilLowRemainsVisibleUntilSensorRecovers() {
         val low = normal.copy(engineOil = OilLevel.LOW)
         val r = eval(low)
         assertEquals(Expression.STAIN, r.expression)
@@ -70,9 +70,9 @@ class StateEngineTest {
         assertTrue(r.engineOilAlert)
 
         val dismissed = eval(low, fresh.copy(engineOilDismissed = true))
-        assertTrue(dismissed.badges.isEmpty())
+        assertEquals(r.badges, dismissed.badges)
         assertEquals(Expression.STAIN, dismissed.expression)  // 표정은 유지
-        assertNull(dismissed.rows[2].badge)
+        assertEquals(Severity.RECOMMEND, dismissed.rows[2].badge)
     }
 
     @Test fun engineOilCriticalIsUrgentSick() {
@@ -81,10 +81,11 @@ class StateEngineTest {
         assertEquals(Severity.URGENT, r.badges.single().severity)
     }
 
-    @Test fun brakeFluidLowIsUrgentWithShopGuide() {
+    @Test fun brakeFluidLowNeedsInspectionWithExistingSickExpression() {
         val r = eval(normal.copy(brakeFluid = OilLevel.LOW))
         assertEquals(Expression.SICK, r.expression)
         assertEquals(StatusId.SEN_04, r.shopGuide?.id)
+        assertEquals(Severity.RECOMMEND, r.badges.single().severity)
         assertEquals("부족", r.rows[3].value)
     }
 
@@ -94,13 +95,44 @@ class StateEngineTest {
         assertEquals(Severity.RECOMMEND, r.badges.single().severity)
     }
 
-    @Test fun engineWarningIsUrgent() {
-        assertEquals(Expression.SICK, eval(normal.copy(engineWarning = true)).expression)
+    @Test fun legacyEngineWarningDoesNotCreateAlertsOrChangeExpression() {
+        val r = eval(normal.copy(engineWarning = true))
+        assertEquals(Expression.IDLE, r.expression)
+        assertTrue(r.badges.isEmpty())
+        assertNull(r.shopGuide)
     }
 
     @Test fun transmissionOilLevels() {
         assertEquals(Expression.STAIN, eval(normal.copy(transmissionOil = OilLevel.LOW)).expression)
         assertEquals(Expression.SICK, eval(normal.copy(transmissionOil = OilLevel.CRITICALLY_LOW)).expression)
+    }
+
+    @Test fun fluidAlertMatrixAndUnsupportedSignals() {
+        val signals = listOf(Signal.ENGINE_OIL, Signal.BRAKE_FLUID, Signal.TRANSMISSION_OIL)
+        signals.forEach { signal ->
+            (OilLevel.entries.toList() + listOf(null)).forEach { level ->
+                val snapshot = when (signal) {
+                    Signal.ENGINE_OIL -> normal.copy(engineOil = level)
+                    Signal.BRAKE_FLUID -> normal.copy(brakeFluid = level)
+                    else -> normal.copy(transmissionOil = level)
+                }
+                val expected = when {
+                    level == OilLevel.CRITICALLY_LOW -> Severity.URGENT
+                    level == OilLevel.LOW -> Severity.RECOMMEND
+                    level == OilLevel.HIGH && signal != Signal.BRAKE_FLUID -> Severity.RECOMMEND
+                    else -> null
+                }
+                assertEquals("$signal / $level", expected, eval(snapshot).badges.singleOrNull()?.severity)
+                assertTrue("Unsupported $signal / $level",
+                    eval(snapshot.copy(unsupported = normal.unsupported + signal)).badges.isEmpty())
+            }
+        }
+    }
+
+    @Test fun fluidAlertsUseCapabilitiesInsteadOfInferredEngineType() {
+        val r = eval(normal.copy(fuelPercent = null, socPercent = 72, unsupported = setOf(Signal.FUEL), engineOil = OilLevel.CRITICALLY_LOW,
+            brakeFluid = OilLevel.LOW, transmissionOil = OilLevel.HIGH))
+        assertEquals(setOf(StatusId.SEN_03, StatusId.SEN_04, StatusId.SEN_05), r.badges.map { it.id }.toSet())
     }
 
     @Test fun unsupportedSignalsShowUnavailableRows() {
@@ -123,7 +155,7 @@ class StateEngineTest {
 
     @Test fun badgesSortedBySeverityAndAllShown() {
         val r = eval(normal.copy(fuelPercent = 28, brakeFluid = OilLevel.LOW, washerLow = true))
-        assertEquals(listOf(Severity.URGENT, Severity.RECOMMEND, Severity.OBSERVE), r.badges.map { it.severity })
+        assertEquals(listOf(Severity.RECOMMEND, Severity.RECOMMEND, Severity.OBSERVE), r.badges.map { it.severity })
         assertEquals(Expression.SICK, r.expression)
     }
 
@@ -160,14 +192,27 @@ class StateEngineTest {
         assertTrue(due.due)
         assertEquals(1, due.round)
         assertEquals("10,000 km 도래", due.display)
-        val after = StateEngine.checkup(m.copy(checkupRoundsDone = 1, checkupDoneDay = today), 10_020f)
+        val after = StateEngine.checkup(m.copy(checkupRoundsDone = 1, checkupDoneDay = today, checkupDoneKm = 10_020f), 10_020f)
         assertFalse(after.due)
         assertEquals(2, after.round)
-        assertEquals("9,980 km 남음", after.display)
+        assertEquals("10,000 km 남음", after.display)
+        assertFalse(StateEngine.checkup(m.copy(checkupDoneKm = 10_020f), 20_019f).due)
+        assertTrue(StateEngine.checkup(m.copy(checkupDoneKm = 10_020f), 20_020f).due)
     }
 
     @Test fun checkupDoesNotBecomeDueByTimeAlone() {
         assertFalse(StateEngine.checkup(MaintenanceState(checkupDoneDay = today - 365), 500f).due)
+    }
+
+    @Test fun odometerRollbackNeverShowsMoreThanOneCheckupInterval() {
+        val previous = MaintenanceState(checkupRoundsDone = 3, checkupDoneKm = 37_200f)
+        val rebased = StateEngine.checkup(previous, 0f)
+        assertFalse(rebased.due)
+        assertEquals("10,000 km 남음", rebased.display)
+        val persisted = previous.copy(checkupDoneKm = 0f)
+        assertEquals("9,900 km 남음", StateEngine.checkup(persisted, 100f).display)
+        assertTrue(StateEngine.checkup(persisted, 10_000f).due)
+        assertEquals("10,000 km 남음", StateEngine.checkup(MaintenanceState(checkupRoundsDone = 3), 0f).display)
     }
 
     @Test fun checkupDueGivesTiredAndOdometerRowBadge() {
@@ -186,8 +231,11 @@ class StateEngineTest {
 
     @Test fun missedMilestonesCannotBeCompletedRepeatedly() {
         val due = StateEngine.checkup(MaintenanceState(), 35_000f)
-        assertEquals(3, due.round)
-        assertFalse(StateEngine.checkup(MaintenanceState(checkupRoundsDone = due.round), 35_000f).due)
+        assertEquals(1, due.round)
+        val done = MaintenanceState(checkupRoundsDone = due.round, checkupDoneKm = 35_000f)
+        assertFalse(StateEngine.checkup(done, 35_000f).due)
+        assertFalse(StateEngine.checkup(done, 44_999f).due)
+        assertTrue(StateEngine.checkup(done, 45_000f).due)
     }
 
     @Test fun completionRequiresDueDistanceAndCurrentEngineChecklist() {

@@ -138,9 +138,14 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         store.update { d ->
             var next = d
             val p = d.profile
+            val checkupBase = d.maintenance.checkupDoneKm
+                ?: (d.maintenance.checkupRoundsDone * Checkup.INTERVAL_KM).toFloat()
+            // 누적 거리가 되돌아갔을 때 한 번 기준을 저장해야 이후 주행분이 정상 차감된다.
+            if (odo != null && odo.isFinite() && odo >= 0f && odo < checkupBase)
+                next = next.copy(maintenance = next.maintenance.copy(checkupDoneKm = odo))
             if (p != null && p.baseOdoKm == null && odo != null) next = next.copy(profile = p.copy(baseOdoKm = odo))
             if (p != null && d.maintenance.oilChangedKm == null && odo != null)
-                next = next.copy(maintenance = next.maintenance.copy(oilChangedKm = odo, oilChangedDay = next.maintenance.oilChangedDay ?: today()))
+                next = next.copy(maintenance = next.maintenance.copy(oilChangedKm = odo))
             // [보충했어]로 숨긴 배지: 센서가 NORMAL로 돌아오면 다시 감시
             if (d.maintenance.engineOilDismissed && s.engineOil == OilLevel.NORMAL)
                 next = next.copy(maintenance = next.maintenance.copy(engineOilDismissed = false))
@@ -227,8 +232,7 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
         store.update {
             AppData(
                 profile = Profile(name, skin.code, answers.joinToString("") { a -> a.name }, today(), odo),
-                maintenance = it.maintenance.copy(oilChangedKm = it.maintenance.oilChangedKm ?: odo,
-                    oilChangedDay = it.maintenance.oilChangedDay ?: today()),
+                maintenance = it.maintenance.copy(oilChangedKm = it.maintenance.oilChangedKm ?: odo),
             )
         }
     }
@@ -313,7 +317,8 @@ class KagomController(context: Context, private val scope: CoroutineScope, useMo
             val snapshot = signals.snapshot.value
             val checkup = StateEngine.checkup(d.maintenance, snapshot.odometerKm)
             if (!Checkup.canComplete(checkup, snapshot.engineType, d.checkupChecks)) d
-            else d.copy(maintenance = d.maintenance.copy(checkupRoundsDone = checkup.round, checkupDoneDay = today()), checkupChecks = emptySet())
+            else d.copy(maintenance = d.maintenance.copy(checkupRoundsDone = checkup.round,
+                checkupDoneDay = today(), checkupDoneKm = snapshot.odometerKm), checkupChecks = emptySet())
         }
         checkQuests()
     }
