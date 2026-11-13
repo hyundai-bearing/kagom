@@ -607,6 +607,7 @@ fun MaintenanceSheet(
     onToggleCheck: (String) -> Unit,
     onCompleteCheckup: () -> Unit,
     onFindShop: () -> Unit,
+    today: Long = LocalDate.now().toEpochDay(),
 ) {
     val split = LocalLayoutMode.current == LayoutMode.SPLIT
     val slideIn = tween<IntOffset>(KagomMotion.SHEET, easing = FastOutSlowInEasing)
@@ -648,9 +649,9 @@ fun MaintenanceSheet(
                     MaintenanceSection {
                         Text("엔진오일 교체 시기", style = KagomType.Heading22, color = KagomColor.Text.primary)
                         val changedDay = data.maintenance.oilChangedDay
-                        val changedToday = changedDay == LocalDate.now().toEpochDay()
+                        val changedToday = changedDay == today
                         MaintenanceValueRow("최근 교체일", changedDay?.let { maintenanceDate(it) + if (changedToday) " (오늘)" else "" } ?: "기록 없음")
-                        MaintenanceValueRow("다음 교체까지", oilCalendarDisplay(changedDay))
+                        MaintenanceValueRow("다음 교체까지", oilCalendarDisplay(changedDay, today))
                         Text(if (changedDay == null) "오일을 교체한 날 버튼을 누르면 12개월(365일) 뒤 교체 시기를 알려드려요"
                             else "12개월(365일)마다 교체를 권장해요", style = KagomType.Caption14, color = KagomColor.Text.tertiary)
                         IviButton("오일 교체했어요", onOilChanged, type = IviButtonType.Primary, enabled = gearP && !changedToday)
@@ -692,14 +693,14 @@ private fun maintenanceDate(epochDay: Long): String =
     LocalDate.ofEpochDay(epochDay).format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
 
 /** 최신 POP-05는 교체 기록일부터 365일 기준이며 주행거리·운전 습관으로 기간을 줄이지 않는다. */
-internal fun oilCalendarDisplay(changedDay: Long?): String {
+internal fun oilCalendarDisplay(changedDay: Long?, today: Long): String {
     if (changedDay == null) return "기록 후 안내"
-    val remaining = 365 - (LocalDate.now().toEpochDay() - changedDay).coerceAtLeast(0)
+    val remaining = 365 - (today - changedDay).coerceAtLeast(0)
     return if (remaining <= 0) "교체 시기 지남" else "${remaining}일 남음"
 }
 
-internal fun oilCalendarRatio(changedDay: Long?): Float = changedDay?.let {
-    ((365 - (LocalDate.now().toEpochDay() - it).coerceAtLeast(0)) / 365f).coerceIn(0f, 1f)
+internal fun oilCalendarRatio(changedDay: Long?, today: Long): Float = changedDay?.let {
+    ((365 - (today - it).coerceAtLeast(0)) / 365f).coerceIn(0f, 1f)
 } ?: 0f
 
 @Composable
