@@ -103,7 +103,6 @@ fun DebugPanel(c: KagomController, gear: Gear, onClose: () -> Unit) {
                 OilButtons(o.transmissionOil, withHigh = false) { v -> c.signals.edit { it.copy(transmissionOil = v) } }
             }
             Group("경고") {
-                Btn("엔진 경고등", o.engineWarning == true) { c.signals.edit { it.copy(engineWarning = if (it.engineWarning == true) false else true) } }
                 Btn("워셔액 부족", o.washerLow == true) { c.signals.edit { it.copy(washerLow = if (it.washerLow == true) false else true) } }
             }
             val dayOffset by c.demoDayOffset.collectAsState()

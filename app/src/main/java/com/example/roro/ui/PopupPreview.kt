@@ -45,7 +45,7 @@ fun PopupPreview(kind: String, gearP: Boolean, onClose: () -> Unit) {
     var completed by rememberSaveable(kind) { mutableStateOf(kind == "maintenance-done") }
     val maintenance = MaintenanceState(severe = severe, recommendedOil = recommended,
         checkupRoundsDone = if (completed) 1 else 0,
-        oilChangedKm = if (oilChanged) 7_840f else 0f, oilChangedDay = day, engineOilDismissed = refilled)
+        oilChangedKm = if (oilChanged) 7_840f else 0f, oilChangedDay = if (oilChanged) day else day - 90, engineOilDismissed = refilled)
     val data = AppData(profile = profile, exp = 120, maintenance = maintenance,
         checkupChecks = checks.toSet(), owned = Items.all.map { it.id }.toSet())
     val status = StateEngine.evaluate(VehicleSnapshot(fuelPercent = if (kind == "maintenance-ev") null else 72,
@@ -54,7 +54,11 @@ fun PopupPreview(kind: String, gearP: Boolean, onClose: () -> Unit) {
     // 진행 중 주행 전환은 샘플을 소비하지 않고 보이지 않게만 한다.
     BackHandler { if (sheetOpen) sheetOpen = false }
     Box(Modifier.fillMaxSize().background(KagomColor.Surface.page)) {
-        HomeScreen(profile, data, status.copy(expression = Expression.IDLE), gearP) { sheetOpen = true }
+        HomeScreen(
+            profile, data, status.copy(expression = Expression.IDLE), gearP,
+            onOpenSheet = { sheetOpen = true },
+            onBlockedSheet = {},
+        )
         if (gearP) {
             MaintenanceSheet(sheetOpen, status, data, true, { sheetOpen = false }, { refilled = true },
                 { oilChanged = true }, { severe = it }, { recommended = it },
