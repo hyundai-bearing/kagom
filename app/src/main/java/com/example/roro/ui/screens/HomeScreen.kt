@@ -147,13 +147,17 @@ fun HomeScreen(
                 header(Modifier)
                 // 2026-11-13 요청: 캐릭터를 머리에서 조금 떨어뜨려 내린다 (전에는 20)
                 Spacer(Modifier.height(56.dp))
-                character(Modifier.size(360.dp, 560.dp))
-                if (hasClosetTitlePlate(data.equipped.title)) {
-                    Spacer(Modifier.height(16.dp))
-                    ClosetTitlePlate(data.equipped.title!!, profile.skin, Modifier.width(320.dp))
-                    Spacer(Modifier.height(24.dp))
-                } else Spacer(Modifier.height(20.dp))
-                badges(Modifier.width(1000.dp))
+                // 2026-11-13 요청: 캐릭터가 바닷가 배경(BG-03)의 물가가 아니라 모래사장 위에 서게 머리 아래 묶음만 더 내린다.
+                // offset이라 머리 자리는 그대로다. 배경은 아래에 붙여 그리므로 물가 높이는 화면 아래에서 일정하다
+                Column(Modifier.offset(y = 120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    character(Modifier.size(360.dp, 560.dp))
+                    if (hasClosetTitlePlate(data.equipped.title)) {
+                        Spacer(Modifier.height(16.dp))
+                        ClosetTitlePlate(data.equipped.title!!, profile.skin, Modifier.width(320.dp))
+                        Spacer(Modifier.height(24.dp))
+                    } else Spacer(Modifier.height(20.dp))
+                    badges(Modifier.width(1000.dp))
+                }
             }
         }
         // vehicleStatusPanel (35%, 640 고정)
