@@ -8,6 +8,13 @@
 
 > 앱 이름은 **bearing**, 캐릭터 이름은 **카곰**이다. 코드와 레포, 런처 아이콘에는 `Kagom`/"카곰"으로 적혀 있다.
 
+| | |
+|---|---|
+| 소개 영상 | [YouTube Shorts](https://www.youtube.com/shorts/sqZ5sKNHyh0) |
+| APK | [GitHub Release v2.0](https://github.com/hyundai-bearing/kagom/releases/tag/v2.0)의 `베어링_bearing_release.apk` |
+| 테스트 환경 | Pleos Connect 에뮬레이터 v2.1.0, 2560×1440 ([자세히](#테스트-환경)) |
+| 사용 SDK | Pleos Playground Vehicle 2.3.2, FusedLocation 1.1.3 ([자세히](#pleos-sdk-사용)) |
+
 ## 주요 기능
 
 ### 1. 달린 만큼 자라는 카곰
@@ -66,7 +73,20 @@
 
 항목마다 지원 여부를 먼저 확인한 뒤 현재 값을 읽고 변경을 구독한다. 권한은 `CAR_ENERGY`, `CAR_SAFETY`, `CAR_DRIVE`, `FUSED_LOCATION`을 쓴다. SDK 호출은 `data/`에만 있고, 판정 규칙(`core/`)은 SDK를 모른다. 그래서 실제 신호와 시연 입력이 같은 규칙을 거친다.
 
-## 실행
+## 실행 방법
+
+### APK로 바로 실행
+
+release APK는 용량(약 114 MB)이 GitHub의 파일 크기 제한을 넘어 레포의 `apk/` 폴더 대신 [GitHub Release v2.0](https://github.com/hyundai-bearing/kagom/releases/tag/v2.0)에 올렸다.
+
+```powershell
+adb install -r 베어링_bearing_release.apk
+adb shell am start -n com.example.roro/.MainActivity
+```
+
+release 빌드는 Pleos SDK 신호만 읽는다. 아래 "차 없이 시연하기"의 시연 패널과 adb 명령은 디버그 빌드에만 있다.
+
+### 소스에서 빌드
 
 ```powershell
 git clone https://github.com/hyundai-bearing/kagom.git
@@ -78,7 +98,26 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 - Android SDK 경로는 Android Studio로 한 번 열면 `local.properties`에 생긴다.
 - Pleos SDK는 `nexus-playground.pleos.ai`에서 받는다. 사내망·VPN에서 막히면 첫 빌드가 실패한다.
-- Pleos Connect 에뮬레이터(Full)와 세로 폰 에뮬레이터(Split)에서 확인했다.
+- release APK는 `.\gradlew.bat :app:assembleRelease`로 만든다 (`app\build\outputs\apk\release\app-release.apk`).
+
+### 테스트 환경
+
+| 항목 | 값 |
+|---|---|
+| 에뮬레이터 | Pleos Connect 에뮬레이터 v2.1.0 (AVD `Pleos_Connect_v2.1.0`) |
+| 화면 규격 | 디스플레이 2560×1440. 앱 창은 Full 1682×1210, Split 841×1210 |
+| Android | minSdk 28, targetSdk 35, compileSdk 37 |
+| 빌드 도구 | Gradle 9.6.0, Android Gradle Plugin 9.5.0, JDK 17 (Android Studio의 `jbr`) |
+| Pleos SDK | Vehicle 2.3.2, FusedLocation 1.1.3 |
+
+필요한 설정:
+
+- **위치 권한**: 처음 실행할 때 묻는다. 랜드마크 방문 판정에 쓰고, 거절해도 나머지 기능은 동작한다.
+- **차량 신호**: 에뮬레이터의 Pleos Virtual Console로 바꾼다 (`adb forward tcp:8088 tcp:8088` 뒤 `http://localhost:8088`). 에뮬레이터가 지원하지 않는 항목은 화면에서 숨기거나 "확인 불가"로 보인다.
+- **인터넷**: 홈 배경 "오늘 날씨"에만 쓴다. 없으면 기본 배경 그림으로 보인다.
+- 로그인이나 별도 서버는 필요 없다. 기록은 기기 안에만 저장한다.
+
+실제 차량에서는 확인하지 못했고, 에뮬레이터에서만 확인했다. 기능별 Full·Split 화면 기록은 [docs/verification](docs/verification)에 있다.
 
 ### 차 없이 시연하기
 
@@ -119,6 +158,17 @@ docs/       요구사항, 구현 노트, 화면 검증 기록
 
 - Kotlin + Jetpack Compose, 모듈 하나(`app`), minSdk 28.
 - `core/`는 `android.*`를 쓰지 않아 JVM 단위 테스트로 검증한다. 테스트는 60개다.
+- 설계 결정과 가정은 [구현 노트](docs/IMPLEMENTATION.md), 요구사항은 [docs/requirements.md](docs/requirements.md)에 있다.
+
+코드에서 볼 곳 (`app/src/main/java/com/example/roro/` 아래):
+
+| 보고 싶은 것 | 파일 |
+|---|---|
+| Pleos Vehicle SDK 연동 (지원 확인 → 조회 → 구독) | `data/PleosVehicleSignalSource.kt` |
+| FusedLocation SDK 연동 | `data/LocationSource.kt` |
+| 주행 중 판정 (기어, `CarUxRestrictionsManager`) | `data/DrivingStateSource.kt`, `ui/KagomController.kt` |
+| 차량 상태 → 카곰 표정·배지 | `core/StateEngine.kt` |
+| 도전과제, 경험치·레벨, 랜드마크 방문 판정 | `core/Progress.kt`, `core/MasterData.kt` |
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest
@@ -135,9 +185,6 @@ docs/       요구사항, 구현 노트, 화면 검증 기록
 | 차량 교체 후 이어가기 | 시연 명령으로 재현 | Pleos ID 기반 동기화 |
 | 음성 | 없음 | TextToSpeech, SpeechToText로 방문 기록 묻고 답하기 |
 
-## 더 보기
+## 출처와 라이선스
 
-- [구현 노트](docs/IMPLEMENTATION.md): 구조, 디자인에 없어 정한 값, 지도·3D 렌더 파이프라인, 시연 방법
-- [요구사항](docs/requirements.md): 기능·비기능 요구사항과 결정 사항
-- [화면 검증 기록](docs/verification): 기능별 Full·Split 화면 캡처
-- [외부 자료 출처와 라이선스](THIRD_PARTY_NOTICES.md): 라이브러리, 글꼴(Asta Sans), 지도 데이터(© OpenStreetMap contributors), 날씨(MET Norway)
+외부 라이브러리, 글꼴(Asta Sans), 지도 데이터(© OpenStreetMap contributors), 날씨(MET Norway)의 출처와 라이선스는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있다.
