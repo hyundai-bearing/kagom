@@ -38,7 +38,7 @@
 
 ### 5. 차를 바꿔도 이어지는 기록
 
-새 차에서 이전 카곰의 기록을 발견하면 "계속 함께하기"로 주행거리·경험치·옷·칭호·방문 기록을 이어받는다. 지금은 시연 명령으로 이 상황을 재현하고, Pleos ID 연동은 후속 계획이다([구현 범위](#구현-범위)).
+새 차에서 이전 카곰의 기록을 발견하면 "계속 함께하기"로 주행거리·경험치·옷·칭호·방문 기록을 이어받는다. 지금은 시연 명령으로 이 상황을 재현하고, Pleos ID 연동은 후속 계획이다([개발 현황과 계획](#개발-현황과-계획)).
 
 ## 차량에 맞춘 설계
 
@@ -113,8 +113,8 @@ app/src/main/java/com/example/roro/
 app/src/main/assets/
   kagom/    캐릭터·옷 3D 렌더 (tools/closet3d/build_closet.py가 Blender로 만든다)
   regions/  지도 데이터 (tools/regions/*.py가 만든다)
-tools/      렌더·지도·측정 도구
-docs/       요구사항, 구현 노트, 디자인 자료, 화면 검증 기록
+tools/      렌더·지도 도구
+docs/       요구사항, 구현 노트, 화면 검증 기록
 ```
 
 - Kotlin + Jetpack Compose, 모듈 하나(`app`), minSdk 28.
@@ -124,7 +124,7 @@ docs/       요구사항, 구현 노트, 디자인 자료, 화면 검증 기록
 .\gradlew.bat :app:testDebugUnitTest
 ```
 
-## 구현 범위
+## 개발 현황과 계획
 
 | 기능 | 지금 | 다음 |
 |---|---|---|
@@ -135,33 +135,9 @@ docs/       요구사항, 구현 노트, 디자인 자료, 화면 검증 기록
 | 차량 교체 후 이어가기 | 시연 명령으로 재현 | Pleos ID 기반 동기화 |
 | 음성 | 없음 | TextToSpeech, SpeechToText로 방문 기록 묻고 답하기 |
 
-패키지명은 아직 `com.example.roro`이고, 정식 서명 키가 없으면 release도 디버그 키로 서명된다. 앱마켓에 올리기 전에 둘 다 바꾼다.
+## 더 보기
 
-## 문서
-
-| 문서 | 내용 |
-|---|---|
-| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | 구현 노트: 구조, 디자인에 없던 값(가정), 지도·렌더 파이프라인, 시연, 검증 |
-| [docs/requirements.md](docs/requirements.md) | 요구사항(FR/NFR)과 결정 사항. "현재 데모" 열은 11/5 기준이다 |
-| [docs/verification/](docs/verification) | 기능별 Full·Split 화면 검증 기록 |
-| [docs/PR_AND_DEPLOY.md](docs/PR_AND_DEPLOY.md) | 브랜치·PR·리뷰·머지·APK 배포 절차 |
-| [docs/design/README.md](docs/design/README.md) | 디자인 자료 버전과 받는 법 |
-| [docs/FIGMA_BRIDGE.md](docs/FIGMA_BRIDGE.md) | AI 도구가 Figma 파일을 직접 읽게 연결하는 법 |
-| [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 내역 |
-| [CLAUDE.md](CLAUDE.md) | AI로 코드를 쓸 때의 규칙 (다른 도구는 [AGENTS.md](AGENTS.md)를 거쳐 같은 파일) |
-
-## 개발 규칙
-
-자세한 내용은 [docs/PR_AND_DEPLOY.md](docs/PR_AND_DEPLOY.md) 6·7장.
-
-- `main`에 직접 push하지 않는다. 모든 변경은 PR로, 승인 1명 뒤 merge commit으로 합친다.
-- release 빌드는 R8로 줄인다. Pleos SDK의 keep 규칙이 빠지면 모든 신호가 "확인 불가"가 되니, 배포 전에 release APK를 설치해서 확인한다.
-- `assets/kagom`, `assets/regions`는 생성 파일이다. 손으로 고치지 않고 스크립트를 고쳐 다시 만든다.
-
-## 라이선스와 출처
-
-외부 라이브러리, 글꼴, 지도 데이터, 날씨 API의 라이선스는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있다. 지도 화면의 "© OpenStreetMap contributors" 표시는 지우지 않는다.
-
-## 이력
-
-이 레포는 시험 레포 `hyundai-bearing/bearing-test`의 `main`(df0333c, PR #1~#11)을 커밋 기록 없이 옮겨 시작했다. 그 전의 커밋·PR·리뷰 기록은 bearing-test에서 본다. bearing-test의 PR 번호는 이 레포의 PR 번호와 다르다.
+- [구현 노트](docs/IMPLEMENTATION.md): 구조, 디자인에 없어 정한 값, 지도·3D 렌더 파이프라인, 시연 방법
+- [요구사항](docs/requirements.md): 기능·비기능 요구사항과 결정 사항
+- [화면 검증 기록](docs/verification): 기능별 Full·Split 화면 캡처
+- [외부 자료 출처와 라이선스](THIRD_PARTY_NOTICES.md): 라이브러리, 글꼴(Asta Sans), 지도 데이터(© OpenStreetMap contributors), 날씨(MET Norway)
