@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | 소개 영상 | [YouTube Shorts](https://www.youtube.com/shorts/sqZ5sKNHyh0) |
-| APK | [GitHub Release v2.0](https://github.com/hyundai-bearing/kagom/releases/tag/v2.0)의 `베어링_bearing_release.apk` |
+| APK | [GitHub Release v2.0](https://github.com/hyundai-bearing/kagom/releases/tag/v2.0)의 `bearing_bearing_release.apk` (화면에는 "베어링_bearing_release.apk"로 보인다) |
 | 테스트 환경 | Pleos Connect 에뮬레이터 v2.1.0, 2560×1440 ([자세히](#테스트-환경)) |
 | 사용 SDK | Pleos Playground Vehicle 2.3.2, FusedLocation 1.1.3 ([자세히](#pleos-sdk-사용)) |
 
@@ -80,7 +80,7 @@
 release APK는 용량(약 114 MB)이 GitHub의 파일 크기 제한을 넘어 레포의 `apk/` 폴더 대신 [GitHub Release v2.0](https://github.com/hyundai-bearing/kagom/releases/tag/v2.0)에 올렸다.
 
 ```powershell
-adb install -r 베어링_bearing_release.apk
+adb install -r bearing_bearing_release.apk
 adb shell am start -n com.example.roro/.MainActivity
 ```
 
